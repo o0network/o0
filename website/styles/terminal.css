@@ -24,7 +24,7 @@ body {
     rgba(191, 117, 0, 0.75), black 120%
   );
   background-size: cover;
-  height: 600px;
+  height: 400px;
   position: relative; 
   padding: var(--border-width);
   overflow: visible;
@@ -32,7 +32,7 @@ body {
   &::after {
     content: '';
     position: absolute;
-    inset: -40px;
+    inset: -25px;
     border-image: url('/assets/terminal-frame.png') 93 92 87 92 stretch stretch;
     border-style: inset;
     border-width: var(--border-width);
@@ -51,7 +51,6 @@ body {
 }
 
 #terminal-container output {
-  color: #ffa600;
   display: block;
   transform-style: preserve-3d;
   clip-path: inset(0 20px 0 0);
