@@ -10,7 +10,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
   // Much subtler parameters
   const maxDepth = 15; // Reduced depth
-  const horizontalPadding = 25;
+  const horizontalPadding = 35;
   const verticalPadding = 30;
   const curvatureIntensity = 0.3; // Reduced from 0.8 to 0.3 for less curve
 

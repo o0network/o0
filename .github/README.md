@@ -2,7 +2,7 @@
   <img width="20%" src="/.github/assets/logo/ios-dark.svg#gh-dark-mode-only">
   <img width="20%" src="/.github/assets/logo/ios-light.svg#gh-light-mode-only">
   <br />
-  <img width=20% src="/.github/assets/logo/title-ios-dark.svg#gh-dark-mode-only">
+  <img width="20%" src="/.github/assets/logo/title-ios-dark.svg#gh-dark-mode-only">
   <img width="20%" src="/.github/assets/logo/title-ios-light.svg#gh-light-mode-only">
   </picture>
 </div>

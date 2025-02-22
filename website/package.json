@@ -25,6 +25,7 @@
   "dependencies": {
     "gl-matrix": "^3.4.3",
     "onecolor": "^4.1.0",
-    "regl": "^2.1.1"
+    "regl": "^2.1.1",
+    "three": "^0.172.0"
   }
 }
