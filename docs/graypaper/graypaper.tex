@@ -1,0 +1,66 @@
+% File: graypaper.tex
+
+\documentclass[12pt]{article}
+
+% Packages
+\usepackage{geometry} % Page layout
+\usepackage{graphicx} % Include graphics
+\usepackage{amsmath} % Math symbols
+\usepackage{amssymb} % More math symbols
+\usepackage{cite} % Citation management
+\usepackage{hyperref} % Hyperlinks
+\usepackage{setspace} % Line spacing
+\usepackage{fancyhdr} % Header and footer
+\usepackage{listings} % Code listings
+
+% Page layout
+\geometry{a4paper, margin=1in}
+\setstretch{1.5} % 1.5 line spacing
+
+% Header and footer
+\pagestyle{fancy}
+\fancyhf{}
+\fancyhead[L]{Your Title Here}
+\fancyhead[R]{\thepage}
+
+\begin{document}
+
+% Title
+\title{Your Title Here}
+\author{Your Name \\ Your Institution}
+\date{\today}
+\maketitle
+
+% Abstract
+\begin{abstract}
+  This is the abstract of the paper. It summarizes the main findings and contributions of the research.
+\end{abstract}
+
+% Keywords
+\textbf{Keywords:} keyword1, keyword2, keyword3
+
+% Introduction
+\section{Introduction}
+The introduction provides background information and outlines the objectives of the research.
+
+% Methodology
+\section{Methodology}
+This section describes the methods and procedures used in the research.
+
+% Results
+\section{Results}
+Here, the results of the research are presented, often with tables and figures.
+
+% Discussion
+\section{Discussion}
+The discussion interprets the results, explaining their significance and implications.
+
+% Conclusion
+\section{Conclusion}
+The conclusion summarizes the main points and suggests future research directions.
+
+% References
+\bibliographystyle{plain}
+\bibliography{bibliography}
+
+\end{document}

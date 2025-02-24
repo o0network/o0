@@ -1,0 +1,52 @@
+name: LaTeX Graypaper
+
+on:
+  push:
+    paths:
+      - docs/graypaper/**
+  workflow_dispatch:
+
+permissions:
+  pages: write
+  contents: write
+  id-token: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: Restore LaTeX Image Cache if it exists
+        id: cache-docker-latex
+        uses: actions/cache@v3
+        with:
+          path: ci/cache/docker/latex
+          key: cache-docker-latex
+
+      - name: Update LaTeX Image Cache if cache miss
+        if: steps.cache-docker-latex.outputs.cache-hit != 'true'
+        run: |
+          docker pull 2109199812/docker-latex && mkdir -p ci/cache/docker/latex && docker image save 2109199812/docker-latex --output ./ci/cache/docker/latex/latex-image.tar
+
+      - name: Use LaTeX Image Cache if cache hit
+        if: steps.cache-docker-latex.outputs.cache-hit == 'true'
+        run: docker image load --input ./ci/cache/docker/latex/latex-image.tar
+
+      - name: Compile Diploma
+        shell: bash
+        run: |
+          docker run --rm -i -v ./docs/graypaper:/diplom:Z 2109199812/docker-latex bash -c "make clean && make diploma.pdf && make graypaper.pdf"
+
+      - name: Prepare release artifacts
+        run: |
+          mkdir -p gh-pages
+          mv ./docs/graypaper/diploma.pdf gh-pages/diploma.pdf
+          mv ./docs/graypaper/graypaper.pdf gh-pages/graypaper.pdf
+
+      - name: Deploy to GitHub Pages
+        uses: peaceiris/actions-gh-pages@v3
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_dir: gh-pages
+          keep_files: true
