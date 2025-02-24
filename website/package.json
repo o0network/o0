@@ -8,9 +8,9 @@
     "build": "vite build",
     "preview": "vite preview"
   },
-  "repository": "https://github.com/desertapp/desert",
-  "homepage": "https://desertapp.github.io/desert",
-  "author": "Desert",
+  "repository": "https://github.com/desertapp/desertapp.github.io",
+  "homepage": "https://desertapp.github.io",
+  "author": "wtf403",
   "license": "Apache-2.0",
   "devDependencies": {
     "postcss": "^8.4.35",
