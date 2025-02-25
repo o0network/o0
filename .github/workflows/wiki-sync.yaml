@@ -1,4 +1,4 @@
-name: Wiki sync
+name: wiki-sync.yaml
 
 on:
   push:

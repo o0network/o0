@@ -1,4 +1,5 @@
-name: Auto Assign
+name: auto-assign.yaml
+
 on:
   issues:
     types: [opened]
