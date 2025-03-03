@@ -1,0 +1,36 @@
+@startuml
+skinparam monochrome true
+
+actor "Авторы идей" as IdeaAuthors
+actor "Инвесторы" as Investors
+actor "Эксперты (AI)" as AIExperts
+
+usecase "Представление идеи" as UC_SubmitIdea
+usecase "Анализ и оценка проекта" as UC_EvaluateProject
+usecase "Распределение инвестиций" as UC_AllocateFunds
+usecase "Предоставление обратной связи" as UC_ProvideFeedback
+usecase "Корректировка оценки" as UC_OverrideDecision
+
+IdeaAuthors --> UC_SubmitIdea : подают проекты
+UC_SubmitIdea --> UC_EvaluateProject : инициируют оценку
+
+AIExperts --> UC_EvaluateProject : проводят анализ
+
+UC_EvaluateProject --> UC_AllocateFunds : определяют финансирование
+Investors --> UC_AllocateFunds : инвестируют средства
+
+Investors --> UC_ProvideFeedback : дают обратную связь
+UC_ProvideFeedback --> UC_OverrideDecision : направляют корректировку
+AIExperts --> UC_OverrideDecision : корректируют оценку
+
+note right of UC_EvaluateProject
+  AI как двигатель:
+  глубокий анализ данных и выдача рекомендаций
+end note
+
+note right of UC_ProvideFeedback
+  Инвесторы как руль:
+  направляют стратегию через обратную связь
+end note
+
+@enduml

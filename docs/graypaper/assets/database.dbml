@@ -1,0 +1,61 @@
+// Users Table: Stores creators (authors) and investors (angels/emerging entrepreneurs)
+Table users {
+  id int [pk]
+  username varchar [unique]
+  role enum('author', 'angel', 'expert', 'community') [default: 'community']
+  email varchar
+  created_at timestamp
+}
+
+// Ideas Table: Stores locally encrypted startup ideas until tokenization
+Table ideas {
+  id int [pk]
+  author_id int [ref: > users.id]
+  title varchar
+  description text [note: 'Encrypted locally for IP protection']
+  industry varchar
+  stage enum('idea', 'mvp', 'scaling')
+  created_at timestamp
+  metadata_hash varchar [note: 'Hash for blockchain verification post-tokenization']
+}
+
+// Evaluations Table: Stores AI and human evaluations for blind investment
+Table evaluations {
+  id int [pk]
+  idea_id int [ref: > ideas.id]
+  ai_score decimal [note: 'AI-generated score (0-1)']
+  human_score decimal [note: 'Expert/community-adjusted score (0-1)']
+  expert_id int [ref: > users.id]
+  comments text
+  evaluated_at timestamp
+}
+
+// Contributions Table: Tracks local contributions before blockchain tokenization
+Table contributions {
+  id int [pk]
+  user_id int [ref: > users.id]
+  idea_id int [ref: > ideas.id]
+  amount decimal [note: 'Local contribution amount in fiat or crypto']
+  timestamp timestamp
+}
+
+// Tokens Table: Manages local token data before on-chain tokenization
+Table tokens {
+  id int [pk]
+  idea_id int [ref: > ideas.id]
+  supply decimal [note: 'Initial token supply for idea']
+  price decimal [note: 'Price calculated via ABC']
+  reserve decimal [note: 'Reserve pool for idea funding']
+  vesting_period int [note: 'Days tokens are locked (e.g., 180)']
+  tribute_percent decimal [note: 'Percentage for reserve pool (e.g., 10%)']
+  created_at timestamp
+}
+
+// Invites Table: Manages community and exclusivity (invite system)
+Table invites {
+  id int [pk]
+  sender_id int [ref: > users.id]
+  receiver_email varchar
+  status enum('pending', 'accepted', 'rejected') [default: 'pending']
+  sent_at timestamp
+}
