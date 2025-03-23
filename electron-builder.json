@@ -1,0 +1,10 @@
+{
+  "files": ["dist/**/*", "dist-electron/**/*"],
+  "extraResources": [
+    {
+      "from": "resources/extension",
+      "to": "extension",
+      "filter": ["**/*"]
+    }
+  ]
+}

@@ -9,8 +9,8 @@ const { exec, spawn } = require("child_process");
 const path = require("path");
 const WindowTracker = require("bindings")("window_tracker").WindowTracker;
 const windowTracker = new WindowTracker();
+const { launchChromeWindow } = require("../electron/main");
 
-// Set the app to be an agent app (UI Element)
 app.dock.hide();
 
 let urlBarWindow = null;
@@ -19,7 +19,7 @@ let isOurWindow = false;
 let trackingInterval = null;
 let currentPosition = { x: 0, y: 0 };
 let targetPosition = { x: 0, y: 0 };
-const SMOOTHING_FACTOR = 0.3; // Adjust this value between 0 and 1 (higher = faster)
+const SMOOTHING_FACTOR = 0.3;
 
 function lerp(start, end, factor) {
   return start + (end - start) * factor;
@@ -47,32 +47,9 @@ function createUrlBar() {
 
   urlBarWindow.loadFile("urlbar.html");
 
-  // Initialize position
   const bounds = urlBarWindow.getBounds();
   currentPosition = { x: bounds.x, y: bounds.y };
   targetPosition = { x: bounds.x, y: bounds.y };
-}
-
-function launchChromeWindow(url = "https://google.com") {
-  const chrome = spawn(
-    "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome",
-    [
-      `--app=${url}`,
-      "--user-data-dir=" + path.join(app.getPath("userData"), "chrome-profile"),
-      "--no-first-run",
-      "--silent-launch",
-    ],
-    {
-      env: {
-        ...process.env,
-        CHROME_BUNDLE_ID: "com.wtf403.o0",
-        LSUIElement: "1",
-      },
-      stdio: "pipe",
-    }
-  );
-
-  return chrome;
 }
 
 function openInChrome(url) {

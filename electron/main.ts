@@ -10,18 +10,16 @@ const __dirname = path.dirname(__filename);
 const WindowTracker = bindings('window_tracker').WindowTracker;
 const windowTracker = new WindowTracker();
 
-// Set the app to be an agent app (UI Element)
 app.dock.hide();
 
-process.env.APP_ROOT = path.join(__dirname, '..');
+process.env.APP_ROOT = path.join(__dirname, "..");
 
-// 🚧 Use ['ENV_NAME'] avoid vite:define plugin - Vite@2.x
-export const VITE_DEV_SERVER_URL = process.env['VITE_DEV_SERVER_URL'];
-export const MAIN_DIST = path.join(process.env.APP_ROOT, 'dist-electron');
-export const RENDERER_DIST = path.join(process.env.APP_ROOT, 'dist');
+export const VITE_DEV_SERVER_URL = process.env["VITE_DEV_SERVER_URL"];
+export const MAIN_DIST = path.join(process.env.APP_ROOT, "dist-electron");
+export const RENDERER_DIST = path.join(process.env.APP_ROOT, "dist");
 
 process.env.VITE_PUBLIC = VITE_DEV_SERVER_URL
-  ? path.join(process.env.APP_ROOT, 'public')
+  ? path.join(process.env.APP_ROOT, "public")
   : RENDERER_DIST;
 
 let win: BrowserWindow | null = null;
@@ -46,26 +44,22 @@ function createWindow() {
     alwaysOnTop: true,
     show: false,
     webPreferences: {
-      preload: path.join(__dirname, 'preload.js'),
+      preload: path.join(__dirname, "preload.js"),
       nodeIntegration: false,
       contextIsolation: true,
     },
-    backgroundColor: '#00000000',
+    backgroundColor: "#00000000",
     skipTaskbar: true,
     focusable: true,
     hasShadow: false,
     roundedCorners: true,
-    visualEffectState: 'active',
-    vibrancy: 'window'
+    visualEffectState: "active",
+    vibrancy: "window",
   });
 
-  // Set window position to center of primary display initially
   const primaryDisplay = screen.getPrimaryDisplay();
   const { width, height } = primaryDisplay.workAreaSize;
-  win.setPosition(
-    Math.floor(width / 2 - 300),
-    Math.floor(height / 2 - 30)
-  );
+  win.setPosition(Math.floor(width / 2 - 300), Math.floor(height / 2 - 30));
 
   const bounds = win.getBounds();
   currentPosition = { x: bounds.x, y: bounds.y };
@@ -74,38 +68,38 @@ function createWindow() {
   if (VITE_DEV_SERVER_URL) {
     win.loadURL(VITE_DEV_SERVER_URL);
   } else {
-    win.loadFile(path.join(RENDERER_DIST, 'index.html'));
+    win.loadFile(path.join(RENDERER_DIST, "index.html"));
   }
 
   // Handle Esc key
-  win.webContents.on('before-input-event', (event, input) => {
-    if (input.key === 'Escape') {
+  win.webContents.on("before-input-event", (event, input) => {
+    if (input.key === "Escape") {
       win?.hide();
     }
   });
 
   // Handle focus event
-  win.on('focus', () => {
+  win.on("focus", () => {
     win?.webContents.focus();
   });
 }
 
-function launchChromeWindow(url = 'https://google.com') {
+export function launchChromeWindow(url = "https://google.com") {
+  // Get the extension path from the app's resources
+  const extensionPath = app.isPackaged
+    ? path.join(process.resourcesPath, "extension")
+    : path.join(process.env.APP_ROOT || "", "extension");
+
   const chrome = spawn(
-    '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome',
-    [
-      `--app=${url}`,
-      '--user-data-dir=' + path.join(app.getPath('userData'), 'chrome-profile'),
-      '--no-first-run',
-      '--silent-launch',
-    ],
+    "/Applications/o0.app/Contents/MacOS/Google\ Chrome",
+    [`--load-extension=${extensionPath}`, "--no-first-run", "--silent-launch"],
     {
       env: {
         ...process.env,
-        CHROME_BUNDLE_ID: 'com.wtf403.o0',
-        LSUIElement: '1',
+        CHROME_BUNDLE_ID: "com.wtf403.o0",
+        LSUIElement: "1",
       },
-      stdio: 'pipe',
+      stdio: "pipe",
     }
   );
 
