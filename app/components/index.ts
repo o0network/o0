@@ -2,9 +2,7 @@ export * from "./Switch";
 export * from "./Card";
 export * from "./Gallery";
 export * from "./TextField";
-export * from "./SearchField";
-export * from "./SecureField";
-export * from "./Button"; // Exporting FigmaButton
+export * from "./Button";
 export * from "./List";
 export * from "./Navigation";
 export * from "./Toggle";

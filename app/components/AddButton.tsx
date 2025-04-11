@@ -4,7 +4,7 @@ import { View, Text, StyleSheet } from "react-native";
 export const AddButton = () => {
   return (
     <View style={styles.container}>
-      <Text>AddButton Component</Text>
+      <Text>AddButton</Text>
     </View>
   );
 };
@@ -19,5 +19,6 @@ const styles = StyleSheet.create({
     borderRadius: 10,
     width: 70, // Different size
     alignItems: "center",
+    justifyContent: "center", // Center text
   },
 });

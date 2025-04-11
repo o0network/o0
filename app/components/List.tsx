@@ -80,7 +80,7 @@ const ListItem: React.FC<
   return <View style={containerStyles}>{content}</View>;
 };
 
-const List: React.FC<ListProps> = ({ items }) => {
+export const List: React.FC<ListProps> = ({ items }) => {
   return (
     <View style={styles.listContainer}>
       {items.map((item, index) => (
@@ -94,5 +94,3 @@ const List: React.FC<ListProps> = ({ items }) => {
     </View>
   );
 };
-
-export default List;

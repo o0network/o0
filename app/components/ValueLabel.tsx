@@ -24,12 +24,10 @@ interface ValueLabelProps {
   value: string;
 }
 
-const ValueLabel: React.FC<ValueLabelProps> = ({ value }) => {
+export const ValueLabel: React.FC<ValueLabelProps> = ({ value }) => {
   return (
     <View style={styles.container}>
       <Text style={styles.text}>{value}</Text>
     </View>
   );
 };
-
-export default ValueLabel;

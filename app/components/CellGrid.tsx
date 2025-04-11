@@ -15,5 +15,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: "gray",
     marginVertical: 5,
+    alignSelf: "stretch",
+    minHeight: 100, // Give it some height
   },
 });

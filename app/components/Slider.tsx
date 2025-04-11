@@ -15,5 +15,6 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: "gray",
     marginVertical: 5,
+    alignSelf: "stretch", // Make slider take width
   },
 });

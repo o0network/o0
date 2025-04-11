@@ -2,7 +2,7 @@ import React from "react";
 import { View, Text, StyleSheet, ScrollView } from "react-native";
 
 // Figma Node: 2658:1359 (Gallery Component)
-const Gallery = () => {
+export const Gallery = () => {
   // Sample data structure based on Figma items
   const items = [
     {
@@ -139,5 +139,3 @@ const styles = StyleSheet.create({
     // textAlignVertical: TOP handled by layout
   },
 });
-
-export default Gallery;

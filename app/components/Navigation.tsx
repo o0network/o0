@@ -37,7 +37,7 @@ interface NavigationProps {
   items: NavigationItem[];
 }
 
-const Navigation: React.FC<NavigationProps> = ({ items }) => {
+export const Navigation: React.FC<NavigationProps> = ({ items }) => {
   return (
     <View style={styles.container}>
       {items.map((item) => (
@@ -52,5 +52,3 @@ const Navigation: React.FC<NavigationProps> = ({ items }) => {
     </View>
   );
 };
-
-export default Navigation;

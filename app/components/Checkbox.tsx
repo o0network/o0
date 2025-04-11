@@ -27,7 +27,7 @@ interface CheckboxProps {
   onToggle: (value: boolean) => void;
 }
 
-const Checkbox: React.FC<CheckboxProps> = ({ isChecked, onToggle }) => {
+export const Checkbox: React.FC<CheckboxProps> = ({ isChecked, onToggle }) => {
   const checkSymbol = "􀆅"; // Checkmark symbol
 
   return (
@@ -38,5 +38,3 @@ const Checkbox: React.FC<CheckboxProps> = ({ isChecked, onToggle }) => {
     </TouchableOpacity>
   );
 };
-
-export default Checkbox;

@@ -1,16 +1,51 @@
 import React from "react";
-import { TextInput, StyleSheet, View, Text } from "react-native";
+import {
+  TextInput,
+  StyleSheet,
+  View,
+  Text,
+  TextInputProps,
+} from "react-native";
+// Import an icon library if you have one, e.g., @expo/vector-icons
+// import { Ionicons } from '@expo/vector-icons';
+
+// Define Props type extending TextInputProps
+interface TextFieldProps extends TextInputProps {
+  placeholder?: string;
+  leftIconName?: "search" | "mic" | string; // Allow specific icons or any string
+  secureTextEntry?: boolean;
+}
 
 // Figma Node: 2658:1051 (TextField Component)
-export const TextField = ({ placeholder = "Value", ...props }) => {
+// Combined functionality for SearchField (2658:1061) and SecureField (2658:1052)
+export const TextField: React.FC<TextFieldProps> = ({
+  placeholder = "Value",
+  leftIconName, // Optional icon name (e.g., 'search' or 'mic' from Figma)
+  secureTextEntry = false, // Default to false
+  ...props
+}) => {
+  // Placeholder logic for icon rendering
+  const renderLeftIcon = () => {
+    if (!leftIconName) return null;
+    // Replace with actual icon component if using a library
+    // Example with placeholder text icon:
+    let iconSymbol = "?";
+    if (leftIconName === 'search') iconSymbol = '􀊫'; // SF Symbol approximation
+    if (leftIconName === 'mic') iconSymbol = '􀊱'; // SF Symbol approximation from Search Field Figma (2601:3598)
+    return <Text style={styles.iconStyle}>{iconSymbol}</Text>;
+  };
+
   return (
     <View style={styles.container}>
+      {renderLeftIcon()}
       <TextInput
         style={styles.input}
-        placeholder={placeholder} // Uses the 'Value' text from Figma node 2601:3574 as default
-        placeholderTextColor={styles.placeholderText.color} // Use color from style
+        placeholder={placeholder}
+        placeholderTextColor={styles.placeholderText.color}
+        secureTextEntry={secureTextEntry} // Pass secureTextEntry prop
         {...props}
       />
+      {/* Add right icon for secure field toggle if needed */}
     </View>
   );
 };
@@ -18,32 +53,35 @@ export const TextField = ({ placeholder = "Value", ...props }) => {
 // Styles derived from Figma nodes:
 // Container: 2658:1051 (fills_MGA790, effects_3TJ2XW, layout_OMFMMY, borderRadius)
 // Input/Text Style: 2601:3574 (textStyle_N75DJP, fills_MOQPQ4 for placeholder)
+// Added styles for icon
 const styles = StyleSheet.create({
   container: {
-    // layout_OMFMMY
-    flexDirection: "row", // mode: row
-    alignSelf: "stretch", // alignSelf: stretch
-    backgroundColor: "rgba(208, 208, 208, 0.5)", // fills_MGA790 (Approximation, taking first value)
-    borderRadius: 12, // borderRadius: 12px
-    // effects_3TJ2XW (boxShadow) omitted for simplicity
-    // padding: 0px 20px - Applied to TextInput style for content padding
-    height: 44, // Guessed height based on typical text field sizes and padding
-    justifyContent: "center", // Center the TextInput vertically
+    flexDirection: "row",
+    alignSelf: "stretch",
+    backgroundColor: "rgba(208, 208, 208, 0.5)",
+    borderRadius: 12,
+    height: 44,
+    alignItems: "center", // Align items vertically
+    paddingHorizontal: 8, // Adjusted padding for potential icon
+    marginVertical: 5, // Added margin like other components
+  },
+  iconStyle: {
+    // Basic styling for the placeholder icon text
+    fontSize: 17, // Match input text size
+    color: "#545454", // Match placeholder color
+    marginHorizontal: 8, // Space around icon
   },
   input: {
-    // textStyle_N75DJP
-    flex: 1, // Take available space
-    fontFamily: "SF Pro", // Note: Ensure font is available
+    flex: 1,
+    fontFamily: "SF Pro",
     fontSize: 17,
-    fontWeight: "500", // Approx 510
-    color: "#FFFFFF", // Assuming input text color contrasts with placeholder, using white as default
-    paddingHorizontal: 20, // layout_OMFMMY: padding: 0px 20px
-    // No specific text color defined for input state in Figma, using white default.
+    fontWeight: "500",
+    color: "#FFFFFF",
+    paddingVertical: 10, // Ensure text fits vertically
   },
   placeholderText: {
-    // Derived from 2601:3574 text properties
-    color: "#545454", // fills_MOQPQ4 (Approximation, taking second value '#545454')
+    color: "#545454",
   },
 });
 
-export default TextField;
+// Removed default export as we use named export
