@@ -1,0 +1,31 @@
+name: Deploy
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+
+jobs:
+  build:
+    name: Build
+    uses: ./.github/workflows/build.yaml
+    secrets: inherit
+
+  website:
+    name: Website
+    uses: ./.github/workflows/website.yaml
+    needs: build
+    secrets: inherit
+
+  expo:
+    name: Expo
+    uses: ./.github/workflows/expo.yaml
+    needs: build
+    secrets: inherit
+
+  telegram:
+    name: Telegram
+    uses: ./.github/workflows/telegram.yaml
+    needs: build
+    secrets: inherit

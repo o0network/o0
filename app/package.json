@@ -1,0 +1,38 @@
+{
+  "name": "app",
+  "version": "1.0.0",
+  "main": "index.ts",
+  "scripts": {
+    "start": "expo start",
+    "android": "expo start --android",
+    "ios": "expo start --ios",
+    "web": "expo start --web",
+    "start:mobile": "expo start --config app.mobile.json",
+    "start:web": "expo start --web --config app.web.json",
+    "start:tg": "expo start --web --config app.tg.json",
+    "build:web": "expo export -p web --config app.web.json",
+    "build:tg": "expo export -p web --config app.tg.json",
+    "build:mobile": "eas build --platform all --profile production",
+    "deploy:web": "expo export -p web --config app.web.json",
+    "deploy:tg": "expo export -p web --config app.tg.json",
+    "deploy:mobile": "eas build --platform all --profile production"
+  },
+  "dependencies": {
+    "@expo/metro-runtime": "~4.0.1",
+    "@twa-dev/sdk": "^6.9.2",
+    "expo": "~52.0.43",
+    "expo-status-bar": "~2.0.1",
+    "react": "18.3.1",
+    "react-dom": "18.3.1",
+    "react-native": "0.76.9",
+    "react-native-web": "~0.19.9",
+    "react-native-webview": "^13.2.2"
+  },
+  "devDependencies": {
+    "@babel/core": "^7.25.2",
+    "@types/react": "~18.3.12",
+    "eas-cli": "^5.9.1",
+    "typescript": "^5.3.3"
+  },
+  "private": true
+}

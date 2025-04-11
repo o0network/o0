@@ -1,0 +1,74 @@
+name: Expo
+
+on:
+  workflow_call:
+    secrets:
+      EXPO_TOKEN:
+        required: true
+      APPLE_ID:
+        required: false
+      APPLE_APP_ID:
+        required: false
+      APPLE_TEAM_ID:
+        required: false
+      GOOGLE_PLAY_SERVICE_ACCOUNT:
+        required: false
+
+jobs:
+  build-and-submit:
+    name: Build and Submit Mobile
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Restore cached app directory
+        uses: actions/cache@v4
+        with:
+          path: app
+          key: ${{ runner.os }}-app-${{ github.sha }}
+          restore-keys: |
+            ${{ runner.os }}-app-
+
+      - name: Setup EAS CLI
+        run: npm install -g eas-cli
+
+      - name: Log in to Expo
+        run: echo "${{ secrets.EXPO_TOKEN }}" | npx eas auth:login --non-interactive
+
+      - name: Configure service accounts
+        if: ${{ secrets.GOOGLE_PLAY_SERVICE_ACCOUNT != '' }}
+        run: |
+          mkdir -p app/secrets
+          echo '${{ secrets.GOOGLE_PLAY_SERVICE_ACCOUNT }}' > app/secrets/google-service-account.json
+
+      - name: Update EAS config for submission
+        if: ${{ secrets.APPLE_ID != '' && secrets.APPLE_APP_ID != '' && secrets.APPLE_TEAM_ID != '' }}
+        working-directory: app
+        run: |
+          cat > eas-submit-overrides.json << EOF
+          {
+            "submit": {
+              "production": {
+                "ios": {
+                  "appleId": "${{ secrets.APPLE_ID }}",
+                  "ascAppId": "${{ secrets.APPLE_APP_ID }}",
+                  "appleTeamId": "${{ secrets.APPLE_TEAM_ID }}"
+                },
+                "android": {
+                  "serviceAccountKeyPath": "./secrets/google-service-account.json",
+                  "track": "production"
+                }
+              }
+            }
+          }
+          EOF
+
+      - name: Build for Android & iOS
+        working-directory: app
+        run: npm run build:mobile
+
+      - name: Submit to App Stores
+        if: ${{ secrets.APPLE_ID != '' && secrets.APPLE_APP_ID != '' && secrets.APPLE_TEAM_ID != '' && secrets.GOOGLE_PLAY_SERVICE_ACCOUNT != '' }}
+        working-directory: app
+        run: npx eas submit --platform all --profile production --non-interactive

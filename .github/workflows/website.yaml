@@ -1,53 +1,35 @@
-name: website.yaml
+name: Website
 
 on:
-  workflow_dispatch:
   workflow_call:
-    outputs:
-      artifact_name:
-        description: "The name of the artifact containing the website build"
-        value: github-pages-${{ github.run_id }}
-
-permissions:
-  pages: write
-  id-token: write
+    secrets:
+      GITHUB_TOKEN:
+        required: true
 
 jobs:
-  build:
+  build-and-deploy:
+    name: Build and Deploy Web
     runs-on: ubuntu-latest
-    environment:
-      name: ${{ github.event_name != 'workflow_call' && 'github-pages' || '' }}
-      url: ${{ steps.deployment.outputs.page_url }}
-
     steps:
-      - name: Checkout Repository
+      - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Set up Node.js
-        uses: actions/setup-node@v4
+      - name: Restore cached app directory
+        uses: actions/cache@v4
         with:
-          node-version: 23.x
+          path: app
+          key: ${{ runner.os }}-app-${{ github.sha }}
+          restore-keys: |
+            ${{ runner.os }}-app-
 
-      - name: Install Dependencies
-        run: yarn --cwd website
-
-      - name: Build Project
-        working-directory: website
-        run: yarn build
-
-      - name: Upload Artifact for Reuse in Combined Workflow
-        uses: actions/upload-artifact@v4
-        with:
-          name: github-pages-${{ github.run_id }}
-          path: website/dist
-
-      - name: Upload Pages Artifact for Direct Deployment
-        if: ${{ github.event_name == 'workflow_dispatch' }}
-        uses: actions/upload-pages-artifact@v3
-        with:
-          path: website/dist
+      - name: Build web app
+        working-directory: app
+        run: npm run build:web
 
       - name: Deploy to GitHub Pages
-        id: deployment
-        if: ${{ github.event_name == 'workflow_dispatch' }}
-        uses: actions/deploy-pages@v4
+        uses: JamesIves/github-pages-deploy-action@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          folder: app/dist/web
+          branch: gh-pages
+          target-folder: www

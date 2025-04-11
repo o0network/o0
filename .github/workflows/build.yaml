@@ -1,0 +1,36 @@
+name: Build
+
+on:
+  workflow_call:
+    inputs:
+      node-version:
+        required: false
+        type: string
+        default: '20.x'
+
+jobs:
+  setup:
+    name: Setup Environment
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ inputs.node-version }}
+          cache: 'npm'
+          cache-dependency-path: 'app/package.json'
+
+      - name: Install dependencies
+        working-directory: app
+        run: npm install
+
+      - name: Cache app directory
+        uses: actions/cache@v4
+        with:
+          path: app
+          key: ${{ runner.os }}-app-${{ github.sha }}
+          restore-keys: |
+            ${{ runner.os }}-app-
