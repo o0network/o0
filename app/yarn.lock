@@ -1687,6 +1687,11 @@
   resolved "https://registry.yarnpkg.com/@pkgjs/parseargs/-/parseargs-0.11.0.tgz#a77ea742fab25775145434eb1d2328cf5013ac33"
   integrity sha512-+1VkjdD0QBLPodGrJUeqarH8VAIvQODIbwh9XpP5Syisf7YoQgsJKPNFoqqLQlu+VQ/tVSshMR6loPMn8U+dPg==
 
+"@react-native-community/slider@^4.5.6":
+  version "4.5.6"
+  resolved "https://registry.yarnpkg.com/@react-native-community/slider/-/slider-4.5.6.tgz#dfbfdd6a582b160d41719ad42a7b524794b06dd5"
+  integrity sha512-UhLPFeqx0YfPLrEz8ffT3uqAyXWu6iqFjohNsbp4cOU7hnJwg2RXtDnYHoHMr7MOkZDVdlLMdrSrAuzY6KGqrg==
+
 "@react-native/assets-registry@0.76.9":
   version "0.76.9"
   resolved "https://registry.yarnpkg.com/@react-native/assets-registry/-/assets-registry-0.76.9.tgz#ec63d32556c29bfa29e55b5e6e24c9d6e1ebbfac"
@@ -3370,6 +3375,11 @@ expo-asset@~11.0.5:
     expo-constants "~17.0.8"
     invariant "^2.2.4"
     md5-file "^3.2.3"
+
+expo-blur@^14.0.3:
+  version "14.0.3"
+  resolved "https://registry.yarnpkg.com/expo-blur/-/expo-blur-14.0.3.tgz#656d6b2442bfbbfb2a6608c6bc1151b29bce6698"
+  integrity sha512-BL3xnqBJbYm3Hg9t/HjNjdeY7N/q8eK5tsLYxswWG1yElISWZmMvrXYekl7XaVCPfyFyz8vQeaxd7q74ZY3Wrw==
 
 expo-constants@~17.0.8:
   version "17.0.8"

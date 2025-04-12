@@ -20,9 +20,13 @@ import {
   Checkbox,
   ValueLabel,
   Slider,
+  RoundSwitchers,
   Dot,
   DotSelected,
+  AddButton,
+  CellGrid,
 } from "./components";
+import { BlurView } from "expo-blur";
 
 const listItems = [
   { id: 1, title: "Copy", symbol: "􀉁" },
@@ -52,59 +56,80 @@ export default function App() {
   const [isChecked, setIsChecked] = React.useState(true);
 
   return (
-    <ScrollView contentContainerStyle={styles.scrollContainer}>
+    <View style={styles.outerContainer}>
       <ImageBackground
         source={require("./assets/images/background-gradient.png")}
-        style={styles.container}
+        style={styles.backgroundImage}
+        resizeMode="cover"
       >
-        <View style={styles.content}>
-          <Text style={styles.platformText}>Running on: {platformName}</Text>
-          <Switch />
-          <Card />
-          <Gallery />
-          <Field placeholder="Text Field" />
-          <Field placeholder="Search" leftIconName="search" />
-          <Field placeholder="Password" secureTextEntry={true} />
-          <FigmaButton />
-          <List items={listItems} />
-          <View style={{ flexDirection: "row", gap: 10 }}>
-            <Navigation items={navItems} />
-            <Toggle isOn={isToggleOn} onToggle={setIsToggleOn} />
-            <ValueLabel value="100%" />
-          </View>
-          <Checkbox isChecked={isChecked} onToggle={setIsChecked} />
-          <View style={{ flexDirection: "row", gap: 10 }}>
-            <Dot />
-            <Dot />
-          </View>
-          <Slider />
-        </View>
-        <StatusBar style="auto" />
+        <BlurView intensity={50} tint="dark" style={StyleSheet.absoluteFill}>
+          <ScrollView
+            style={styles.scrollView}
+            contentContainerStyle={styles.contentContainer}
+          >
+            <Text style={styles.platformText}>Running on: {platformName}</Text>
+            <Switch />
+            <Card />
+            <Gallery />
+            <Field placeholder="Text Field" />
+            <Field placeholder="Search" leftIconName="search" />
+            <Field placeholder="Password" secureTextEntry={true} />
+            <FigmaButton />
+            <List items={listItems} />
+            <View style={styles.inlineRow}>
+              <Toggle isOn={isToggleOn} onToggle={setIsToggleOn} />
+              <Checkbox isChecked={isChecked} onToggle={setIsChecked} />
+              <ValueLabel value="100%" />
+            </View>
+            <Slider />
+            <RoundSwitchers>
+              <Dot color="#000000" />
+              <Dot color="#007AFF" />
+              <Dot color="#34C759" />
+              <DotSelected />
+              <AddButton />
+            </RoundSwitchers>
+            <CellGrid />
+          </ScrollView>
+        </BlurView>
       </ImageBackground>
-    </ScrollView>
+      <StatusBar style="light" />
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
-  scrollContainer: {
-    flexGrow: 1,
-  },
-  container: {
+  outerContainer: {
     flex: 1,
-    resizeMode: "cover",
-    backgroundColor: "#1c1c1e",
+    backgroundColor: "#000",
   },
-  content: {
+  backgroundImage: {
     flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  scrollView: {
+    width: "100%",
+    maxWidth: 700,
+  },
+  contentContainer: {
     alignItems: "center",
     padding: 20,
     paddingTop: 50,
-    gap: 10,
+    paddingBottom: 50,
+    gap: 15,
   },
   platformText: {
     fontSize: 18,
-    marginBottom: 24,
+    marginBottom: 20,
     textAlign: "center",
-    color: "#8e8e93",
+    color: "rgba(235, 235, 245, 0.6)",
+  },
+  inlineRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 16,
+    alignSelf: "stretch",
   },
 });
