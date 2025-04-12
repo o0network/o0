@@ -1,11 +1,18 @@
 import React from "react";
 import { StatusBar } from "expo-status-bar";
-import { StyleSheet, View, Platform, Text, ScrollView } from "react-native";
+import {
+  StyleSheet,
+  View,
+  Platform,
+  Text,
+  ScrollView,
+  ImageBackground,
+} from "react-native";
 import {
   Switch,
   Card,
   Gallery,
-  TextField,
+  Field,
   FigmaButton,
   List,
   Navigation,
@@ -13,14 +20,10 @@ import {
   Checkbox,
   ValueLabel,
   Slider,
-  RoundSwitchers,
   Dot,
   DotSelected,
-  AddButton,
-  CellGrid,
 } from "./components";
 
-// Define dummy data/handlers for components needing props
 const listItems = [
   { id: 1, title: "Copy", symbol: "􀉁" },
   { id: 2, title: "Print", symbol: "􀎚" },
@@ -45,37 +48,39 @@ export default function App() {
         : "Web"
       : Platform.OS;
 
-  // State for Toggle and Checkbox example
   const [isToggleOn, setIsToggleOn] = React.useState(true);
   const [isChecked, setIsChecked] = React.useState(true);
 
   return (
     <ScrollView contentContainerStyle={styles.scrollContainer}>
-      <View style={styles.container}>
+      <ImageBackground
+        source={require("./assets/images/background-gradient.png")}
+        style={styles.container}
+      >
         <View style={styles.content}>
           <Text style={styles.platformText}>Running on: {platformName}</Text>
           <Switch />
           <Card />
           <Gallery />
-          <TextField placeholder="Text Field" />
-          <TextField placeholder="Search" leftIconName="search" />
-          <TextField placeholder="Password" secureTextEntry={true} />
+          <Field placeholder="Text Field" />
+          <Field placeholder="Search" leftIconName="search" />
+          <Field placeholder="Password" secureTextEntry={true} />
           <FigmaButton />
           <List items={listItems} />
-          <Navigation items={navItems} />
-          <Toggle isOn={isToggleOn} onToggle={setIsToggleOn} />
+          <View style={{ flexDirection: "row", gap: 10 }}>
+            <Navigation items={navItems} />
+            <Toggle isOn={isToggleOn} onToggle={setIsToggleOn} />
+            <ValueLabel value="100%" />
+          </View>
           <Checkbox isChecked={isChecked} onToggle={setIsChecked} />
-          <ValueLabel value="100%" />
-          <Slider />
-          <RoundSwitchers>
+          <View style={{ flexDirection: "row", gap: 10 }}>
             <Dot />
-            <DotSelected />
-            <AddButton />
-          </RoundSwitchers>
-          <CellGrid />
+            <Dot />
+          </View>
+          <Slider />
         </View>
         <StatusBar style="auto" />
-      </View>
+      </ImageBackground>
     </ScrollView>
   );
 }
@@ -86,6 +91,7 @@ const styles = StyleSheet.create({
   },
   container: {
     flex: 1,
+    resizeMode: "cover",
     backgroundColor: "#1c1c1e",
   },
   content: {

@@ -10,7 +10,6 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     alignSelf: "stretch",
     minHeight: 44, // Estimate
-    // Add boxShadow/effects if needed
   },
   text: {
     fontSize: 17,

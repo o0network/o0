@@ -11,33 +11,33 @@ export const Gallery = () => {
       selected: true,
       avatarNode: "2658:1055",
       textNode: "2601:3644",
-      frameNode: "2601:3642",
-      avatarFill: "rgba(0, 0, 0, 0.2)",
-    }, // ItemSelected
+      frameNode: "2601:3642", // ItemSelected Frame
+      avatarFill: "rgba(0, 0, 0, 0.2)", // fill_5TFAY2
+    },
     {
       id: "2",
       label: "Two",
       avatarNode: "2601:3653",
       textNode: "2601:3654",
-      frameNode: "2601:3652",
-      avatarFill: "rgba(0, 0, 0, 0.2)",
-    }, // Item
+      frameNode: "2601:3652", // Item Frame
+      avatarFill: "rgba(0, 0, 0, 0.2)", // fill_5TFAY2
+    },
     {
       id: "3",
       label: "Three",
       avatarNode: "2658:1053",
       textNode: "2601:3649",
-      frameNode: "2601:3647",
-      avatarFill: "rgba(0, 0, 0, 0.2)",
-    }, // Item
+      frameNode: "2601:3647", // Item Frame
+      avatarFill: "rgba(0, 0, 0, 0.2)", // fill_5TFAY2
+    },
     {
       id: "4",
       label: "Four",
       avatarNode: "2658:1058",
       textNode: "2658:1059",
-      frameNode: "2658:1057",
-      avatarFill: "rgba(0, 0, 0, 0.2)",
-    }, // Item
+      frameNode: "2658:1057", // Item Frame
+      avatarFill: "rgba(0, 0, 0, 0.2)", // fill_5TFAY2
+    },
     // _Contact (2601:3632) - Represents a contact with an image avatar
     // Actual image requires download for imageRef: 9e82c570f47dbdc66d043c851e6a77a10f9b0e3c
     {
@@ -46,33 +46,33 @@ export const Gallery = () => {
       avatarNode: "2601:3633",
       textNode: "2601:3634",
       frameNode: "2601:3632",
-      avatarFill: "rgba(0, 0, 0, 0.3)" /* Placeholder color */,
+      avatarFill: "rgba(0, 0, 0, 0.3)" /* fill_ITSHHC - Placeholder color */,
       isImageAvatar: true,
     },
   ];
 
   return (
-    // Gallery Container (2658:1359, layout_PSXYF3)
+    // Gallery Container (2658:1359, layout_3D2ZI6)
     <ScrollView
       horizontal
       showsHorizontalScrollIndicator={false}
       contentContainerStyle={styles.scrollContainer}
-      style={styles.galleryContainer} // Added for potential outer styling if needed
+      style={styles.galleryContainer}
     >
       {items.map((item) => (
-        // Item Frame (e.g., 2601:3642, layout_PHAKMS, borderRadius)
+        // Item Frame (e.g., 2601:3642 - ItemSelected, layout_1KFL52, borderRadius)
         <View
           key={item.id}
           style={[styles.itemFrame, item.selected && styles.itemFrameSelected]}
         >
-          {/* Avatar (e.g., 2658:1055, layout_0X8POT, borderRadius) */}
+          {/* Avatar (e.g., 2658:1055, borderRadius, fill_5TFAY2) */}
           <View style={[styles.avatar, { backgroundColor: item.avatarFill }]}>
-            {/* Placeholder for actual image if item.isImageAvatar is true */}
             {item.isImageAvatar && (
+              // Placeholder for image fill (fill_ITSHHC)
               <View style={styles.avatarImagePlaceholder} />
             )}
           </View>
-          {/* Label (e.g., 2601:3644, textStyle_TF008X, fills_I7OTR1) */}
+          {/* Label (e.g., 2601:3644, textStyle_7SOT5O, fills_2G2BWC) */}
           <Text style={styles.labelText}>{item.label}</Text>
         </View>
       ))}
@@ -81,61 +81,57 @@ export const Gallery = () => {
 };
 
 // Styles derived from Figma nodes:
-// Gallery Container: 2658:1359 (layout_PSXYF3 - used for contentContainerStyle gap)
-// Item Frame: 2601:3642, 2601:3652, etc. (layout_PHAKMS, borderRadius)
-// Item Frame Selected: 2601:3642 specific fills (fill_S4WBEV)
-// Avatar: 2658:1055, 2601:3653, etc. (layout_0X8POT, borderRadius, fill_S03KCT)
-// Avatar Image (Placeholder): 2601:3633 (using layout, borderRadius from node)
-// Label Text: 2601:3644, 2601:3654, etc. (textStyle_TF008X, fills_I7OTR1)
+// Gallery Container: 2658:1359 (layout_3D2ZI6)
+// Item Frame: e.g., 2601:3652 (layout_1KFL52, borderRadius)
+// Item Frame Selected: 2601:3642 (fill_HHLOQ5)
+// Avatar: e.g., 2658:1055 (fill_5TFAY2, borderRadius, fixed size inferred)
+// Avatar Image Placeholder: 2601:3633 (fill_ITSHHC - image ref)
+// Label Text: e.g., 2601:3644 (textStyle_7SOT5O, fills_2G2BWC)
 const styles = StyleSheet.create({
   galleryContainer: {
-    // Potentially add width if needed, Figma has fixed width 393 (dimensions: width: 393)
-    // but horizontal scroll makes this less critical.
+    alignSelf: "stretch", // Take full width
   },
   scrollContainer: {
-    // layout_PSXYF3
-    paddingHorizontal: 16, // Added padding for better spacing from screen edges
-    gap: 16, // gap: 16px
-    alignItems: "flex-start", // Align items to top
+    // layout_3D2ZI6
+    paddingHorizontal: 16,
+    gap: 16,
+    alignItems: "flex-start",
   },
   itemFrame: {
-    // layout_PHAKMS
-    flexDirection: "column", // mode: column
-    alignItems: "center", // alignItems: center
-    gap: 4, // gap: 4px
-    padding: 8, // padding: 8px
-    borderRadius: 16, // borderRadius: 16px
-    width: 84, // dimensions: width: 84
-    backgroundColor: "transparent", // Default, no specific fill for regular items
+    // layout_1KFL52
+    flexDirection: "column",
+    alignItems: "center",
+    gap: 4,
+    padding: 8,
+    borderRadius: 16,
+    width: 84,
+    backgroundColor: "transparent",
   },
   itemFrameSelected: {
-    // fill_S4WBEV (Approximations)
-    backgroundColor: "rgba(94, 94, 94, 0.18)", // Taking second value of fill_S4WBEV
+    // fill_HHLOQ5 (Approximation)
+    backgroundColor: "rgba(94, 94, 94, 0.18)", // Taking second value
     // Complex gradient fills omitted
   },
   avatar: {
-    // layout_0X8POT: sizing: horizontal/vertical: fixed - applied via width/height
-    width: 60, // Guessed size based on visual hierarchy within 84px width
+    width: 60,
     height: 60,
-    borderRadius: 100, // borderRadius: 100px
-    // backgroundColor is set dynamically
+    borderRadius: 100,
+    // fill_5TFAY2 applied dynamically
     justifyContent: "center",
     alignItems: "center",
   },
   avatarImagePlaceholder: {
-    // Style matching avatar dimensions, could overlay an icon or pattern
     width: "100%",
     height: "100%",
-    borderRadius: 100, // Match avatar borderRadius
-    backgroundColor: "rgba(255, 255, 255, 0.1)", // Light placeholder overlay
+    borderRadius: 100,
+    backgroundColor: "rgba(255, 255, 255, 0.1)", // Placeholder for image fill_ITSHHC
   },
   labelText: {
-    // textStyle_TF008X
-    fontFamily: "SF Pro", // Note: Ensure font is available
+    // textStyle_7SOT5O
+    fontFamily: "System",
     fontSize: 13,
     fontWeight: "500", // Approx 510
-    color: "rgba(255, 255, 255, 0.96)", // fill_I7OTR1
-    textAlign: "center", // textAlignHorizontal: CENTER
-    // textAlignVertical: TOP handled by layout
+    color: "rgba(255, 255, 255, 0.96)", // fill_2G2BWC
+    textAlign: "center",
   },
 });

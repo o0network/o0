@@ -1,14 +1,29 @@
 import React from "react";
 import { View, Text, StyleSheet, ViewStyle } from "react-native";
 
+// Figma Node: 2658:1356 (Dot Component)
+// Also represents other Dot frames like 2658:1081, 2658:1082
+
 interface DotProps {
   selected?: boolean;
   style?: ViewStyle;
+  color?: string; // Allow specifying color based on Figma fills
 }
 
-export const Dot: React.FC<DotProps> = ({ selected = false, style }) => {
+export const Dot: React.FC<DotProps> = ({
+  selected = false,
+  style,
+  color = "#000000" /* Default from 2658:1356 fill_850ZME */,
+}) => {
   return (
-    <View style={[styles.container, selected && styles.selected, style]}>
+    <View
+      style={[
+        styles.container,
+        selected && styles.selected,
+        style,
+        { backgroundColor: color },
+      ]}
+    >
       <Text>{selected ? "DotSelected Component" : "Dot Component"}</Text>
     </View>
   );

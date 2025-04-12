@@ -1,28 +1,40 @@
 import React from "react";
-import { View, StyleSheet, TouchableOpacity, Animated } from "react-native";
+import {
+  View,
+  StyleSheet,
+  TouchableOpacity,
+  Animated,
+  Easing,
+} from "react-native";
 import { Text } from "react-native";
+
+// Figma Node: 2658:1062 (Toggle Component)
 
 const styles = StyleSheet.create({
   container: {
+    // layout_WNV36K
     width: 56,
     height: 32,
     borderRadius: 100,
+    paddingVertical: 4,
     paddingHorizontal: 2,
     justifyContent: "center",
-    // Add shadow
+    // fill_T5SSKU applied dynamically
+    // effect_K03GM1 (shadow) omitted
   },
-  containerOn: {
-    backgroundColor: "#32D74B", // Green when ON
+  trackOn: {
+    backgroundColor: "#32D74B", // fill_T5SSKU (first value)
   },
-  containerOff: {
-    backgroundColor: "rgba(208, 208, 208, 0.5)", // Gray when OFF
+  trackOff: {
+    backgroundColor: "rgba(208, 208, 208, 0.5)", // fill_T5SSKU (second value)
   },
   knob: {
-    width: 28, // Height - padding * 2
-    height: 28,
+    // Knob Frame: 2651:11793
+    width: 24, // Approx based on container padding/size
+    height: 24,
     borderRadius: 100,
-    backgroundColor: "#FFFFFF",
-    // Add shadow
+    backgroundColor: "#FFFFFF", // fill_YBBY7M
+    // effect_45TZYL (shadow) omitted
   },
 });
 
@@ -32,37 +44,31 @@ interface ToggleProps {
 }
 
 export const Toggle: React.FC<ToggleProps> = ({ isOn, onToggle }) => {
-  // Basic animation setup (can be refined)
   const position = React.useRef(new Animated.Value(isOn ? 1 : 0)).current;
 
   React.useEffect(() => {
     Animated.timing(position, {
       toValue: isOn ? 1 : 0,
-      duration: 200, // Adjust speed
-      useNativeDriver: false, // Set to true if only animating transform/opacity
+      duration: 200,
+      easing: Easing.ease,
+      useNativeDriver: false, // Use false for layout properties like left
     }).start();
   }, [isOn, position]);
 
-  const translateX = position.interpolate({
+  const knobLeft = position.interpolate({
     inputRange: [0, 1],
-    outputRange: [
-      0,
-      styles.container.width -
-        styles.knob.width -
-        styles.container.paddingHorizontal * 2,
-    ], // Calculate travel distance
+    outputRange: [2, 56 - 24 - 2], // Start: paddingLeft, End: width - knobWidth - paddingRight
   });
 
   return (
-    <TouchableOpacity activeOpacity={0.8} onPress={() => onToggle(!isOn)}>
-      <View
-        style={[
-          styles.container,
-          isOn ? styles.containerOn : styles.containerOff,
-        ]}
-      >
-        <Animated.View style={[styles.knob, { transform: [{ translateX }] }]} />
-      </View>
+    <TouchableOpacity
+      activeOpacity={0.8}
+      onPress={() => onToggle(!isOn)}
+      style={[styles.container, isOn ? styles.trackOn : styles.trackOff]}
+    >
+      <Animated.View
+        style={[styles.knob, { position: "absolute", left: knobLeft }]}
+      />
     </TouchableOpacity>
   );
 };
