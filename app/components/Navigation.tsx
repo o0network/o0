@@ -1,61 +1,94 @@
-import React from "react";
-import { View, Text, StyleSheet, TouchableOpacity } from "react-native";
+import React, { useState } from "react";
+import { Pressable, StyleSheet, View, Text } from "react-native";
+import { Ionicons } from "@expo/vector-icons";
+import { BlurView } from "expo-blur";
 
-// Figma Node: 2651:12854 (Navigation Component)
-
-const styles = StyleSheet.create({
-  container: {
-    // layout_7FECXV
-    flexDirection: "row",
-    justifyContent: "center",
-    alignItems: "center",
-    alignSelf: "stretch",
-    gap: 16,
-    padding: 12,
-    borderRadius: 100, // borderRadius: 100px
-    backgroundColor: "rgba(128, 128, 128, 0.3)", // From fill_BM5NKS
-    marginVertical: 5, // Keep existing margin
-    // strokes_IBCZHQ (gradient) and effects_AOD5D3 (shadow/blur) omitted
-  },
-  iconButton: {
-    // Style applied to Frame nodes like 'explore' (2651:11786)
-    padding: 8, // Example padding for touch target
-    borderRadius: 100, // Match container rounding
-  },
-  icon: {
-    // style_WYQ5G7
-    fontFamily: "System",
-    fontSize: 17,
-    fontWeight: "500", // Approx 510
-    color: "rgba(255, 255, 255, 0.96)", // fill_2G2BWC
-    textAlign: "center",
-  },
-});
-
-interface NavigationItem {
-  id: string | number;
-  symbol: string;
+type NavigationTabProps = {
+  iconName: keyof typeof Ionicons.glyphMap;
+  label: string;
+  isActive: boolean;
   onPress: () => void;
-}
+};
 
-interface NavigationProps {
-  items: NavigationItem[];
-}
+const NavigationTab: React.FC<NavigationTabProps> = ({
+  iconName,
+  label,
+  isActive,
+  onPress,
+}) => {
+  return (
+    <Pressable style={styles.tabButton} onPress={onPress}>
+      <View style={[styles.tabContent, { opacity: isActive ? 1 : 0.5 }]}>
+        <Ionicons name={iconName} size={24} color="#fff" />
+        <Text style={styles.tabLabel}>{label}</Text>
+      </View>
+    </Pressable>
+  );
+};
 
-export const Navigation: React.FC<NavigationProps> = ({ items }) => {
+// Main Navigation Component
+export const Navigation = () => {
+  const [activeTab, setActiveTab] = useState("explore");
+
+  const tabs = [
+    { id: "explore", iconName: "compass-outline" as const, label: "Explore" },
+    { id: "create", iconName: "bulb-outline" as const, label: "Create" },
+    { id: "assets", iconName: "wallet-outline" as const, label: "Assets" },
+    { id: "account", iconName: "person-outline" as const, label: "Account" },
+  ];
+
   return (
     <View style={styles.container}>
-      {items.map((item) => (
-        // Frame: e.g., explore (2651:11786), create (2651:11788)
-        <TouchableOpacity
-          key={item.id}
-          style={styles.iconButton}
-          onPress={item.onPress}
-        >
-          {/* Symbol Text: e.g., 2651:11787 */}
-          <Text style={styles.icon}>{item.symbol}</Text>
-        </TouchableOpacity>
-      ))}
+      <BlurView intensity={30} tint="dark" style={styles.blurContainer}>
+        <View style={styles.content}>
+          {tabs.map((tab) => (
+            <NavigationTab
+              key={tab.id}
+              iconName={tab.iconName}
+              label={tab.label}
+              isActive={activeTab === tab.id}
+              onPress={() => {
+                setActiveTab(tab.id);
+                console.log(`Navigation: ${tab.label} pressed`);
+              }}
+            />
+          ))}
+        </View>
+      </BlurView>
     </View>
   );
 };
+
+const styles = StyleSheet.create({
+  container: {
+    width: "100%",
+    height: 84,
+    marginVertical: 16,
+  },
+  blurContainer: {
+    flex: 1,
+    overflow: "hidden",
+    borderRadius: 24,
+  },
+  content: {
+    flexDirection: "row",
+    justifyContent: "space-around",
+    alignItems: "flex-start",
+    paddingTop: 12,
+    paddingBottom: 28,
+  },
+  tabButton: {
+    flex: 1,
+    alignItems: "center",
+  },
+  tabContent: {
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  tabLabel: {
+    fontSize: 10,
+    color: "#fff",
+    marginTop: 4,
+    fontWeight: "500",
+  },
+});

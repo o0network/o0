@@ -1,5 +1,6 @@
 import React from "react";
-import { View, Text, StyleSheet, TouchableOpacity } from "react-native";
+import { View, StyleSheet, TouchableOpacity } from "react-native";
+import { Ionicons } from "@expo/vector-icons";
 
 // Figma Node: 2658:1355 (AddButton Component)
 
@@ -13,23 +14,16 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     alignItems: "center",
   },
-  symbol: {
-    // Text Node 2658:1087 (style_VFH8EI, fills_2G2BWC)
-    fontFamily: "System",
-    fontSize: 19,
-    fontWeight: "500", // Approx 510
-    color: "rgba(255, 255, 255, 0.96)", // fill_2G2BWC
-    textAlign: "center",
-    // Letter spacing ignored
-  },
 });
 
-export const AddButton = () => {
-  const symbol = "􀅼"; // Text Node 2658:1087
-
+export const AddButton = ({ onPress }: { onPress?: () => void }) => {
   return (
-    <TouchableOpacity style={styles.container} activeOpacity={0.7}>
-      <Text style={styles.symbol}>{symbol}</Text>
+    <TouchableOpacity
+      style={styles.container}
+      activeOpacity={0.7}
+      onPress={onPress}
+    >
+      <Ionicons name="add" size={19} color="rgba(255, 255, 255, 0.96)" />
     </TouchableOpacity>
   );
 };

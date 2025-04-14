@@ -13,27 +13,32 @@ import { Text } from "react-native";
 const styles = StyleSheet.create({
   container: {
     // layout_WNV36K
-    width: 56,
-    height: 32,
+    width: 51,
+    height: 31,
     borderRadius: 100,
-    paddingVertical: 4,
+    paddingVertical: 2,
     paddingHorizontal: 2,
     justifyContent: "center",
     // fill_T5SSKU applied dynamically
     // effect_K03GM1 (shadow) omitted
   },
   trackOn: {
-    backgroundColor: "#32D74B", // fill_T5SSKU (first value)
+    backgroundColor: "#34C759", // fill_T5SSKU (first value)
   },
   trackOff: {
-    backgroundColor: "rgba(208, 208, 208, 0.5)", // fill_T5SSKU (second value)
+    backgroundColor: "rgba(60, 60, 67, 0.3)", // fill_T5SSKU (second value)
   },
   knob: {
     // Knob Frame: 2651:11793
-    width: 24, // Approx based on container padding/size
-    height: 24,
-    borderRadius: 100,
+    width: 27, // Approx based on container padding/size
+    height: 27,
+    borderRadius: 13.5,
     backgroundColor: "#FFFFFF", // fill_YBBY7M
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.15,
+    shadowRadius: 2,
+    elevation: 2,
     // effect_45TZYL (shadow) omitted
   },
 });
@@ -49,15 +54,15 @@ export const Toggle: React.FC<ToggleProps> = ({ isOn, onToggle }) => {
   React.useEffect(() => {
     Animated.timing(position, {
       toValue: isOn ? 1 : 0,
-      duration: 200,
-      easing: Easing.ease,
+      duration: 150,
+      easing: Easing.elastic(0.5),
       useNativeDriver: false, // Use false for layout properties like left
     }).start();
   }, [isOn, position]);
 
   const knobLeft = position.interpolate({
     inputRange: [0, 1],
-    outputRange: [2, 56 - 24 - 2], // Start: paddingLeft, End: width - knobWidth - paddingRight
+    outputRange: [2, 22],
   });
 
   return (

@@ -1,13 +1,13 @@
-import React from "react";
+import React, { useState } from "react";
 import {
   TextInput,
   StyleSheet,
   View,
   Text,
   TextInputProps,
+  TouchableOpacity,
 } from "react-native";
-// Import an icon library if you have one, e.g., @expo/vector-icons
-// import { Ionicons } from '@expo/vector-icons';
+import { Ionicons } from "@expo/vector-icons";
 
 // Renaming to Field to match App.tsx usage
 // Figma Nodes: TextField (2658:1051), SearchField (2658:1061), SecureField (2658:1052)
@@ -27,34 +27,71 @@ export const Field: React.FC<FieldProps> = ({
   secureTextEntry = false,
   ...props
 }) => {
+  const [isPasswordVisible, setIsPasswordVisible] = useState(false);
+  const [isFocused, setIsFocused] = useState(false);
+
   const renderLeftIcon = () => {
     if (!leftIconName) return null;
-    let iconSymbol = "?";
-    // Icons from Search Field (2601:3598 - Mic 􀊱)
-    // Note: Figma shows Mic icon, but App.tsx uses 'search'. Using search symbol.
-    if (leftIconName === "search") iconSymbol = "􀊫";
-    if (leftIconName === "mic") iconSymbol = "􀊱";
-    return <Text style={styles.iconStyle}>{iconSymbol}</Text>;
+
+    // Map to Ionicons names
+    let iconName: keyof typeof Ionicons.glyphMap = "help-outline";
+    if (leftIconName === "search") iconName = "search-outline";
+    if (leftIconName === "mic") iconName = "mic-outline";
+
+    return (
+      <Ionicons
+        name={iconName}
+        size={17}
+        color="rgba(235, 235, 245, 0.6)"
+        style={styles.iconStyle}
+      />
+    );
   };
 
-  // Choose base style based on type (approximated)
+  // Toggle password visibility
+  const togglePasswordVisibility = () => {
+    setIsPasswordVisible(!isPasswordVisible);
+  };
+
+  // Choose base style based on type
   const isSearch = leftIconName === "search" || leftIconName === "mic";
   const baseContainerStyle = isSearch
     ? styles.searchContainer
     : styles.textContainer;
-  const baseInputStyle = isSearch ? styles.searchInput : styles.textInput;
+
+  // Focus state for better visual feedback
+  const containerStyle = [
+    styles.container,
+    baseContainerStyle,
+    isFocused && styles.focusedContainer,
+    secureTextEntry && styles.passwordContainer,
+  ];
 
   return (
-    <View style={[styles.container, baseContainerStyle]}>
+    <View style={containerStyle}>
       {renderLeftIcon()}
       <TextInput
-        style={[styles.input, baseInputStyle]}
+        style={styles.input}
         placeholder={placeholder}
         placeholderTextColor={styles.placeholderText.color}
-        secureTextEntry={secureTextEntry}
+        secureTextEntry={secureTextEntry && !isPasswordVisible}
+        onFocus={() => setIsFocused(true)}
+        onBlur={() => setIsFocused(false)}
         {...props}
       />
-      {/* Add right icon for secure field toggle if needed */}
+      {secureTextEntry && (
+        <TouchableOpacity
+          onPress={togglePasswordVisibility}
+          activeOpacity={0.7}
+        >
+          <Ionicons
+            name={isPasswordVisible ? "eye-off-outline" : "eye-outline"}
+            size={17}
+            color="rgba(235, 235, 245, 0.6)"
+            style={styles.iconStyle}
+          />
+        </TouchableOpacity>
+      )}
     </View>
   );
 };
@@ -64,61 +101,46 @@ export const Field: React.FC<FieldProps> = ({
 // Input/Text Style: 2601:3574 (textStyle_N75DJP, fills_MOQPQ4 for placeholder)
 // Added styles for icon
 const styles = StyleSheet.create({
-  // Base Container Styles (Common properties)
+  // Base Container Styles
   container: {
     flexDirection: "row",
     alignItems: "center",
     alignSelf: "stretch",
-    backgroundColor: "rgba(208, 208, 208, 0.5)", // fill_ZS8JUU (first value)
-    // effect_C1EF21 (boxShadow) omitted
-    marginVertical: 5, // Keep existing margin
-    minHeight: 44, // Estimated common height
+    backgroundColor: "rgba(60, 60, 67, 0.18)", // Updated to match Figma
+    borderRadius: 12,
+    minHeight: 44, // Height from Figma
+    width: "100%",
   },
   // Specific Container Styles
   textContainer: {
-    // From TextField (2658:1051)
-    borderRadius: 12,
-    paddingHorizontal: 20, // layout_6WC31U
+    paddingHorizontal: 16,
   },
   searchContainer: {
-    // From Search Field (2658:1061)
-    borderRadius: 12,
-    paddingHorizontal: 8, // layout_95NVTL (adjust for icon)
-    gap: 8, // layout_95NVTL
+    paddingLeft: 8,
+    paddingRight: 16,
   },
-  // Secure Field (2658:1052) uses borderRadius 16, slightly different layout
-  // For simplicity, using textContainer style as base for secure field too.
-
-  // Base Input Styles
+  passwordContainer: {
+    borderWidth: 1,
+    borderColor: "rgba(255, 255, 255, 0.3)",
+  },
+  focusedContainer: {
+    borderWidth: 1,
+    borderColor: "rgba(255, 255, 255, 0.5)",
+  },
+  // Input Styles
   input: {
     flex: 1,
     fontFamily: "System",
-    fontSize: 17, // style_P4SVCV
-    fontWeight: "500", // style_P4SVCV (approx 510)
-    paddingVertical: 10, // Ensure text fits vertically
-    color: "#FFFFFF", // Default input color (assuming contrast)
+    fontSize: 17,
+    fontWeight: "400",
+    paddingVertical: 10,
+    color: "#FFFFFF",
   },
-  // Specific Input Styles (if needed, often covered by container padding)
-  textInput: {
-    // For regular TextField
-  },
-  searchInput: {
-    // For Search Field
-  },
-  // Secure Field Input (dots: style_C9W241)
-  // Secure field specific input styling (like larger font for dots) is handled by `secureTextEntry` prop + system defaults.
-
   placeholderText: {
-    // style_P4SVCV applied to placeholder, color from fills_TNC26D
-    color: "#545454", // Second value
+    color: "rgba(235, 235, 245, 0.6)",
   },
   iconStyle: {
-    // style_DW13PU for Mic icon
-    fontSize: 17,
-    fontWeight: "500", // Approx 510
-    color: "#545454", // fills_TNC26D (second value)
-    textAlign: "center",
-    // Padding/margin adjusted by container gap/padding
+    marginRight: 8,
   },
 });
 
