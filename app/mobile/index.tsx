@@ -1,19 +1,9 @@
-import { registerRootComponent } from "expo";
 import React from "react";
-import { SafeAreaView, StyleSheet } from "react-native";
+import { registerRootComponent } from "expo";
 import App from "../App";
 
-const MobileApp = () => (
-  <SafeAreaView style={styles.container}>
-    <App />
-  </SafeAreaView>
-);
+// Mobile-specific initialization code can go here
+// For example, setting up mobile-specific navigation, notifications, etc.
 
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: "#fff",
-  },
-});
-
-registerRootComponent(MobileApp);
+// Register the root component (App already has PlatformProvider)
+registerRootComponent(App);
