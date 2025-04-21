@@ -35,7 +35,7 @@ graypaper:
 	$(LATEX_COMPILER) $(LATEX_COMPILER_FLAGS) $*
 
 clean:
-	$(RM) $(FILES_TO_BUILD) $(LOG_FILES) $(TEMPORARY_FILES)
+	$(RM) $(LOG_FILES) $(TEMPORARY_FILES)
 
 clean_after_build:
 	$(RM) $(TEMPORARY_FILES)
