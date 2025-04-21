@@ -68,3 +68,5 @@ const styles = StyleSheet.create({
     opacity: 0.4,
   },
 });
+
+export default Switch;

@@ -37,3 +37,5 @@ const styles = StyleSheet.create({
     backgroundColor: "#0A84FF",
   },
 });
+
+export default Checkbox;

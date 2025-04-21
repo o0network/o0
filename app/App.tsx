@@ -1,204 +1,274 @@
-import { useState } from "react";
-import { StatusBar } from "expo-status-bar";
+import { DefaultTheme, NavigationContainer } from "@react-navigation/native";
+import {
+  createMaterialTopTabNavigator,
+  MaterialTopTabBarProps,
+} from "@react-navigation/material-top-tabs";
+import { createNativeStackNavigator } from "@react-navigation/native-stack";
+import { RouteProp, ParamListBase } from "@react-navigation/native";
+import React, { useRef } from "react";
 import {
   StyleSheet,
   View,
-  Text,
-  ScrollView,
-  Dimensions,
   SafeAreaView,
+  Dimensions,
+  Image,
+  Text,
+  TouchableOpacity,
+  Animated,
 } from "react-native";
-import {
-  Switch,
-  Card,
-  Field,
-  FigmaButton,
-  List,
-  Toggle,
-  Checkbox,
-  ValueLabel,
-  Slider,
-  CellGrid,
-  DotSelector,
-} from "./components";
-import Background from "./components/Background";
-import BubbleBar from "./components/BubbleBar";
+import { StatusBar } from "expo-status-bar";
+import { GestureHandlerRootView } from "react-native-gesture-handler";
 
-import { PlatformProvider, usePlatformContext } from "./utils/platform";
-const listItems = [
-  { id: 1, title: "Copy", iconName: "copy-outline" },
-  { id: 2, title: "Print", iconName: "print-outline" },
-  { id: 3, title: "Duplicate", iconName: "documents-outline" },
-];
+// Import screens
+import HomeScreen from "./screens/HomeScreen";
+import CreateScreen from "./screens/CreateScreen";
+import AssetsScreen from "./screens/AssetsScreen";
+import ParamsScreen from "./screens/ParamsScreen";
+// Import components
+import { PlatformProvider } from "./utils/platform";
+import { Background } from "./components";
 
-const deviceWidth = Dimensions.get("window").width;
-const deviceHeight = Dimensions.get("window").height;
-const isTablet = deviceWidth > 768;
-const contentWidth = Math.min(deviceWidth, isTablet ? 420 : 390);
+// Define ParamList for type safety
+type HomeTabParamList = {
+  Explore: undefined;
+  Create: undefined;
+  Assets: undefined;
+  Params: undefined;
+};
 
-// Main App content component
-function AppContent() {
-  const [isToggleOn, setIsToggleOn] = useState(true);
-  const [isChecked, setIsChecked] = useState(true);
-  const [isSwitchOn, setIsSwitchOn] = useState(false);
-  const [selectedDotIndex, setSelectedDotIndex] = useState(3);
-  const { platformName } = usePlatformContext();
+const Tab = createMaterialTopTabNavigator<HomeTabParamList>();
+const Stack = createNativeStackNavigator();
+const { width } = Dimensions.get("window");
 
-  const dotOptions = [
-    {
-      color: "#000000",
-      selected: selectedDotIndex === 0,
-      onSelect: () => setSelectedDotIndex(0),
-    },
-    {
-      color: "#007AFF",
-      selected: selectedDotIndex === 1,
-      onSelect: () => setSelectedDotIndex(1),
-    },
-    {
-      color: "#34C759",
-      selected: selectedDotIndex === 2,
-      onSelect: () => setSelectedDotIndex(2),
-    },
-    {
-      color: "#FF4015",
-      selected: selectedDotIndex === 3,
-      onSelect: () => setSelectedDotIndex(3),
-    },
-  ];
+// --- Custom Tab Bar Component ---
+function CustomTabBar({
+  state,
+  descriptors,
+  navigation,
+  position,
+}: MaterialTopTabBarProps) {
+  // Refs for bounce animation, one Animated.Value per tab
+  const bounceValues = useRef(
+    state.routes.map(() => new Animated.Value(0))
+  ).current;
+
+  const onTabPress = (
+    route: RouteProp<ParamListBase, string>,
+    index: number,
+    isFocused: boolean
+  ) => {
+    const event = navigation.emit({
+      type: "tabPress",
+      target: route.key,
+      canPreventDefault: true,
+    });
+
+    if (!isFocused) {
+      Animated.sequence([
+        Animated.timing(bounceValues[index], {
+          toValue: 16,
+          duration: 100,
+          useNativeDriver: true,
+        }),
+        Animated.timing(bounceValues[index], {
+          toValue: 0,
+          duration: 150,
+          useNativeDriver: true,
+        }),
+      ]).start();
+    }
+
+    if (!isFocused && !event.defaultPrevented) {
+      navigation.navigate(route.name, route.params);
+    }
+  };
 
   return (
-    <View style={styles.outerContainer}>
-      <View style={styles.backgroundWrapper}>
-        <Background />
-      </View>
-      <SafeAreaView style={styles.safeArea}>
-        <View style={styles.contentWrapper}>
-          <ScrollView
-            contentContainerStyle={styles.scrollContent}
-            showsVerticalScrollIndicator={false}
+    <View style={styles.tabBarContainer}>
+      {state.routes.map((route, index) => {
+        const { options } = descriptors[route.key];
+        const label = route.name;
+
+        const isFocused = state.index === index;
+
+        // Determine emoji based on route name (same logic as before)
+        let emoji = "🧭";
+        if (route.name === "Explore") emoji = "🧭";
+        if (route.name === "Create") emoji = "🪩";
+        if (route.name === "Assets") emoji = "🪙";
+        if (route.name === "Params") emoji = "⚙️";
+
+        const bounceValue = bounceValues[index];
+
+        return (
+          <Animated.View // Outer view for bounce transform
+            key={route.key}
+            style={{ transform: [{ translateX: bounceValue }] }}
           >
-            <Text style={styles.platformText}>Running on: {platformName}</Text>
+            <TouchableOpacity
+              accessibilityRole="button"
+              accessibilityState={isFocused ? { selected: true } : {}}
+              accessibilityLabel={options.tabBarAccessibilityLabel}
+              testID={options.tabBarTestID}
+              onPress={() => onTabPress(route, index, isFocused)}
+              // Add onLongPress if needed, similar structure
+              style={styles.touchableTabBase} // Base touchable area style
+            >
+              <Animated.View // Inner view for scaling and styling
+                style={[
+                  styles.tabItemBase,
+                  isFocused ? styles.tabItemActive : styles.tabItemInactive,
+                ]}
+              >
+                <Text
+                  style={[
+                    styles.icon,
+                    {
+                      color: isFocused
+                        ? styles.iconActive.color
+                        : styles.iconInactive.color,
+                    },
+                  ]}
+                >
+                  {emoji}
+                </Text>
+                {isFocused && <Text style={styles.label}>{label}</Text>}
+              </Animated.View>
+            </TouchableOpacity>
+          </Animated.View>
+        );
+      })}
+    </View>
+  );
+}
+// --- End Custom Tab Bar Component ---
 
-            <View style={styles.topButtonRow}>
-              <FigmaButton />
-              <FigmaButton />
-            </View>
-
-            <Card />
-
-            <View style={styles.cardSection}>
-              <DotSelector
-                options={dotOptions}
-                showAddButton={true}
-                onAddPress={() => console.log("Add button pressed")}
-              />
-            </View>
-
-            <View style={styles.fieldSection}>
-              <Field placeholder="Value" />
-              <Field placeholder="Search" leftIconName="search" />
-              <Field placeholder="Password" secureTextEntry={true} />
-            </View>
-
-            <FigmaButton />
-
-            <List items={listItems} />
-
-            <BubbleBar
-              onTabChange={(tabId) => console.log(`Tab changed to: ${tabId}`)}
-            />
-
-            <View style={styles.controlsSection}>
-              <Toggle isOn={isToggleOn} onToggle={setIsToggleOn} />
-              <Checkbox isChecked={isChecked} onToggle={setIsChecked} />
-              <Switch
-                value={isSwitchOn}
-                onValueChange={setIsSwitchOn}
-                trackColor={{ false: "#767577", true: "#0A84FF" }}
-                thumbColor="#FFFFFF"
-              />
-              <ValueLabel value="100%" />
-            </View>
-
-            <Slider />
-
-            <CellGrid />
-          </ScrollView>
-        </View>
-      </SafeAreaView>
-      <StatusBar style="light" />
+function HomeTabs() {
+  return (
+    <View style={styles.homeTabsContainer}>
+      <Tab.Navigator
+        initialLayout={{ width: Dimensions.get("window").width }}
+        tabBar={(props) => <CustomTabBar {...props} />}
+        screenOptions={{
+          swipeEnabled: false,
+        }}
+      >
+        <Tab.Screen name="Explore" component={HomeScreen} />
+        <Tab.Screen name="Create" component={CreateScreen} />
+        <Tab.Screen name="Assets" component={AssetsScreen} />
+        <Tab.Screen name="Params" component={ParamsScreen} />
+      </Tab.Navigator>
     </View>
   );
 }
 
-// Root component that wraps the AppContent with PlatformProvider
 export default function App() {
   return (
-    <PlatformProvider>
-      <AppContent />
-    </PlatformProvider>
+    <GestureHandlerRootView style={{ flex: 1 }}>
+      <PlatformProvider>
+        <View style={styles.container}>
+          <Background />
+          <SafeAreaView style={styles.safeArea}>
+            <NavigationContainer
+              theme={{
+                ...DefaultTheme,
+                colors: {
+                  ...DefaultTheme.colors,
+                  background: "transparent",
+                },
+              }}
+            >
+              <Stack.Navigator
+                screenOptions={{
+                  headerShown: false,
+                  contentStyle: {
+                    backgroundColor: "transparent",
+                  },
+                }}
+              >
+                <Stack.Screen
+                  name="Main"
+                  component={HomeTabs}
+                  options={{
+                    contentStyle: {
+                      backgroundColor: "transparent",
+                    },
+                  }}
+                />
+              </Stack.Navigator>
+            </NavigationContainer>
+          </SafeAreaView>
+          <StatusBar style="light" />
+        </View>
+      </PlatformProvider>
+    </GestureHandlerRootView>
   );
 }
 
 const styles = StyleSheet.create({
-  outerContainer: {
+  container: {
     flex: 1,
-    backgroundColor: "rgba(0, 0, 0, 0.7)", // Darker background to make particles more visible
-  },
-  backgroundWrapper: {
-    ...StyleSheet.absoluteFillObject,
-    zIndex: 0,
+    backgroundColor: "transparent",
   },
   safeArea: {
     flex: 1,
-    zIndex: 1,
+    backgroundColor: "transparent",
   },
-  contentWrapper: {
-    flex: 1,
+  homeTabsContainer: {
     width: "100%",
-    alignItems: "center",
+    backgroundColor: "transparent",
+    marginTop: 10,
   },
-  scrollContent: {
-    width: contentWidth,
-    paddingHorizontal: 16,
-    paddingTop: 20,
-    paddingBottom: 40,
-    gap: 12,
-    alignItems: "center",
-  },
-  platformText: {
-    fontSize: 16,
-    marginBottom: 10,
-    textAlign: "center",
-    color: "rgba(235, 235, 245, 0.6)",
-  },
-  topButtonRow: {
-    flexDirection: "row",
-    width: "100%",
-    gap: 8,
-    justifyContent: "space-between",
-    marginBottom: 8,
-  },
-  cardSection: {
-    width: "100%",
-    marginVertical: 8,
-  },
-  fieldSection: {
-    width: "100%",
-    gap: 8,
-    marginVertical: 4,
-  },
-  controlsSection: {
+  tabBarContainer: {
     flexDirection: "row",
     alignItems: "center",
-    justifyContent: "space-around",
-    width: "100%",
-    marginVertical: 12,
-    gap: 20,
+    alignSelf: "center",
+    paddingVertical: 4,
+    paddingHorizontal: 4,
+    backgroundColor: "rgba(208, 208, 208, 0.5)",
+    borderRadius: 999,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
+    gap: 32,
   },
-  noiseContainer: {
-    ...StyleSheet.absoluteFillObject,
-    zIndex: 1,
+  touchableTabBase: {},
+  tabItemBase: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    height: 36,
+  },
+  tabItemActive: {
+    backgroundColor: "rgba(94, 94, 94, 0.18)",
+    borderRadius: 20,
+    paddingHorizontal: 8,
+    gap: 4,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 2,
+  },
+  tabItemInactive: {
+    paddingHorizontal: 8,
+    gap: 3,
+  },
+  icon: {
+    fontSize: 24,
+    fontWeight: "600",
+  },
+  iconActive: {
+    color: "rgba(255, 255, 255, 0.96)",
+  },
+  iconInactive: {
+    color: "#545454",
+  },
+  label: {
+    fontSize: 15,
+    fontWeight: "600",
+    color: "rgba(255, 255, 255, 0.96)",
   },
 });

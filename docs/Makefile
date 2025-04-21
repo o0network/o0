@@ -14,11 +14,17 @@ DOCKER_COMMAND = make release
 
 FILES_TO_BUILD := $(patsubst %.tex,%.pdf,$(wildcard *.tex))
 
-release: clean $(FILES_TO_BUILD) cleanup
+.PHONY: all release clean clean_after_build clean_diploma clean_presentation clean_graypaper
+
+all: diploma graypaper
+
+release: clean $(FILES_TO_BUILD) clean_after_build
 
 diploma:
-	$(DOCKER_RUN) $(DOCKER_FLAGS) $(DOCKER_IMAGE) bash -c "make clean && make diploma.pdf && make cleanup"
+	$(DOCKER_RUN) $(DOCKER_FLAGS) $(DOCKER_IMAGE) bash -c "make clean_diploma && make diploma.pdf && make clean_after_build"
 
+graypaper:
+	$(DOCKER_RUN) $(DOCKER_FLAGS) $(DOCKER_IMAGE) bash -c "make clean_graypaper && make graypaper.pdf && make clean_after_build"
 
 %.pdf: %.tex
 	$(LATEX_COMPILER) $(LATEX_COMPILER_FLAGS) $*
@@ -31,7 +37,8 @@ diploma:
 clean:
 	$(RM) $(FILES_TO_BUILD) $(LOG_FILES) $(TEMPORARY_FILES)
 
-cleanup:
+clean_after_build:
 	$(RM) $(TEMPORARY_FILES)
 
+clean_diploma clean_graypaper:
 	$(RM) $(TEMPORARY_FILES) $(subst clean_,,$@).pdf

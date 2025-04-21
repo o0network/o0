@@ -1,0 +1,9 @@
+---
+description: 
+globs: app/**/*
+alwaysApply: false
+---
+You are inside the /app directory in my monorepo
+It's a React Native expo app
+I use yarn
+I use https://reactnavigation.org/

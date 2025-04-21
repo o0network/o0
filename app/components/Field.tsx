@@ -17,6 +17,7 @@ interface FieldProps extends TextInputProps {
   placeholder?: string;
   leftIconName?: "search" | "mic" | string;
   secureTextEntry?: boolean;
+  style?: any;
 }
 
 // Figma Node: 2658:1051 (TextField Component)
@@ -25,6 +26,7 @@ export const Field: React.FC<FieldProps> = ({
   placeholder = "Value", // Default from TextField (2601:3574)
   leftIconName,
   secureTextEntry = false,
+  style,
   ...props
 }) => {
   const [isPasswordVisible, setIsPasswordVisible] = useState(false);
@@ -65,6 +67,7 @@ export const Field: React.FC<FieldProps> = ({
     baseContainerStyle,
     isFocused && styles.focusedContainer,
     secureTextEntry && styles.passwordContainer,
+    style,
   ];
 
   return (
@@ -107,9 +110,11 @@ const styles = StyleSheet.create({
     alignItems: "center",
     alignSelf: "stretch",
     backgroundColor: "rgba(60, 60, 67, 0.18)", // Updated to match Figma
-    borderRadius: 12,
+    borderRadius: 999,
     minHeight: 44, // Height from Figma
     width: "100%",
+    paddingHorizontal: 20,
+    marginBottom: 8,
   },
   // Specific Container Styles
   textContainer: {
@@ -144,4 +149,4 @@ const styles = StyleSheet.create({
   },
 });
 
-// Removed default export as we use named export
+export default Field;

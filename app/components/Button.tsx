@@ -1,18 +1,37 @@
 import React from "react";
-import { View, Text, StyleSheet, TouchableOpacity } from "react-native";
+import {
+  View,
+  Text,
+  StyleSheet,
+  TouchableOpacity,
+  StyleProp,
+  ViewStyle,
+} from "react-native";
+
+interface ButtonProps {
+  title: string;
+  icon?: string;
+  onPress?: () => void;
+  style?: StyleProp<ViewStyle>;
+}
 
 // Figma Node: 2658:1049 (Button Component)
-export const FigmaButton = () => {
+export const Button: React.FC<ButtonProps> = ({
+  title,
+  icon,
+  onPress,
+  style,
+}) => {
   // Icon: 2651:11773 (textStyle_5FA6YV, fills_2G2BWC)
-  // Label: 2651:11774 (textStyle_5FA6YV, fills_2G2BWC)
-  const icon = "😸";
-  const label = "Button";
+  // Label: 2651:11774 (textStyle_5FA6YV
+  // const icon = "😸"; // Removed hardcoded value
+  // const label = "Button"; // Removed hardcoded value
 
   return (
     // Container: 2658:1049 (fills_Q9LOHA, strokes_IRPERO, effects_OUM1NZ, layout_1Y5HES, borderRadius)
-    <TouchableOpacity style={styles.container}>
-      <Text style={styles.textStyle}>{icon}</Text>
-      <Text style={styles.textStyle}>{label}</Text>
+    <TouchableOpacity style={[styles.container, style]} onPress={onPress}>
+      {icon && <Text style={styles.iconStyle}>{icon}</Text>}
+      <Text style={styles.textStyle}>{title}</Text>
     </TouchableOpacity>
   );
 };
@@ -33,12 +52,21 @@ const styles = StyleSheet.create({
     minHeight: 44, // Estimate
     marginVertical: 5, // Keep existing margin
   },
+  iconStyle: {
+    // From Figma icon 2651:11773, textStyle_JSCQX0
+    fontSize: 18,
+    fontWeight: "600",
+    color: "rgba(255, 255, 255, 0.96)",
+    textAlign: "center",
+  },
   textStyle: {
-    // style_5FA6YV
+    // style_5FA6YV / style_T98XRF
     fontFamily: "System",
-    fontSize: 15,
-    fontWeight: "600", // Approx 590
-    color: "rgba(255, 255, 255, 0.96)", // fill_2G2BWC
+    fontSize: 16, // Matches style_T98XRF
+    fontWeight: "600", // Approx 590 / Matches style_T98XRF
+    color: "rgba(255, 255, 255, 0.96)", // fill_CLIVFQ
     textAlign: "center",
   },
 });
+
+export default Button;

@@ -27,3 +27,5 @@ export const AddButton = ({ onPress }: { onPress?: () => void }) => {
     </TouchableOpacity>
   );
 };
+
+export default AddButton;

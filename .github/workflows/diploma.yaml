@@ -13,6 +13,7 @@ permissions:
 jobs:
   build:
     runs-on: ubuntu-latest
+
     steps:
       - uses: actions/checkout@v3
 
@@ -32,27 +33,32 @@ jobs:
         if: steps.cache-docker-latex.outputs.cache-hit == 'true'
         run: docker image load --input ./ci/cache/docker/latex/latex-image.tar
 
-      - name: Compile Diploma
+      - name: Compile PDF
         shell: bash
         run: |
-          docker run --rm -i -v ./docs/:/diploma:Z 2109199812/docker-latex bash -c "make clean && make diploma.pdf"
+          docker run --rm -i -v ./docs/:/diplom:Z 2109199812/docker-latex bash -c "make clean && make diploma.pdf"
+          docker run --rm -i -v ./docs/:/diplom:Z 2109199812/docker-latex bash -c "make clean && make graypaper.pdf"
 
       - name: Prepare release artifacts
         run: |
           mkdir -p gh-pages
           mv ./docs/diploma.pdf gh-pages/diploma.pdf
+          mv ./docs/graypaper.pdf gh-pages/graypaper.pdf
 
       - name: Upload PDFs as artifact
         uses: actions/upload-artifact@v4
         with:
-          name: diploma
+          name: pdfs
           path: gh-pages/
           retention-days: 1
 
       - name: Upload Pages artifact
+        if: ${{ github.event_name == 'workflow_dispatch' }}
         uses: actions/upload-pages-artifact@v3
         with:
           path: gh-pages
 
       - name: Deploy to GitHub Pages
+        id: deployment
+        if: ${{ github.event_name == 'workflow_dispatch' }}
         uses: actions/deploy-pages@v4

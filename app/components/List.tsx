@@ -132,3 +132,5 @@ export const List: React.FC<ListProps> = ({ items }) => {
     </View>
   );
 };
+
+export default List;
