@@ -1,6 +1,7 @@
 import React from "react";
-import { Text, StyleSheet, SafeAreaView, View } from "react-native";
+import { StyleSheet, SafeAreaView, View } from "react-native";
 import { Frame } from "../components";
+import { Text } from "../App";
 
 export default function CreateScreen() {
   return (
@@ -29,5 +30,8 @@ const styles = StyleSheet.create({
     width: "100%",
     padding: 20,
   },
-  text: { fontSize: 24, color: "#fff" },
+  text: {
+    fontSize: 24,
+    color: "#fff",
+  },
 });

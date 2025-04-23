@@ -1,7 +1,6 @@
 import { useState } from "react";
 import {
   View,
-  Text,
   StyleSheet,
   Dimensions,
   Pressable,
@@ -11,6 +10,7 @@ import {
 import { Background, Card, Frame } from "../components";
 import { usePlatformContext } from "../utils/platform";
 import VideoNote from "../components/VideoNote";
+import { Text } from "../App";
 
 const { width } = Dimensions.get("window");
 const isTablet = width > 768;
@@ -99,8 +99,7 @@ const styles = StyleSheet.create({
   },
   cardTitle: {
     fontSize: 17,
-    fontWeight: "500",
-    color: "#FFFFFF",
+    fontWeight: "600",
   },
   cardSubtitle: {
     fontSize: 13,
@@ -123,8 +122,8 @@ const styles = StyleSheet.create({
   },
   connectButtonText: {
     fontSize: 24,
-    fontWeight: "800",
-    color: "rgba(255, 255, 255, 0.96)",
+    fontWeight: "700",
     textAlign: "center",
+    fontFamily: "Nunito_700Bold",
   },
 });

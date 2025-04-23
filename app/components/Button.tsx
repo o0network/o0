@@ -1,12 +1,12 @@
 import React from "react";
 import {
   View,
-  Text,
   StyleSheet,
   TouchableOpacity,
   StyleProp,
   ViewStyle,
 } from "react-native";
+import { Text } from "../App";
 
 interface ButtonProps {
   title: string;
@@ -56,15 +56,12 @@ const styles = StyleSheet.create({
     // From Figma icon 2651:11773, textStyle_JSCQX0
     fontSize: 18,
     fontWeight: "600",
-    color: "rgba(255, 255, 255, 0.96)",
     textAlign: "center",
   },
   textStyle: {
     // style_5FA6YV / style_T98XRF
-    fontFamily: "System",
     fontSize: 16, // Matches style_T98XRF
     fontWeight: "600", // Approx 590 / Matches style_T98XRF
-    color: "rgba(255, 255, 255, 0.96)", // fill_CLIVFQ
     textAlign: "center",
   },
 });

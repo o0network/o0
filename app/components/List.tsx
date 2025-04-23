@@ -1,6 +1,7 @@
 import React from "react";
-import { View, Text, StyleSheet, TouchableOpacity } from "react-native";
+import { View, StyleSheet, TouchableOpacity } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
+import { Text } from "../App";
 
 // Figma Node: 2658:1050 (List Component)
 // Styles derived from ItemTop (2601:3548), Item (2601:3543), ItemBottom (2601:3538)
@@ -38,7 +39,6 @@ const styles = StyleSheet.create({
     flex: 1,
     fontSize: 17,
     fontWeight: "400",
-    color: "#FFFFFF",
   },
   iconContainer: {
     width: 24,

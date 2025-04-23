@@ -3,11 +3,11 @@ import {
   TextInput,
   StyleSheet,
   View,
-  Text,
   TextInputProps,
   TouchableOpacity,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
+import { Text } from "../App";
 
 // Renaming to Field to match App.tsx usage
 // Figma Nodes: TextField (2658:1051), SearchField (2658:1061), SecureField (2658:1052)
@@ -135,10 +135,10 @@ const styles = StyleSheet.create({
   // Input Styles
   input: {
     flex: 1,
-    fontFamily: "System",
     fontSize: 17,
     fontWeight: "400",
     paddingVertical: 10,
+    fontFamily: "Nunito_600SemiBold", // Keep this to make TextInput match Text style
     color: "#FFFFFF",
   },
   placeholderText: {

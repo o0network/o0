@@ -1,12 +1,7 @@
 import React, { ReactNode } from "react";
-import {
-  View,
-  Text,
-  StyleSheet,
-  ViewStyle,
-  TouchableOpacity,
-} from "react-native";
+import { View, StyleSheet, ViewStyle, TouchableOpacity } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
+import { Text } from "../App";
 
 interface CardProps {
   children?: ReactNode;
@@ -70,12 +65,12 @@ const styles = StyleSheet.create({
   },
   title: {
     fontSize: 16,
-    fontWeight: "500",
-    color: "#FFFFFF",
+    fontWeight: "600",
   },
   subtitle: {
     fontSize: 13,
     color: "rgba(235, 235, 245, 0.6)",
+    fontWeight: "500",
   },
   actionIcon: {
     padding: 4,

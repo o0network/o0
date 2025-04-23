@@ -5,25 +5,33 @@ import {
 } from "@react-navigation/material-top-tabs";
 import { createNativeStackNavigator } from "@react-navigation/native-stack";
 import { RouteProp, ParamListBase } from "@react-navigation/native";
-import React, { useRef } from "react";
+import React, { useRef, useCallback } from "react";
 import {
   StyleSheet,
   View,
   SafeAreaView,
   Dimensions,
   Image,
-  Text,
+  Text as RNText,
   TouchableOpacity,
   Animated,
+  TextStyle,
+  Platform,
 } from "react-native";
 import { StatusBar } from "expo-status-bar";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
+import { useFonts } from "expo-font";
+import * as SplashScreen from "expo-splash-screen";
+import { Nunito_600SemiBold, Nunito_700Bold } from "@expo-google-fonts/nunito";
+import { DMMono_500Medium } from "@expo-google-fonts/dm-mono";
+import { DynaPuff_700Bold } from "@expo-google-fonts/dynapuff";
 
 // Import screens
 import HomeScreen from "./screens/HomeScreen";
 import CreateScreen from "./screens/CreateScreen";
 import AssetsScreen from "./screens/AssetsScreen";
 import ParamsScreen from "./screens/ParamsScreen";
+import ComponentsScreen from "./screens/ComponentsScreen";
 // Import components
 import { PlatformProvider } from "./utils/platform";
 import { Background } from "./components";
@@ -120,7 +128,7 @@ function CustomTabBar({
                   isFocused ? styles.tabItemActive : styles.tabItemInactive,
                 ]}
               >
-                <Text
+                <RNText
                   style={[
                     styles.icon,
                     {
@@ -131,8 +139,8 @@ function CustomTabBar({
                   ]}
                 >
                   {emoji}
-                </Text>
-                {isFocused && <Text style={styles.label}>{label}</Text>}
+                </RNText>
+                {isFocused && <RNText style={styles.label}>{label}</RNText>}
               </Animated.View>
             </TouchableOpacity>
           </Animated.View>
@@ -162,7 +170,39 @@ function HomeTabs() {
   );
 }
 
+// Set default text style globally with a custom Text component
+export const Text = (props: React.ComponentProps<typeof RNText>) => {
+  const { style, ...rest } = props;
+  return (
+    <RNText
+      style={[{ fontFamily: "Nunito_600SemiBold", color: "#FFFFFF" }, style]}
+      {...rest}
+    />
+  );
+};
+
+// Keep the splash screen visible while we fetch resources
+SplashScreen.preventAutoHideAsync();
+
 export default function App() {
+  const [fontsLoaded, fontError] = useFonts({
+    Nunito_600SemiBold,
+    Nunito_700Bold,
+    DMMono_500Medium,
+    DynaPuff_700Bold,
+  });
+
+  const onLayoutRootView = useCallback(async () => {
+    if (fontsLoaded || fontError) {
+      // Hide the splash screen after the fonts have loaded (or an error was returned)
+      await SplashScreen.hideAsync();
+    }
+  }, [fontsLoaded, fontError]);
+
+  if (!fontsLoaded && !fontError) {
+    return null;
+  }
+
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
       <PlatformProvider>
@@ -177,6 +217,7 @@ export default function App() {
                   background: "transparent",
                 },
               }}
+              onReady={onLayoutRootView}
             >
               <Stack.Navigator
                 screenOptions={{
@@ -192,6 +233,19 @@ export default function App() {
                   options={{
                     contentStyle: {
                       backgroundColor: "transparent",
+                    },
+                  }}
+                />
+                <Stack.Screen
+                  name="Components"
+                  component={ComponentsScreen}
+                  options={{
+                    headerShown: true,
+                    headerStyle: { backgroundColor: "#333" },
+                    headerTintColor: "#fff",
+                    title: "UI Components",
+                    contentStyle: {
+                      backgroundColor: "rgba(0, 0, 0, 0.7)",
                     },
                   }}
                 />

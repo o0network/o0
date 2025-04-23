@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { View, StyleSheet, Text, Platform } from "react-native";
+import { View, StyleSheet, Platform } from "react-native";
 import {
   Background,
   Navigation,
@@ -9,6 +9,7 @@ import {
   Frame,
 } from "../components";
 import { SafeAreaView } from "react-native-safe-area-context";
+import { Text } from "../App";
 
 // Placeholder data - replace with actual data fetching/management
 const mockListData = [
@@ -66,10 +67,8 @@ export const AssetsScreen: React.FC = () => {
 
   return (
     <View style={styles.outerContainer}>
-      <Background />
       <SafeAreaView style={styles.safeArea}>
         <Frame style={styles.frameContainer}>
-          <Navigation activeRoute={activeRoute} onNavigate={handleNavigate} />
           <View style={styles.addressContainer}>
             <Text style={styles.addressLabel}>Address:</Text>
             <Text style={styles.addressValue}>
@@ -103,17 +102,17 @@ export const AssetsScreen: React.FC = () => {
   );
 };
 
-// TODO: Refine styles based on Figma details (fills, strokes, layout props, text styles)
 const styles = StyleSheet.create({
   outerContainer: {
     flex: 1,
-    position: "relative", // For Background
-    justifyContent: "center", // Center Frame vertically
-    alignItems: "center", // Center Frame horizontally
+    position: "relative",
+    justifyContent: "center",
+    alignItems: "center",
   },
   safeArea: {
     flex: 1,
-    width: "100%", // Ensure SafeArea takes width
+    width: "100%",
+
     justifyContent: "center",
     alignItems: "center",
   },
@@ -129,12 +128,12 @@ const styles = StyleSheet.create({
   addressLabel: {
     color: "rgba(255, 255, 255, 0.7)", // Softer white
     fontSize: 17,
-    fontWeight: "500",
+    fontWeight: "600",
   },
   addressValue: {
     color: "rgba(255, 255, 255, 0.9)", // Brighter white
-    fontSize: 12,
-    fontFamily: Platform.OS === "ios" ? "Courier New" : "monospace", // Use monospace
+    fontSize: 13,
+    fontFamily: "DMMono_500Medium", // Keep explicit mono font
   },
   graphPlaceholder: {
     height: 110, // Approximation from Figma data
@@ -151,7 +150,7 @@ const styles = StyleSheet.create({
   bubblesLabel: {
     color: "rgba(255, 255, 255, 0.7)",
     fontSize: 17,
-    fontWeight: "500",
+    fontWeight: "600",
   },
   bubblesGridPlaceholder: {
     backgroundColor: "rgba(0, 0, 0, 0.3)", // from 2727:23054
@@ -164,7 +163,7 @@ const styles = StyleSheet.create({
   },
   placeholderText: {
     color: "rgba(255, 255, 255, 0.5)",
-    fontSize: 14,
+    fontSize: 13,
   },
   divider: {
     height: 1, // Thinner divider
@@ -186,7 +185,7 @@ const styles = StyleSheet.create({
   toggleLabel: {
     color: "rgba(255, 255, 255, 0.8)",
     fontSize: 15,
-    fontWeight: "500",
+    fontWeight: "600",
   },
   dynamicContentContainer: {
     flex: 1, // Allow this container to expand
