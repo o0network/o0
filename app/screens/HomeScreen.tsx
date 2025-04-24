@@ -7,7 +7,7 @@ import {
   SafeAreaView,
   Linking,
 } from "react-native";
-import { Background, Card, Frame } from "../components";
+import { Background, Card, Frame, Inbound, Outbound } from "../components";
 import { usePlatformContext } from "../utils/platform";
 import VideoNote from "../components/VideoNote";
 import { Text } from "../App";
@@ -16,9 +16,7 @@ const { width } = Dimensions.get("window");
 const isTablet = width > 768;
 const contentWidth = Math.min(width, isTablet ? 420 : 390);
 
-// Define the video source path relative to this file
 const videoSourcePath = require("../assets/example.mp4");
-// Define the texts to display below the video
 const textsToShow = ["10%", "3000ETH", "100$"];
 
 export default function HomeScreen() {
@@ -26,7 +24,7 @@ export default function HomeScreen() {
 
   return (
     <SafeAreaView style={styles.container}>
-      <Frame style={styles.frameStyle}>
+      <Outbound style={styles.frameStyle}>
         <View style={styles.content}>
           <VideoNote
             videoSource={videoSourcePath}
@@ -37,25 +35,29 @@ export default function HomeScreen() {
             }}
           />
 
-          <Card
-            style={styles.linkCard}
-            onPress={() => Linking.openURL("https://research.allo.capital")}
-          >
-            <View style={styles.cardContent}>
-              <View>
-                <Text style={styles.cardTitle}>Link to DAO:</Text>
-                <Text style={styles.cardSubtitle}>
-                  https://research.allo.capital
-                </Text>
+          <Inbound style={styles.linkCard}>
+            <Pressable
+              onPress={() => Linking.openURL("https://research.allo.capital")}
+            >
+              <View style={styles.cardContent}>
+                <View>
+                  <Text style={styles.cardTitle}>Link to DAO:</Text>
+                  <Text style={styles.cardSubtitle}>
+                    https://research.allo.capital
+                  </Text>
+                </View>
+                <Text style={styles.cardArrow}>↗</Text>
               </View>
-              <Text style={styles.cardArrow}>↗</Text>
-            </View>
-          </Card>
-          <Pressable style={styles.connectButton}>
-            <Text style={styles.connectButtonText}>Connect Wallet</Text>
-          </Pressable>
+            </Pressable>
+          </Inbound>
+
+          <Outbound style={styles.connectButton}>
+            <Pressable>
+              <Text style={styles.connectButtonText}>Connect Wallet</Text>
+            </Pressable>
+          </Outbound>
         </View>
-      </Frame>
+      </Outbound>
     </SafeAreaView>
   );
 }
@@ -87,7 +89,6 @@ const styles = StyleSheet.create({
   },
   linkCard: {
     width: contentWidth - 32,
-    backgroundColor: "rgba(214, 214, 214, 0.45)",
     marginBottom: 24,
   },
   cardContent: {
@@ -113,11 +114,8 @@ const styles = StyleSheet.create({
   },
   connectButton: {
     width: contentWidth - 32,
-    backgroundColor: "rgba(128, 128, 128, 0.3)",
     borderRadius: 100,
     padding: 12,
-    borderWidth: 1.4,
-    borderColor: "rgba(255, 255, 255, 0.1)",
     marginBottom: 32,
   },
   connectButtonText: {

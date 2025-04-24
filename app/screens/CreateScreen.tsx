@@ -1,16 +1,16 @@
 import React from "react";
 import { StyleSheet, SafeAreaView, View } from "react-native";
-import { Frame } from "../components";
+import { Outbound } from "../components";
 import { Text } from "../App";
 
 export default function CreateScreen() {
   return (
     <SafeAreaView style={styles.container}>
-      <Frame style={styles.frameStyle}>
+      <Outbound style={styles.frameStyle}>
         <View style={styles.inner}>
           <Text style={styles.text}>Create Screen</Text>
         </View>
-      </Frame>
+      </Outbound>
     </SafeAreaView>
   );
 }

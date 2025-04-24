@@ -1,15 +1,21 @@
-import React from "react";
 import {
   Pressable,
   StyleSheet,
   View,
   Text,
   Image,
-  Platform,
+  ImageSourcePropType,
 } from "react-native";
+import { usePlatformContext } from "../utils/platform";
 
-// If you have these icons in assets, use require("../assets/safari.png") etc.
-const icons = [
+type TabItem = {
+  key: string;
+  label: string;
+  emoji: string;
+  img?: ImageSourcePropType;
+};
+
+const icons: TabItem[] = [
   {
     key: "explore",
     label: "Explore",
@@ -26,36 +32,48 @@ const icons = [
     emoji: "🪙",
   },
   {
-    key: "params",
-    label: "Params",
-    emoji: "⚙️",
+    key: "tweaks",
+    label: "Tweaks",
+    emoji: "🪩",
   },
 ];
-const routes = ["/", "/create", "/assets", "/params"];
+const routes = ["/explore", "/create", "/assets", "/tweaks"];
 
-const Navigation = ({
+export default function Navigation({
   activeRoute,
   onNavigate,
 }: {
   activeRoute: string;
   onNavigate: (route: string) => void;
-}) => {
+}) {
+  const { platform } = usePlatformContext();
+
+  const navBarStyle = [
+    styles.navBar,
+    platform === "telegram" && styles.navBarTelegram,
+    platform === "web" && styles.navBarWeb,
+  ];
+
+  const showLabels = platform !== "telegram";
+
   return (
-    <View style={styles.navBar}>
+    <View style={navBarStyle}>
       {icons.map((tab, i) => {
         const isActive = routes[i] === activeRoute;
         return (
           <Pressable
             key={tab.key}
-            style={[styles.tab, isActive && styles.tabActive]}
+            style={[
+              styles.tab,
+              isActive && styles.tabActive,
+              platform === "telegram" && styles.tabTelegram,
+            ]}
             onPress={() => onNavigate(routes[i])}
           >
             {tab.img ? (
               <Image
                 source={tab.img}
-                style={[
-                  styles.iconBase /*, isActive && styles.iconActiveImage */,
-                ]}
+                style={[styles.iconBase, isActive && styles.iconActiveImage]}
                 resizeMode="contain"
               />
             ) : (
@@ -69,15 +87,15 @@ const Navigation = ({
                 {tab.emoji}
               </Text>
             )}
-            {isActive && <Text style={styles.label}>{tab.label}</Text>}
+            {(isActive || platform === "web") && showLabels && (
+              <Text style={styles.label}>{tab.label}</Text>
+            )}
           </Pressable>
         );
       })}
     </View>
   );
-};
-
-export default Navigation;
+}
 
 const styles = StyleSheet.create({
   navBar: {
@@ -95,6 +113,16 @@ const styles = StyleSheet.create({
     gap: 32,
     alignSelf: "flex-start",
     minHeight: 44,
+  },
+  navBarTelegram: {
+    gap: 16,
+    padding: 2,
+    borderRadius: 24,
+  },
+  navBarWeb: {
+    gap: 8,
+    justifyContent: "center",
+    alignSelf: "stretch",
   },
   tab: {
     flexDirection: "row",
@@ -114,6 +142,10 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 2 },
     elevation: 4,
   },
+  tabTelegram: {
+    paddingHorizontal: 12,
+    paddingVertical: 4,
+  },
   iconBase: {
     width: 36,
     height: 36,
@@ -126,6 +158,10 @@ const styles = StyleSheet.create({
   },
   iconActive: {
     color: "rgba(255, 255, 255, 0.96)",
+  },
+  iconActiveImage: {
+    opacity: 1,
+    tintColor: "rgba(255, 255, 255, 0.96)",
   },
   label: {
     fontSize: 15,

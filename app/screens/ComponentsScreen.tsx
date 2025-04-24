@@ -12,16 +12,18 @@ import {
   DotSelector,
   BubbleBar,
   Background,
+  Frame,
+  Outbound,
+  Inbound,
 } from "../components";
 import {
   View,
   StyleSheet,
   SafeAreaView,
   ScrollView,
-  Platform,
+  TouchableOpacity,
 } from "react-native";
 import { Text } from "../App";
-import { Frame } from "../components";
 
 export default function ComponentsScreen() {
   const [switchValue, setSwitchValue] = useState(false);
@@ -65,14 +67,14 @@ export default function ComponentsScreen() {
     <SafeAreaView style={styles.container}>
       <Background />
       <ScrollView contentContainerStyle={styles.scrollContent}>
-        <Frame style={styles.frameStyle}>
-          <Card style={styles.card}>
+        <Outbound style={styles.frameStyle}>
+          <Inbound style={styles.card}>
             <Text>Nunito (SemiBold)</Text>
             <Text style={styles.textMono}>DM Mono (Medium)</Text>
             <Text style={styles.textPuff}>DynaPuff (Bold)</Text>
-          </Card>
+          </Inbound>
 
-          <Card style={styles.card}>
+          <Inbound style={styles.card}>
             <View style={styles.userInfoRow}>
               <View style={styles.avatarPlaceholder} />
               <View style={styles.userInfoText}>
@@ -81,7 +83,7 @@ export default function ComponentsScreen() {
               </View>
               <Text style={styles.grabber}>􀌇</Text>
             </View>
-          </Card>
+          </Inbound>
 
           <Gallery items={galleryItems} selectedId="1" />
 
@@ -89,20 +91,19 @@ export default function ComponentsScreen() {
           <Field placeholder="Search" style={styles.field} />
           <Field placeholder="Password" secureTextEntry style={styles.field} />
 
-          <Button
-            title="Button"
-            icon="😸"
-            onPress={() => {}}
-            style={styles.button}
-          />
+          <TouchableOpacity onPress={() => {}}>
+            <Outbound style={styles.button}>
+              <Text>Button</Text>
+            </Outbound>
+          </TouchableOpacity>
 
           <List items={listItems} />
 
-          <View style={styles.controlsRow}>
+          <Inbound style={styles.controlsRow}>
             <Switch value={switchValue} onValueChange={setSwitchValue} />
             <Checkbox isChecked={checkboxValue} onToggle={setCheckboxValue} />
             <ValueLabel value={`${Math.round(sliderValue)}%`} />
-          </View>
+          </Inbound>
 
           <Slider
             value={sliderValue}
@@ -112,7 +113,7 @@ export default function ComponentsScreen() {
             style={styles.slider}
           />
 
-          <View style={styles.dotSelectorContainer}>
+          <Inbound style={styles.dotSelectorContainer}>
             <DotSelector
               options={dotOptions.map((opt, index) => ({
                 ...opt,
@@ -122,7 +123,7 @@ export default function ComponentsScreen() {
               showAddButton={true}
               onAddPress={() => console.log("Add dot pressed")}
             />
-          </View>
+          </Inbound>
 
           <BubbleBar
             items={bubbleItems}
@@ -131,19 +132,19 @@ export default function ComponentsScreen() {
             style={styles.bubbleBar}
           />
 
-          <View style={styles.roundButtonRow}>
+          <Inbound style={styles.roundButtonRow}>
             <Button
               icon="⚙️"
               title=""
               onPress={() => {}}
               style={styles.pillButton}
             />
-          </View>
+          </Inbound>
 
-          <View style={styles.gloriousButtonPlaceholder}>
+          <Inbound style={styles.gloriousButtonPlaceholder}>
             <Text style={styles.text}>Glorious Button Placeholder</Text>
-          </View>
-        </Frame>
+          </Inbound>
+        </Outbound>
       </ScrollView>
     </SafeAreaView>
   );

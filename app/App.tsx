@@ -30,7 +30,7 @@ import { DynaPuff_700Bold } from "@expo-google-fonts/dynapuff";
 import HomeScreen from "./screens/HomeScreen";
 import CreateScreen from "./screens/CreateScreen";
 import AssetsScreen from "./screens/AssetsScreen";
-import ParamsScreen from "./screens/ParamsScreen";
+import TweaksScreen from "./screens/TweaksScreen";
 import ComponentsScreen from "./screens/ComponentsScreen";
 // Import components
 import { PlatformProvider } from "./utils/platform";
@@ -41,7 +41,7 @@ type HomeTabParamList = {
   Explore: undefined;
   Create: undefined;
   Assets: undefined;
-  Params: undefined;
+  Tweaks: undefined;
 };
 
 const Tab = createMaterialTopTabNavigator<HomeTabParamList>();
@@ -104,7 +104,7 @@ function CustomTabBar({
         if (route.name === "Explore") emoji = "🧭";
         if (route.name === "Create") emoji = "🪩";
         if (route.name === "Assets") emoji = "🪙";
-        if (route.name === "Params") emoji = "⚙️";
+        if (route.name === "Tweaks") emoji = "🪩";
 
         const bounceValue = bounceValues[index];
 
@@ -164,7 +164,7 @@ function HomeTabs() {
         <Tab.Screen name="Explore" component={HomeScreen} />
         <Tab.Screen name="Create" component={CreateScreen} />
         <Tab.Screen name="Assets" component={AssetsScreen} />
-        <Tab.Screen name="Params" component={ParamsScreen} />
+        <Tab.Screen name="Tweaks" component={TweaksScreen} />
       </Tab.Navigator>
     </View>
   );

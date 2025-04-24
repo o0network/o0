@@ -15,4 +15,4 @@ export { default as DotSelector } from "./DotSelector";
 export { default as Background } from "./Background";
 export { RoundButton } from "./RoundButton";
 export { default as BubbleBar } from "./BubbleBar";
-export { default as Frame } from "./Frame";
+export { default as Frame, Inbound, Outbound } from "./Frame";

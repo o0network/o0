@@ -14,15 +14,39 @@ interface FrameProps {
   intensity?: number; // Allow customizing intensity
   // Simplify tint options to common cross-platform values
   tint?: "light" | "dark" | "default";
+  outbound?: boolean;
+  inbound?: boolean;
 }
 
 const windowWidth = Dimensions.get("window").width;
 
-export const Frame: React.FC<FrameProps> = ({ children, style }) => {
+export const Frame: React.FC<FrameProps> = ({
+  children,
+  style,
+  outbound = false,
+  inbound = false,
+}) => {
+  const frameStyles = [
+    styles.container,
+    outbound && styles.outbound,
+    inbound && styles.inbound,
+    style,
+  ];
+
   return (
     // Use BlurView as the main container
-    <View style={styles.contentContainer}>{children}</View>
+    <View style={frameStyles}>
+      <View style={styles.contentContainer}>{children}</View>
+    </View>
   );
+};
+
+export const Outbound: React.FC<Omit<FrameProps, "outbound">> = (props) => {
+  return <Frame {...props} outbound={true} />;
+};
+
+export const Inbound: React.FC<Omit<FrameProps, "inbound">> = (props) => {
+  return <Frame {...props} inbound={true} />;
 };
 
 const styles = StyleSheet.create({
@@ -40,6 +64,14 @@ const styles = StyleSheet.create({
     borderWidth: 1.4,
     borderColor: "rgba(255, 255, 255, 0.2)", // Subtle white border
     position: "relative", // Keep if needed for absolute children, might not be necessary
+  },
+  outbound: {
+    backgroundColor: "rgba(128, 128, 128, 0.3)",
+    borderColor: "rgba(255, 255, 255, 0.1)",
+  },
+  inbound: {
+    backgroundColor: "rgba(214, 214, 214, 0.45)",
+    borderColor: "rgba(255, 255, 255, 0.15)",
   },
   contentContainer: {
     // Apply Figma layout properties (padding, gap)
