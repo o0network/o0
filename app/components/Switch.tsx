@@ -1,63 +1,133 @@
-import React from "react";
 import {
-  StyleSheet,
-  TouchableOpacity,
   View,
-  Animated,
-  Platform,
+  StyleSheet,
+  Pressable,
+  Text,
+  Image,
+  ImageSourcePropType,
 } from "react-native";
 
-interface SwitchProps {
-  value: boolean;
-  onValueChange: (value: boolean) => void;
-  trackColor?: { false: string; true: string };
-  thumbColor?: string;
-  disabled?: boolean;
-}
+export type TabItemType = {
+  key: string;
+  label: string;
+  emoji: string;
+  img?: ImageSourcePropType;
+};
 
-export const Switch: React.FC<SwitchProps> = ({
-  value,
-  onValueChange,
-  trackColor = { false: "rgba(120, 120, 128, 0.16)", true: "#34C759" },
-  thumbColor = "#FFFFFF",
-  disabled = false,
-}) => {
-  const thumbPosition = value ? 22 : 0;
+type SwitchProps = {
+  style?: any;
+  children?: React.ReactNode;
+};
 
+const Switch = ({ style, children }: SwitchProps) => {
+  return <View style={[styles.container, style]}>{children}</View>;
+};
+
+type TabProps = {
+  tab: TabItemType;
+  active: boolean;
+  showLabels?: boolean;
+  isPlatformWeb?: boolean;
+  style?: any;
+  onPress: () => void;
+};
+
+const Tab = ({
+  tab,
+  active,
+  showLabels = true,
+  isPlatformWeb = false,
+  style,
+  onPress,
+}: TabProps) => {
   return (
-    <TouchableOpacity
-      activeOpacity={0.8}
-      onPress={() => !disabled && onValueChange(!value)}
-      style={[
-        styles.container,
-        { backgroundColor: value ? trackColor.true : trackColor.false },
-        disabled && styles.disabled,
-      ]}
-      disabled={disabled}
+    <Pressable
+      key={tab.key}
+      style={[styles.tab, active && styles.tabActive, style]}
+      onPress={onPress}
     >
-      <View
-        style={[
-          styles.thumb,
-          { backgroundColor: thumbColor },
-          { transform: [{ translateX: thumbPosition }] },
-        ]}
-      />
-    </TouchableOpacity>
+      {tab.img ? (
+        <Image
+          source={tab.img}
+          style={[styles.iconBase, active && styles.iconActiveImage]}
+          resizeMode="contain"
+        />
+      ) : (
+        <Text
+          style={[styles.iconBase, styles.icon, active && styles.iconActive]}
+        >
+          {tab.emoji}
+        </Text>
+      )}
+      {(active || isPlatformWeb) && showLabels && (
+        <Text style={styles.label}>{tab.label}</Text>
+      )}
+    </Pressable>
   );
 };
 
 const styles = StyleSheet.create({
-  container: {
-    width: 51,
-    height: 31,
-    borderRadius: 16,
-    padding: 4,
+  tab: {
+    flexDirection: "row",
+    alignItems: "center",
     justifyContent: "center",
+    borderRadius: 999,
+    paddingVertical: 6,
+    paddingHorizontal: 16,
+    marginHorizontal: 0,
+    gap: 8,
+  },
+  tabActive: {
+    backgroundColor: "rgba(94, 94, 94, 0.18)",
+    shadowColor: "#000",
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    shadowOffset: { width: 0, height: 2 },
+    elevation: 4,
+    borderRadius: 999,
+  },
+  iconBase: {
+    width: 24,
+    height: 24,
+  },
+  icon: {
+    fontSize: 20,
+    textAlign: "center",
+    textAlignVertical: "center",
+    color: "rgba(84, 84, 84, 1)",
+  },
+  iconActive: {
+    color: "rgba(255, 255, 255, 0.96)",
+  },
+  iconActiveImage: {
+    opacity: 1,
+    tintColor: "rgba(255, 255, 255, 0.96)",
+  },
+  label: {
+    fontSize: 15,
+    fontWeight: "500",
+    color: "rgba(255, 255, 255, 0.96)",
+  },
+  container: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "rgba(208, 208, 208, 0.5)",
+    borderRadius: 999,
+    paddingVertical: 4,
+    paddingHorizontal: 4,
+    gap: 32,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
   },
   thumb: {
     width: 25,
     height: 25,
     borderRadius: 13,
+    backgroundColor: "#FFFFFF",
     shadowColor: "#000",
     shadowOffset: { width: 0, height: 1 },
     shadowOpacity: 0.15,
@@ -68,5 +138,7 @@ const styles = StyleSheet.create({
     opacity: 0.4,
   },
 });
+
+Switch.Tab = Tab;
 
 export default Switch;

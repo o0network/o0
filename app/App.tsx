@@ -1,21 +1,24 @@
-import { DefaultTheme, NavigationContainer } from "@react-navigation/native";
+import {
+  DefaultTheme,
+  NavigationContainer,
+  LinkingOptions,
+  NavigatorScreenParams,
+} from "@react-navigation/native";
 import {
   createMaterialTopTabNavigator,
   MaterialTopTabBarProps,
+  MaterialTopTabScreenProps,
 } from "@react-navigation/material-top-tabs";
 import { createNativeStackNavigator } from "@react-navigation/native-stack";
-import { RouteProp, ParamListBase } from "@react-navigation/native";
-import React, { useRef, useCallback } from "react";
+import { useRef, useCallback } from "react";
 import {
   StyleSheet,
   View,
   SafeAreaView,
   Dimensions,
-  Image,
   Text as RNText,
   TouchableOpacity,
   Animated,
-  TextStyle,
   Platform,
 } from "react-native";
 import { StatusBar } from "expo-status-bar";
@@ -26,70 +29,43 @@ import { Nunito_600SemiBold, Nunito_700Bold } from "@expo-google-fonts/nunito";
 import { DMMono_500Medium } from "@expo-google-fonts/dm-mono";
 import { DynaPuff_700Bold } from "@expo-google-fonts/dynapuff";
 
-// Import screens
-import HomeScreen from "./screens/HomeScreen";
+import ExploreScreen from "./screens/ExploreScreen";
 import CreateScreen from "./screens/CreateScreen";
 import AssetsScreen from "./screens/AssetsScreen";
 import TweaksScreen from "./screens/TweaksScreen";
 import ComponentsScreen from "./screens/ComponentsScreen";
-// Import components
 import { PlatformProvider } from "./utils/platform";
 import { Background } from "./components";
 
-// Define ParamList for type safety
 type HomeTabParamList = {
-  Explore: undefined;
+  Explore: { address?: string };
   Create: undefined;
-  Assets: undefined;
-  Tweaks: undefined;
+  Assets: { address?: string };
+  Network: undefined;
+};
+
+type RootStackParamList = {
+  Main: NavigatorScreenParams<HomeTabParamList>;
+  Components: undefined;
 };
 
 const Tab = createMaterialTopTabNavigator<HomeTabParamList>();
-const Stack = createNativeStackNavigator();
+const Stack = createNativeStackNavigator<RootStackParamList>();
 const { width } = Dimensions.get("window");
 
-// --- Custom Tab Bar Component ---
+const DEFAULT_ADDRESS = "o0.network";
+
+type TabScreenProps<T extends keyof HomeTabParamList = any> =
+  MaterialTopTabScreenProps<HomeTabParamList, T>;
+
 function CustomTabBar({
   state,
   descriptors,
   navigation,
-  position,
 }: MaterialTopTabBarProps) {
-  // Refs for bounce animation, one Animated.Value per tab
   const bounceValues = useRef(
     state.routes.map(() => new Animated.Value(0))
   ).current;
-
-  const onTabPress = (
-    route: RouteProp<ParamListBase, string>,
-    index: number,
-    isFocused: boolean
-  ) => {
-    const event = navigation.emit({
-      type: "tabPress",
-      target: route.key,
-      canPreventDefault: true,
-    });
-
-    if (!isFocused) {
-      Animated.sequence([
-        Animated.timing(bounceValues[index], {
-          toValue: 16,
-          duration: 100,
-          useNativeDriver: true,
-        }),
-        Animated.timing(bounceValues[index], {
-          toValue: 0,
-          duration: 150,
-          useNativeDriver: true,
-        }),
-      ]).start();
-    }
-
-    if (!isFocused && !event.defaultPrevented) {
-      navigation.navigate(route.name, route.params);
-    }
-  };
 
   return (
     <View style={styles.tabBarContainer}>
@@ -99,12 +75,11 @@ function CustomTabBar({
 
         const isFocused = state.index === index;
 
-        // Determine emoji based on route name (same logic as before)
         let emoji = "🧭";
         if (route.name === "Explore") emoji = "🧭";
         if (route.name === "Create") emoji = "🪩";
         if (route.name === "Assets") emoji = "🪙";
-        if (route.name === "Tweaks") emoji = "🪩";
+        if (route.name === "Network") emoji = "🌐";
 
         const bounceValue = bounceValues[index];
 
@@ -118,11 +93,20 @@ function CustomTabBar({
               accessibilityState={isFocused ? { selected: true } : {}}
               accessibilityLabel={options.tabBarAccessibilityLabel}
               testID={options.tabBarTestID}
-              onPress={() => onTabPress(route, index, isFocused)}
-              // Add onLongPress if needed, similar structure
-              style={styles.touchableTabBase} // Base touchable area style
+              onPress={() => {
+                const event = navigation.emit({
+                  type: "tabPress",
+                  target: route.key,
+                  canPreventDefault: true,
+                });
+
+                if (!isFocused && !event.defaultPrevented) {
+                  navigation.navigate(route.name, route.params);
+                }
+              }}
+              style={styles.touchableTabBase}
             >
-              <Animated.View // Inner view for scaling and styling
+              <Animated.View
                 style={[
                   styles.tabItemBase,
                   isFocused ? styles.tabItemActive : styles.tabItemInactive,
@@ -149,42 +133,34 @@ function CustomTabBar({
     </View>
   );
 }
-// --- End Custom Tab Bar Component ---
 
 function HomeTabs() {
   return (
-    <View style={styles.homeTabsContainer}>
-      <Tab.Navigator
-        initialLayout={{ width: Dimensions.get("window").width }}
-        tabBar={(props) => <CustomTabBar {...props} />}
-        screenOptions={{
-          swipeEnabled: false,
-        }}
-      >
-        <Tab.Screen name="Explore" component={HomeScreen} />
-        <Tab.Screen name="Create" component={CreateScreen} />
-        <Tab.Screen name="Assets" component={AssetsScreen} />
-        <Tab.Screen name="Tweaks" component={TweaksScreen} />
-      </Tab.Navigator>
-    </View>
+    <Tab.Navigator
+      initialLayout={{ width: Dimensions.get("window").width }}
+      tabBar={(props) => <CustomTabBar {...props} />}
+      screenOptions={{
+        swipeEnabled: false,
+      }}
+    >
+      <Tab.Screen
+        name="Explore"
+        component={ExploreScreen}
+        initialParams={{ address: DEFAULT_ADDRESS }}
+      />
+      <Tab.Screen name="Create" component={CreateScreen} />
+      <Tab.Screen
+        name="Assets"
+        component={AssetsScreen}
+        initialParams={{ address: DEFAULT_ADDRESS }}
+      />
+      <Tab.Screen name="Network" component={TweaksScreen} />
+    </Tab.Navigator>
   );
 }
 
-// Set default text style globally with a custom Text component
-export const Text = (props: React.ComponentProps<typeof RNText>) => {
-  const { style, ...rest } = props;
-  return (
-    <RNText
-      style={[{ fontFamily: "Nunito_600SemiBold", color: "#FFFFFF" }, style]}
-      {...rest}
-    />
-  );
-};
-
-// Keep the splash screen visible while we fetch resources
-SplashScreen.preventAutoHideAsync();
-
 export default function App() {
+  const navigationRef = useRef(null);
   const [fontsLoaded, fontError] = useFonts({
     Nunito_600SemiBold,
     Nunito_700Bold,
@@ -194,7 +170,6 @@ export default function App() {
 
   const onLayoutRootView = useCallback(async () => {
     if (fontsLoaded || fontError) {
-      // Hide the splash screen after the fonts have loaded (or an error was returned)
       await SplashScreen.hideAsync();
     }
   }, [fontsLoaded, fontError]);
@@ -210,6 +185,7 @@ export default function App() {
           <Background />
           <SafeAreaView style={styles.safeArea}>
             <NavigationContainer
+              ref={navigationRef}
               theme={{
                 ...DefaultTheme,
                 colors: {
@@ -218,6 +194,26 @@ export default function App() {
                 },
               }}
               onReady={onLayoutRootView}
+              linking={
+                Platform.OS === "web"
+                  ? ({
+                      prefixes: [],
+                      config: {
+                        screens: {
+                          Main: {
+                            screens: {
+                              Explore: "explore/:address?",
+                              Create: "create",
+                              Assets: "assets/:address?",
+                              Network: "network",
+                            },
+                          },
+                          Components: "components",
+                        },
+                      },
+                    } as LinkingOptions<RootStackParamList>)
+                  : undefined
+              }
             >
               <Stack.Navigator
                 screenOptions={{

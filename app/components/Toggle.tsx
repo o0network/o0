@@ -1,81 +1,62 @@
-import React from "react";
-import {
-  View,
-  StyleSheet,
-  TouchableOpacity,
-  Animated,
-  Easing,
-} from "react-native";
-import { Text } from "react-native";
+import { StyleSheet, TouchableOpacity, Animated } from "react-native";
 
-// Figma Node: 2658:1062 (Toggle Component)
+type ToggleProps = {
+  value: boolean;
+  onValueChange: (value: boolean) => void;
+  disabled?: boolean;
+};
 
-const styles = StyleSheet.create({
-  container: {
-    // layout_WNV36K
-    width: 51,
-    height: 31,
-    borderRadius: 100,
-    paddingVertical: 2,
-    paddingHorizontal: 2,
-    justifyContent: "center",
-    // fill_T5SSKU applied dynamically
-    // effect_K03GM1 (shadow) omitted
-  },
-  trackOn: {
-    backgroundColor: "#34C759", // fill_T5SSKU (first value)
-  },
-  trackOff: {
-    backgroundColor: "rgba(60, 60, 67, 0.3)", // fill_T5SSKU (second value)
-  },
-  knob: {
-    // Knob Frame: 2651:11793
-    width: 27, // Approx based on container padding/size
-    height: 27,
-    borderRadius: 13.5,
-    backgroundColor: "#FFFFFF", // fill_YBBY7M
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.15,
-    shadowRadius: 2,
-    elevation: 2,
-    // effect_45TZYL (shadow) omitted
-  },
-});
+const Toggle = ({ value, onValueChange, disabled }: ToggleProps) => {
+  const translateX = new Animated.Value(value ? 20 : 0);
 
-interface ToggleProps {
-  isOn: boolean;
-  onToggle: (value: boolean) => void;
-}
+  const handlePress = () => {
+    if (!disabled) {
+      const newValue = !value;
+      onValueChange(newValue);
+      Animated.timing(translateX, {
+        toValue: newValue ? 20 : 0,
+        duration: 200,
+        useNativeDriver: true,
+      }).start();
+    }
+  };
 
-export const Toggle: React.FC<ToggleProps> = ({ isOn, onToggle }) => {
-  const position = React.useRef(new Animated.Value(isOn ? 1 : 0)).current;
-
-  React.useEffect(() => {
-    Animated.timing(position, {
-      toValue: isOn ? 1 : 0,
-      duration: 150,
-      easing: Easing.elastic(0.5),
-      useNativeDriver: false, // Use false for layout properties like left
-    }).start();
-  }, [isOn, position]);
-
-  const knobLeft = position.interpolate({
-    inputRange: [0, 1],
-    outputRange: [2, 22],
-  });
+  const trackColor = value ? "#32D74B" : "rgba(208, 208, 208, 0.5)";
+  const knobTransform = { transform: [{ translateX }] };
 
   return (
     <TouchableOpacity
       activeOpacity={0.8}
-      onPress={() => onToggle(!isOn)}
-      style={[styles.container, isOn ? styles.trackOn : styles.trackOff]}
+      onPress={handlePress}
+      style={[
+        styles.container,
+        { backgroundColor: trackColor },
+        disabled && styles.disabled,
+      ]}
+      disabled={disabled}
     >
-      <Animated.View
-        style={[styles.knob, { position: "absolute", left: knobLeft }]}
-      />
+      <Animated.View style={[styles.knob, knobTransform]} />
     </TouchableOpacity>
   );
 };
+
+const styles = StyleSheet.create({
+  container: {
+    width: 51,
+    height: 31,
+    borderRadius: 74.5,
+    padding: 2,
+    justifyContent: "center",
+  },
+  knob: {
+    width: 27,
+    height: 27,
+    borderRadius: 74.5,
+    backgroundColor: "#FFFFFF",
+  },
+  disabled: {
+    opacity: 0.5,
+  },
+});
 
 export default Toggle;

@@ -1,15 +1,12 @@
 import { useState } from "react";
 import {
-  Card,
   Field,
   Gallery,
   Button,
-  List,
   Switch,
   Checkbox,
   ValueLabel,
   Slider,
-  DotSelector,
   BubbleBar,
   Background,
   Frame,
@@ -23,7 +20,7 @@ import {
   ScrollView,
   TouchableOpacity,
 } from "react-native";
-import { Text } from "../App";
+import { Text } from "../components";
 
 export default function ComponentsScreen() {
   const [switchValue, setSwitchValue] = useState(false);
@@ -66,6 +63,10 @@ export default function ComponentsScreen() {
   return (
     <SafeAreaView style={styles.container}>
       <Background />
+
+      <Frame>💸</Frame>
+      <Inbound>💸</Inbound>
+      <Outbound>💸</Outbound>
       <ScrollView contentContainerStyle={styles.scrollContent}>
         <Outbound style={styles.frameStyle}>
           <Inbound style={styles.card}>
@@ -97,10 +98,7 @@ export default function ComponentsScreen() {
             </Outbound>
           </TouchableOpacity>
 
-          <List items={listItems} />
-
           <Inbound style={styles.controlsRow}>
-            <Switch value={switchValue} onValueChange={setSwitchValue} />
             <Checkbox isChecked={checkboxValue} onToggle={setCheckboxValue} />
             <ValueLabel value={`${Math.round(sliderValue)}%`} />
           </Inbound>
@@ -113,23 +111,18 @@ export default function ComponentsScreen() {
             style={styles.slider}
           />
 
-          <Inbound style={styles.dotSelectorContainer}>
-            <DotSelector
-              options={dotOptions.map((opt, index) => ({
-                ...opt,
-                selected: index === dotIndex,
-                onSelect: () => setDotIndex(index),
-              }))}
-              showAddButton={true}
-              onAddPress={() => console.log("Add dot pressed")}
-            />
-          </Inbound>
-
           <BubbleBar
             items={bubbleItems}
             selectedIndex={bubbleIndex}
             onSelectIndex={setBubbleIndex}
             style={styles.bubbleBar}
+          />
+
+          <Button
+            glorious
+            title="Glorious Button"
+            onPress={() => {}}
+            style={styles.gloriousButton}
           />
 
           <Inbound style={styles.roundButtonRow}>
@@ -139,10 +132,6 @@ export default function ComponentsScreen() {
               onPress={() => {}}
               style={styles.pillButton}
             />
-          </Inbound>
-
-          <Inbound style={styles.gloriousButtonPlaceholder}>
-            <Text style={styles.text}>Glorious Button Placeholder</Text>
           </Inbound>
         </Outbound>
       </ScrollView>
@@ -244,11 +233,9 @@ const styles = StyleSheet.create({
     minWidth: 44,
     paddingHorizontal: 12,
   },
-  gloriousButtonPlaceholder: {
-    height: 50,
-    backgroundColor: "rgba(255, 255, 255, 0.1)",
-    justifyContent: "center",
-    alignItems: "center",
-    borderRadius: 8,
+  gloriousButton: {
+    marginVertical: 16,
+    paddingVertical: 12,
+    minHeight: 54,
   },
 });

@@ -1,4 +1,3 @@
-import React from "react";
 import { View, Text, StyleSheet, ScrollView } from "react-native";
 
 interface GalleryItemProps {
@@ -48,25 +47,16 @@ export const Gallery: React.FC<GalleryProps> = ({
   );
 };
 
-// Styles derived from Figma nodes:
-// Gallery Container: 2658:1359 (layout_3D2ZI6)
-// Item Frame: e.g., 2601:3652 (layout_1KFL52, borderRadius)
-// Item Frame Selected: 2601:3642 (fill_HHLOQ5)
-// Avatar: e.g., 2658:1055 (fill_5TFAY2, borderRadius, fixed size inferred)
-// Avatar Image Placeholder: 2601:3633 (fill_ITSHHC - image ref)
-// Label Text: e.g., 2601:3644 (textStyle_7SOT5O, fills_2G2BWC)
 const styles = StyleSheet.create({
   galleryContainer: {
-    alignSelf: "stretch", // Take full width
+    alignSelf: "stretch",
   },
   scrollContainer: {
-    // layout_3D2ZI6
     paddingHorizontal: 16,
     gap: 16,
     alignItems: "flex-start",
   },
   itemFrame: {
-    // layout_1KFL52
     flexDirection: "column",
     alignItems: "center",
     gap: 4,

@@ -1,6 +1,15 @@
-import React, { useState } from "react";
+import { useState } from "react";
 import { StyleSheet, View, ScrollView, Text, SafeAreaView } from "react-native";
 import { Toggle, Button, Inbound, Outbound } from "../components";
+import { useNavigation } from "@react-navigation/native";
+import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
+
+type RootStackParamList = {
+  Components: undefined;
+  Main: undefined;
+};
+
+type NavigationProp = NativeStackNavigationProp<RootStackParamList>;
 
 interface ProposalCardProps {
   title: string;
@@ -8,6 +17,55 @@ interface ProposalCardProps {
   percentage: number;
   status: "voting" | "approved" | "rejected";
 }
+
+const proposalData: {
+  key: string;
+  title: string;
+  description: string;
+  percentage: number;
+  status: "voting" | "approved" | "rejected";
+}[] = [
+  {
+    key: "fae3bb34-34a1-4d15-af46-5e0d7fc9cbb4",
+    title: "Which remote work project should we support?",
+    description:
+      "A survey to assess the feasibility and potential benefits of a remote work initiative aimed at enhancing work-life balance and boosting productivity.",
+    percentage: 72,
+    status: "voting",
+  },
+  {
+    key: "72f7cd00-30f2-4a14-bb7f-ea3eb6c0a2f8",
+    title: "Which renewable energy project should we support?",
+    description:
+      "A survey to evaluate the integration of renewable energy solutions to reduce operational costs and promote sustainability.",
+    percentage: 85,
+    status: "approved",
+  },
+  {
+    key: "2b895eed-4286-4f11-8967-3457d25cd0b9",
+    title: "Which employee benefits project should we support?",
+    description:
+      "Assessing proposals to upgrade health, wellness, and educational benefits for improved employee satisfaction and retention.",
+    percentage: 35,
+    status: "rejected",
+  },
+  {
+    key: "b75b1977-8b8b-4a0a-bbca-52762c30a2fd",
+    title: "Which international expansion project should we support?",
+    description:
+      "A market research survey exploring initiatives for extending our services to international markets while balancing benefits and challenges.",
+    percentage: 60,
+    status: "voting",
+  },
+  {
+    key: "c1234567-89ab-cdef-0123-456789abcdef",
+    title: "Which sustainability project should we support?",
+    description:
+      "Investigating potential projects focused on waste reduction, recycling, and sustainable product development.",
+    percentage: 90,
+    status: "approved",
+  },
+];
 
 const ProposalCard: React.FC<ProposalCardProps> = ({
   title,
@@ -61,6 +119,7 @@ const ProposalCard: React.FC<ProposalCardProps> = ({
 };
 
 const TweaksScreen = () => {
+  const navigation = useNavigation<NavigationProp>();
   const [reducedMotion, setReducedMotion] = useState(false);
 
   return (
@@ -69,7 +128,7 @@ const TweaksScreen = () => {
         <Inbound style={styles.settingsCard}>
           <View style={styles.toggleRow}>
             <Text style={styles.toggleLabel}>Reduced motion</Text>
-            <Toggle isOn={reducedMotion} onToggle={setReducedMotion} />
+            <Toggle value={reducedMotion} onValueChange={setReducedMotion} />
           </View>
 
           <Button
@@ -79,6 +138,14 @@ const TweaksScreen = () => {
               console.log("Disconnect wallet pressed");
             }}
             style={styles.disconnectButton}
+          />
+
+          <Button
+            title="Open Components"
+            icon="🪣"
+            onPress={() => {
+              navigation.navigate("Components");
+            }}
           />
         </Inbound>
 
@@ -94,29 +161,15 @@ const TweaksScreen = () => {
 
           <Inbound style={styles.proposalsContainer}>
             <ScrollView>
-              <ProposalCard
-                title="Should we support gamble projects?"
-                description="This refers to applications centered on gambling, including online casinos, sports betting platforms, poker apps, or lottery systems, which involve real-money wagering and chance-based outcomes."
-                yesPercentage={67}
-                noPercentage={33}
-                status="voting"
-              />
-
-              <ProposalCard
-                title="Should we support gamble projects?"
-                description="This refers to applications centered on gambling, including online casinos, sports betting platforms, poker apps, or lottery systems, which involve real-money wagering and chance-based outcomes."
-                yesPercentage={67}
-                noPercentage={33}
-                status="approved"
-              />
-
-              <ProposalCard
-                title="Should we support gamble projects?"
-                description="This refers to applications centered on gambling, including online casinos, sports betting platforms, poker apps, or lottery systems, which involve real-money wagering and chance-based outcomes."
-                yesPercentage={67}
-                noPercentage={33}
-                status="approved"
-              />
+              {proposalData.map((p) => (
+                <ProposalCard
+                  key={p.key}
+                  title={p.title}
+                  description={p.description}
+                  percentage={p.percentage}
+                  status={p.status}
+                />
+              ))}
             </ScrollView>
           </Inbound>
         </Outbound>
@@ -131,6 +184,10 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingVertical: 12,
     gap: 16,
+    maxWidth: 512,
+    width: "100%",
+    alignSelf: "center",
+    justifyContent: "flex-start",
   },
   settingsCard: {
     borderRadius: 16,
