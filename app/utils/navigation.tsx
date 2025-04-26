@@ -2,10 +2,8 @@ import React from "react";
 import { Linking, Platform } from "react-native";
 import { detectPlatform, AppPlatform } from "./platform";
 
-// Different navigation types
 export type NavigationType = "stack" | "tab" | "drawer";
 
-// Navigation configuration for different platforms
 export interface NavigationConfig {
   type: NavigationType;
   headerVisible: boolean;
@@ -14,7 +12,6 @@ export interface NavigationConfig {
   tabBarPosition: "bottom" | "top";
 }
 
-// Platform-specific navigation configurations
 const navigationConfigs: Record<AppPlatform, NavigationConfig> = {
   mobile: {
     type: "stack",
@@ -32,20 +29,18 @@ const navigationConfigs: Record<AppPlatform, NavigationConfig> = {
   },
   telegram: {
     type: "stack",
-    headerVisible: false, // Telegram has its own header
+    headerVisible: false,
     animationsEnabled: true,
     gesturesEnabled: false,
     tabBarPosition: "bottom",
   },
 };
 
-// Get navigation configuration for current platform
 export const getNavigationConfig = (): NavigationConfig => {
   const platform = detectPlatform();
   return navigationConfigs[platform];
 };
 
-// Handle navigation back
 export const handleBackNavigation = (): boolean => {
   const platform = detectPlatform();
 
@@ -76,22 +71,18 @@ export const handleBackNavigation = (): boolean => {
       return true;
 
     case "mobile":
-      // Let the native navigation handle it
       return true;
   }
 };
 
-// External URL handling based on platform
 export const openExternalUrl = (url: string): void => {
   const platform = detectPlatform();
 
   switch (platform) {
     case "telegram":
-      // Telegram has its own way to open links
       if (window.Telegram && window.Telegram.WebApp) {
         window.Telegram.WebApp.openLink(url);
       } else {
-        // Fallback
         window.open(url, "_blank");
       }
       break;
@@ -106,7 +97,6 @@ export const openExternalUrl = (url: string): void => {
   }
 };
 
-// Hook to use navigation
 export const useAppNavigation = () => {
   const config = getNavigationConfig();
 

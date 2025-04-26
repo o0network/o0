@@ -37,11 +37,11 @@ interface DotSelectorProps {
   onAddPress?: () => void;
 }
 
-export const DotSelector: React.FC<DotSelectorProps> = ({
+export default function DotSelector({
   options,
   showAddButton = false,
   onAddPress,
-}) => {
+}: DotSelectorProps) {
   return (
     <View style={styles.dotSelector}>
       {options.map((option, index) => (

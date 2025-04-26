@@ -37,4 +37,4 @@ const styles = StyleSheet.create({
 });
 
 // Rename export to match usage
-export { SliderComponent as Slider };
+export default Slider;

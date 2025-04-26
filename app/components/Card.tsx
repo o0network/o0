@@ -1,11 +1,24 @@
-import React from "react";
-import { View, Text, StyleSheet } from "react-native";
+import React, { ReactNode } from "react";
+import { View, StyleSheet, ViewStyle, TouchableOpacity } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
+import { Text } from "../components";
+
+interface CardProps {
+  children?: ReactNode;
+  style?: ViewStyle;
+  onPress?: () => void;
+}
 
 // Figma Node: Approximated from user design references
-export const Card = () => {
+const Card = ({ children, style, onPress }: CardProps) => {
+  // If children are provided, render with custom content
+  if (children) {
+    return <View style={[styles.container, style]}>{children}</View>;
+  }
+
+  // Default card with avatar and text content
   return (
-    <View style={styles.container}>
+    <TouchableOpacity style={[styles.container, style]} onPress={onPress}>
       <View style={styles.contentWrapper}>
         <View style={styles.avatar}>
           <Ionicons name="person" size={22} color="#FFFFFF" />
@@ -18,9 +31,11 @@ export const Card = () => {
           <Ionicons name="menu" size={22} color="rgba(235, 235, 245, 0.6)" />
         </View>
       </View>
-    </View>
+    </TouchableOpacity>
   );
 };
+
+export default Card;
 
 const styles = StyleSheet.create({
   container: {
@@ -50,12 +65,12 @@ const styles = StyleSheet.create({
   },
   title: {
     fontSize: 16,
-    fontWeight: "500",
-    color: "#FFFFFF",
+    fontWeight: "600",
   },
   subtitle: {
     fontSize: 13,
     color: "rgba(235, 235, 245, 0.6)",
+    fontWeight: "500",
   },
   actionIcon: {
     padding: 4,

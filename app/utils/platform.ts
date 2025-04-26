@@ -1,7 +1,6 @@
 import { Platform } from "react-native";
 import React, { createContext, useContext, ReactNode } from "react";
 
-// Extend the Window interface to include Telegram WebApp
 declare global {
   interface Window {
     Telegram?: {
@@ -10,10 +9,8 @@ declare global {
   }
 }
 
-// Define the available platforms
 export type AppPlatform = "web" | "mobile" | "telegram";
 
-// Platform-specific configuration types
 export interface PlatformConfig {
   name: string;
   isNative: boolean;
@@ -21,9 +18,7 @@ export interface PlatformConfig {
   supportsDeepLinking: boolean;
 }
 
-// Detect the current platform
 export const detectPlatform = (): AppPlatform => {
-  // Check if running in Telegram WebApp environment
   if (
     typeof window !== "undefined" &&
     window.Telegram &&
@@ -32,16 +27,13 @@ export const detectPlatform = (): AppPlatform => {
     return "telegram";
   }
 
-  // Check if running on web but not in Telegram
   if (Platform.OS === "web") {
     return "web";
   }
 
-  // Default to mobile (iOS, Android)
   return "mobile";
 };
 
-// Get platform display name
 export const getPlatformName = (): string => {
   const platform = detectPlatform();
 
@@ -57,7 +49,6 @@ export const getPlatformName = (): string => {
   }
 };
 
-// Get platform-specific configuration
 export const getPlatformConfig = (): PlatformConfig => {
   const platform = detectPlatform();
 
@@ -91,12 +82,10 @@ export const getPlatformConfig = (): PlatformConfig => {
   }
 };
 
-// Check if the current platform is a specific platform
 export const isPlatform = (platform: AppPlatform): boolean => {
   return detectPlatform() === platform;
 };
 
-// Create a type for our platform context
 export interface PlatformContextType {
   platform: AppPlatform;
   platformName: string;
@@ -128,7 +117,6 @@ export const PlatformProvider = ({ children }: { children: ReactNode }) => {
   );
 };
 
-// Custom hook to use the platform
 export const usePlatform = () => {
   return {
     platform: detectPlatform(),
@@ -138,7 +126,6 @@ export const usePlatform = () => {
   };
 };
 
-// Custom hook to use the platform context
 export const usePlatformContext = () => {
   const context = useContext(PlatformContext);
   if (!context) {
@@ -148,3 +135,29 @@ export const usePlatformContext = () => {
   }
   return context;
 };
+
+export type PlatformType = "ios" | "android" | "web" | "telegram" | "unknown";
+
+const isTelegram = (): boolean => {
+  return (
+    typeof window !== "undefined" && window.Telegram && window.Telegram.WebApp
+  );
+};
+
+export const getPlatformType = (): PlatformType => {
+  if (isTelegram()) {
+    return "telegram";
+  }
+  switch (Platform.OS) {
+    case "ios":
+      return "ios";
+    case "android":
+      return "android";
+    case "web":
+      return "web";
+    default:
+      return "unknown";
+  }
+};
+
+export const currentPlatform: PlatformType = getPlatformType();

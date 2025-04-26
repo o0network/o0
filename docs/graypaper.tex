@@ -1,0 +1,215 @@
+% File: graypaper.tex
+
+\documentclass[12pt]{article}
+
+% Packages
+\usepackage[utf8]{inputenc} % Add UTF-8 input encoding
+\usepackage[T2A]{fontenc}    % Add T2A font encoding for Cyrillic
+\usepackage[english]{babel}
+\usepackage{geometry} % Page layout
+\usepackage{graphicx} % Include graphics
+\usepackage{amsmath} % Math symbols
+\usepackage{amssymb} % More math symbols
+\usepackage{cite} % Citation management
+\usepackage{hyperref} % Hyperlinks
+\usepackage{setspace} % Line spacing
+\usepackage{fancyhdr} % Header and footer
+\usepackage{listings} % Code listings
+
+% Page layout
+\geometry{a4paper, margin=1in}
+\setlength{\headheight}{15pt} % Adjust headheight to fix fancyhdr warning
+\setstretch{1.5} % 1.5 line spacing
+
+% Header and footer
+\pagestyle{fancy}
+\fancyhf{}
+\fancyhead[L]{Development of a Decentralized Application for Investment Assessment}
+\fancyhead[R]{\thepage}
+
+\begin{document}
+
+% Title
+\title{Designing a Decentralized Application for Investment Assessment through Scaling a Neural Network Model for Resource Allocation}
+\author{wtf403.eth}
+\date{\today}
+\maketitle
+
+% Abstract
+\begin{abstract}
+    This is the abstract of the paper. It summarizes the main findings and contributions of the research.
+\end{abstract}
+
+% Keywords
+\textbf{Keywords:} capital allocation, decentralized application, neural network, resource allocation, investments
+
+Below is a comprehensive analysis of the platform, addressing the user's query step-by-step as outlined. This response leverages the provided materials, integrates Augmented Bonding Curves (ABC) and Quadratic Funding (QF), and scales the capital allocation mechanism inspired by allo.capital's design proposals to a wide range of investors (angels) and founders (authors). The response is self-contained, uses markdown for clarity, and follows the structure requested.
+
+% Introduction
+\section{Introduction}
+
+Введение
+
+% Analysis
+\section{Analysis}
+
+\subsection{Subject Area and Identified Problem}
+The traditional early-stage investment ecosystem suffers from information asymmetry, bias in evaluation, and intellectual property vulnerability. The platform addresses these challenges through a blockchain-based blind investment mechanism combined with AI-driven analytics. The platform's relevance stems from its unique approach to protecting innovators while enabling data-driven investment decisions through:
+\begin{itemize}
+    \item Secure local idea storage with zero-knowledge proofs
+    \item Tokenized intellectual property using non-fungible tokens (NFTs)
+    \item AI-powered matching between anonymized ideas and investor profiles
+\end{itemize}
+
+\subsection{Determining Relevance}
+The rise of global entrepreneurship underscores the need for secure, transparent, and unbiased investment platforms. The platform's use of blockchain for IP protection and AI for objective evaluation tackles these pain points, fostering a fairer ecosystem for innovation. Its relevance is amplified by the increasing demand for digital tools that protect creators while connecting them with capital efficiently.
+
+\subsection{Description of the Target Audience}
+The platform serves three key groups facing the identified challenges:
+
+\begin{itemize}
+    \item Idea Creators (Authors): Pre-seed entrepreneurs who need a secure, confidential platform to store, validate, and monetize their ideas without risking IP exposure. They seek funding without compromising their concepts' integrity.
+    \item Angel Investors (Angels): Early-stage investors searching for high-potential startups but requiring unbiased, data-driven insights to make informed decisions. They face the challenge of navigating subjective evaluations in traditional systems.
+    \item Emerging Entrepreneurs: Individuals with moderate experience who benefit from a community-driven, unbiased environment to refine and fund their ideas. They need a level playing field to compete with more established founders.
+\end{itemize}
+
+These groups collectively need a solution that ensures privacy, reduces bias, and provides reliable assessments—problems the platform directly addresses.
+
+\subsection{Overview of existing solutions}
+
+
+
+\subsubsection{Global Analogues}
+\begin{itemize}
+    \item Kickstarter: A crowdfunding platform where creators pitch ideas publicly. It lacks IP protection and blind investment features, exposing founders to risks.
+    \item AngelList: Connects startups with investors but relies on traditional evaluation methods, leaving room for bias and lacking privacy-first mechanisms.
+    \item Blockchain-Based Crowdfunding (e.g., ICOs): Offers liquidity through tokenization but prioritizes public exposure over IP security, unlike the platform's local storage approach.
+\end{itemize}
+
+\subsubsection{Competitors}
+\begin{itemize}
+    \item Startup Incubators: Provide mentorship and networking but do not focus on IP protection or blind investments.
+    \item Tech Accelerators: Offer resources and funding opportunities but lack emphasis on privacy, AI-driven insights, and unbiased evaluation.
+\end{itemize}
+
+\subsubsection{Gap Analysis}
+While the ecosystem is growing, no platform combines the unique features of local IP storage, blockchain transparency, AI-enhanced rankings, and blind investments. Globally, analogues address funding but miss the mark on privacy and fairness, positioning this platform as a pioneering solution.
+
+\subsection{Chapter overview}
+People have devised various algorithms to solve problems similar to resource allocation.
+
+% ## 2
+\section{Theoretical Foundations of Resource Allocation Mechanisms}
+
+% ## 2.1
+\subsection{Real-World Examples of Problem}
+Resource allocation is not a new problem. Examples include:
+\begin{itemize}
+    \item Hiring employees.
+    \item Distributing roles within a project.
+\end{itemize}
+Humanity has become adept at solving such problems, but a universal system is likely impossible due to the inherent complexities and trade-offs involved. Many specific challenges still need to be addressed.
+
+% ## 2.2
+\subsection{Static Model}
+Resource allocation models exist on a spectrum:
+\begin{itemize}
+  \item Limit of Centralization: Represented by a single decision-making entity (e.g., a sole leader, a comprehensive AI).
+  \item Limit of Decentralization: Represented by a market where individual agents vote with their resources based on their own perspectives.
+\end{itemize}
+Other models, such as Decentralized Autonomous Organizations (DAOs), voting systems, and delegation mechanisms, can be viewed as hybrids or intermediate forms along this spectrum.
+
+% ## 2.3
+\subsection{Centralized AI Model}
+\textbf{Advantages:}
+\begin{itemize}
+  \item Simple architecture: A single AI handles all decisions.
+  \item Fast reaction to input data.
+  \item Suitable for smaller, less critical systems.
+  \item Can potentially utilize confidential information effectively without public disclosure.
+\end{itemize}
+\textbf{Disadvantages:}
+\begin{itemize}
+  \item Lack of neutrality: The model is trained on potentially biased data and may contain hidden preferences.
+  \item Lack of transparency: Even with open weights, understanding the model's behavior is difficult.
+  \item Complexity and opacity: The model can contain vast amounts of information (comparable to a large legal system).
+  \item Frequent updates required: Rapid AI evolution means the "model" effectively changes frequently (e.g., every 3 months).
+  \item Centralization of power: Control lies with those who manage the model and its updates.
+\end{itemize}
+
+% ## 2.4
+\subsection{Distributed Model}
+\textbf{Advantages:} Distributed models offer several key benefits. They separate goals and predictions, allowing humans to define values while markets determine optimal solutions based on those values. They create an open market of ideas that stimulates participation from intelligent traders, AI agents, and humans. Economic motivation ensures correct predictions are rewarded while errors lead to losses. Additionally, the logic behind decisions is generally clear and verifiable, providing transparency to all participants.
+
+\textbf{Disadvantages:} Despite their strengths, distributed models face significant challenges. Defining metrics that resist manipulation proves consistently difficult. These systems depend heavily on "oracles" - the entities that measure metrics - raising questions about who performs measurements and how. There exists a substantial risk of manipulation, as participants might "game" the system if metrics are poorly designed. Finally, these models struggle with non-quantitative tasks, particularly when assessing subjective qualities like fairness, morality, or style.
+
+
+Markets are perhaps the most powerful distributed system that humanity has ever developed. Unlike engineered constructs, markets were never explicitly designed; rather, they spontaneously emerged from our fundamental human desire to trade. When individuals seek to exchange goods or services, they naturally congregate in shared spaces—physical marketplaces, coffee houses, or digital forums—and through these interactions, a crucial technological byproduct is created: the market price.
+
+Initially, individual exchanges occur at varying ratios, as each participant negotiates based on subjective valuations. However, as more participants enter the market, individual variations gradually diminish, and prices inevitably converge toward a shared average. This average price becomes a potent source of collective intelligence, embodying the aggregate knowledge and expectations of all market participants.
+
+Interestingly, traders historically developed novel communication systems to efficiently relay market information. From open outcry pits to the telegraph and eventually the modern internet, each innovation amplified the market's ability to process and disseminate information, embedding deep collective intelligence within the price. Observers soon recognized that these market-derived prices contained unique, valuable insights—revealing hidden truths and forecasting future events.
+
+Yet, a natural question arises: why can't one exploit private information profitably? Ironically, attempts to trade on secret information do not degrade the market but rather strengthen its accuracy. Each confidential trade transmits hidden knowledge into the open, adjusting prices accordingly, thus enhancing the accuracy and reliability of the market's collective predictions. This phenomenon, observable in cases like weather impacts on orange futures or sports betting odds, results in a predictive capability whereby prices not only reflect current value but also future expectations.
+
+Pic. 1
+
+This intriguing property leads us to consider a hypothetical yet logical progression: what if we eliminated immediate transactions entirely, focusing exclusively on betting outcomes of future events? Such a market would purely express probabilities rather than values. Indeed, such structures already exist—known as prediction markets—and they encapsulate a fundamentally different market mechanism. These prediction markets yield probabilistic evaluations, integrating diverse and even conflicting perspectives to produce remarkably accurate forecasts.
+
+Critics may argue that these markets can be manipulated. However, if one genuinely believes prediction markets are subject to easy manipulation, one implicitly claims superior personal knowledge over the aggregated insight of countless participants—a bold assertion. Conversely, if one acknowledges prediction markets as reliable and truthful, an equally provocative question arises: why not entrust critical decisions directly to such markets?
+
+Ultimately, interconnecting various market systems—traditional, predictive, and computational—creates a unified global mechanism. This integration magnifies the capacity for collective intelligence, turning dispersed information into actionable insights and decisions. Such interconnectedness transforms human collaboration into a scalable, intelligent economic machine, capable of continuously adapting and evolving, effectively becoming humanity's most powerful computational engine.
+
+
+\subsection{Chapter overview}
+Existing resource allocation mechanisms have significant drawbacks when applied directly to the problem of distributing investments in startups.
+
+\section{Creating a Resource Allocation Mechanism}
+
+\subsection{Introduction}
+Consider a set of projects \( P = \{p_1, \dots, p_n \} \), each seeking capital \( C_i \) for development. There exists a set of agents \( A = \{a_1, \dots, a_m \} \) who can interact with these projects.
+
+\subsection{Tokenomics}
+According to \href{https://en.wikipedia.org/wiki/Condorcet%27s_jury_theorem}{Condorcet's jury theorem}, if each participant has a probability slightly greater than 50\% of making a correct assessment, the collective opinion of the group converges exponentially towards the truth as the group size increases.
+\begin{itemize}
+    \item Individual investors possess limited information and are subject to biases.
+    \item A diverse group, in the absence of coordinated distortions, aggregates varied partial knowledge, forming a more accurate representation of the future (or startup quality).
+\end{itemize}
+
+It is necessary to break the curve where incorrect collective decisions become more likely, creating a system where playing by the rules is the only advantageous strategy. This involves mechanisms like Proof-of-Stake (PoS) combined with a tokenization of ideas that avoids zero-sum games.
+
+Blockchain operates similarly: Individual agents find it disadvantageous to violate the rules and advantageous to perform useful work, such as evaluating (predicting) startups.
+
+\subsection{Augmented Bonding Curves (ABC)}
+Each idea is tokenized via ABC, with price determined by supply and demand. Transaction tributes fund the platform, and vesting ensures investor commitment, enhancing liquidity and scalability for a wide range of users.
+
+\subsection{Quadratic Funding (QF)}
+Matching funds are allocated based on unique contributors, incentivizing broad participation. This scales the platform by attracting both small and large investors, aligning with community-driven approaches.
+
+% 2.1 Engine
+\subsection{Engine}
+System participants possess hidden knowledge about startups, which they are motivated to apply to earn rewards.
+\textbf{Rationale for an Isolated System:} New ideas introduced into the system are not initially subject to this pre-existing hidden knowledge (Y). This helps prevent distortion of the model during its initial phases or for specific evaluations. Agents' assessments are therefore based on the presented information rather than external factors.
+In the long term, this model could potentially be adapted for real market analysis, where external knowledge and potential manipulation of inputs (X, Y) must be considered.
+
+%
+\section{Prospects for Technology Development}
+
+\subsection{Broader Application}
+Nested economic structures within the system could allow for more precise approximation of complex value distributions or decision-making processes.
+
+\subsection{Example}
+A contest hosted on a platform like Pond represents such an environment. Participants could choose evaluation metrics or even the system's architecture. For instance, fixing the architecture as an agentic LLM framework, where each agent could internally implement a similar nested evaluation/funding environment.
+
+\subsection{Chapter overview}
+Connecting these concepts opens opportunities for scaling complex decision-making and resource allocation systems. Developing such a system on a blockchain offers unique advantages, potentially extending beyond purely economic applications. However, achieving universal consensus remains a challenge in highly complex or subjective domains.
+
+\section{Conclusion}
+Distilled judgment mechanisms, as explored in this work, offer potential applications for general problem-solving.
+A promising future direction involves creating Layer 0 (L0) systems capable of unifying and coordinating different blockchain-based allocation or evaluation mechanisms.
+
+% References
+\bibliographystyle{plain}
+\bibliography{bibliography}
+
+\end{document}

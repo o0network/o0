@@ -1,40 +1,48 @@
-import { useState } from "react";
-import { View, StyleSheet, TouchableOpacity } from "react-native";
+import {
+  View,
+  StyleSheet,
+  TouchableOpacity,
+  StyleProp,
+  ViewStyle,
+} from "react-native";
 
-const gridData = Array.from({ length: 10 }, (_, rowIndex) =>
-  Array.from({ length: 12 }, (_, colIndex) => ({
-    id: `${rowIndex}-${colIndex}`,
-    color: `hsl(${(rowIndex * 36 + colIndex * 15) % 360}, 70%, 60%)`,
-    selected: rowIndex === 5 && colIndex === 5,
-  }))
-);
+interface CellGridProps {
+  data: string[][];
+  style?: StyleProp<ViewStyle>;
+  onSelect?: (rowIndex: number, colIndex: number) => void;
+  selectedCoords?: { row: number; col: number } | null;
+}
 
-export const CellGrid = () => {
-  const [selectedCell, setSelectedCell] = useState("5-5");
-
+export const CellGrid: React.FC<CellGridProps> = ({
+  data,
+  style,
+  onSelect,
+  selectedCoords,
+}) => {
   return (
-    <View style={styles.container}>
-      {gridData.map((row, rowIndex) => (
+    <View style={[styles.container, style]}>
+      {data.map((row, rowIndex) => (
         <View key={rowIndex} style={styles.rowContainer}>
-          {row.map((cell) => (
-            <TouchableOpacity
-              key={cell.id}
-              style={styles.cellOuter}
-              onPress={() => setSelectedCell(cell.id)}
-              activeOpacity={0.7}
-            >
-              <View
-                style={[
-                  styles.cellInner,
-                  { backgroundColor: cell.color },
-                  selectedCell === cell.id && styles.selectedCellInner,
-                ]}
-              />
-              {selectedCell === cell.id && (
-                <View style={styles.selectedCellInner} />
-              )}
-            </TouchableOpacity>
-          ))}
+          {row.map((color, colIndex) => {
+            const isSelected =
+              selectedCoords?.row === rowIndex &&
+              selectedCoords?.col === colIndex;
+            const cellId = `${rowIndex}-${colIndex}`;
+
+            return (
+              <TouchableOpacity
+                key={cellId}
+                style={styles.cellOuter}
+                onPress={
+                  onSelect ? () => onSelect(rowIndex, colIndex) : undefined
+                }
+                activeOpacity={0.7}
+              >
+                <View style={[styles.cellInner, { backgroundColor: color }]} />
+                {isSelected && <View style={styles.selectedCellBorder} />}
+              </TouchableOpacity>
+            );
+          })}
         </View>
       ))}
     </View>
@@ -44,33 +52,36 @@ export const CellGrid = () => {
 const styles = StyleSheet.create({
   container: {
     flexDirection: "column",
-    borderRadius: 16,
+    borderRadius: 2,
     backgroundColor: "#000000",
     alignSelf: "stretch",
-    padding: 5,
-    marginVertical: 5,
+    padding: 2,
+    gap: 2,
   },
   rowContainer: {
     flexDirection: "row",
-    justifyContent: "space-around",
-    marginBottom: 2,
+    justifyContent: "space-between",
+    gap: 2,
   },
   cellOuter: {
+    flex: 1,
+    aspectRatio: 1,
     alignItems: "center",
     justifyContent: "center",
-    width: 28,
-    height: 28,
   },
   cellInner: {
-    width: 24,
-    height: 24,
+    width: "100%",
+    height: "100%",
+    borderRadius: 2,
   },
-  selectedCellInner: {
+  selectedCellBorder: {
     position: "absolute",
-    width: 28,
-    height: 28,
+    width: "100%",
+    height: "100%",
     borderRadius: 2,
     borderWidth: 3,
     borderColor: "#FFFFFF",
   },
 });
+
+export default CellGrid;

@@ -1,44 +1,117 @@
-import React from "react";
-import { View, Text, StyleSheet, TouchableOpacity } from "react-native";
+import {
+  View,
+  StyleSheet,
+  TouchableOpacity,
+  StyleProp,
+  ViewStyle,
+  TextStyle,
+} from "react-native";
+import { Text } from "../components";
+import ButtonSvg from "../assets/Button.svg";
 
-// Figma Node: 2658:1049 (Button Component)
-export const FigmaButton = () => {
-  // Icon: 2651:11773 (textStyle_5FA6YV, fills_2G2BWC)
-  // Label: 2651:11774 (textStyle_5FA6YV, fills_2G2BWC)
-  const icon = "😸";
-  const label = "Button";
+type ButtonProps = {
+  title: string;
+  glorious?: boolean;
+  icon?: string;
+  onPress?: () => void;
+  style?: StyleProp<ViewStyle>;
+  textStyle?: StyleProp<TextStyle>;
+};
+
+export const Button: React.FC<ButtonProps> = ({
+  title,
+  icon,
+  onPress,
+  style,
+  glorious,
+  textStyle,
+}) => {
+  const containerStyles: StyleProp<ViewStyle>[] = [styles.container];
+  const textStyles: StyleProp<TextStyle>[] = [styles.textStyle];
+
+  if (glorious) {
+    containerStyles.push(styles.gloriousContainer);
+    textStyles.push(styles.gloriousTextStyle);
+  } else {
+    containerStyles.push(styles.defaultContainer);
+  }
+  containerStyles.push(style);
+  textStyles.push(textStyle);
 
   return (
-    // Container: 2658:1049 (fills_Q9LOHA, strokes_IRPERO, effects_OUM1NZ, layout_1Y5HES, borderRadius)
-    <TouchableOpacity style={styles.container}>
-      <Text style={styles.textStyle}>{icon}</Text>
-      <Text style={styles.textStyle}>{label}</Text>
+    <TouchableOpacity
+      style={containerStyles}
+      onPress={onPress}
+      activeOpacity={glorious ? 0.8 : 0.2}
+    >
+      {glorious && (
+        <View style={styles.svgContainer}>
+          <ButtonSvg width="100%" height="100%" />
+        </View>
+      )}
+      <View style={styles.contentContainer}>
+        {icon && <Text style={styles.iconStyle}>{icon}</Text>}
+        <Text style={textStyles}>{title}</Text>
+      </View>
     </TouchableOpacity>
   );
 };
 
 const styles = StyleSheet.create({
   container: {
-    // layout_1Y5HES
     flexDirection: "row",
     justifyContent: "center",
     alignItems: "center",
-    alignSelf: "stretch",
     gap: 3,
-    paddingVertical: 10, // Guessed padding for ~44px height
-    paddingHorizontal: 8,
+    paddingVertical: 10,
+    paddingHorizontal: 24,
+    minHeight: 44,
+    marginVertical: 5,
+    position: "relative",
+    overflow: "hidden",
+  },
+  defaultContainer: {
     borderRadius: 20,
-    backgroundColor: "rgba(94, 94, 94, 0.18)", // From fill_Q9LOHA (second value)
-    // strokes_IRPERO (gradient) and effects_OUM1NZ (shadow) omitted
-    minHeight: 44, // Estimate
-    marginVertical: 5, // Keep existing margin
+    backgroundColor: "rgba(94, 94, 94, 0.18)",
+  },
+  gloriousContainer: {
+    borderRadius: 35,
+    minHeight: 54,
+  },
+  svgContainer: {
+    position: "absolute",
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    width: "100%",
+    height: "100%",
+  },
+  contentContainer: {
+    flexDirection: "row",
+    justifyContent: "center",
+    alignItems: "center",
+    gap: 3,
+    zIndex: 1,
+  },
+  iconStyle: {
+    fontSize: 18,
+    fontWeight: "600",
+    textAlign: "center",
+    color: "#FFFFFF",
+    zIndex: 1,
   },
   textStyle: {
-    // style_5FA6YV
-    fontFamily: "System",
-    fontSize: 15,
-    fontWeight: "600", // Approx 590
-    color: "rgba(255, 255, 255, 0.96)", // fill_2G2BWC
+    fontSize: 16,
+    fontWeight: "600",
     textAlign: "center",
+    color: "#FFFFFF",
+    zIndex: 1,
+  },
+  gloriousTextStyle: {
+    fontSize: 18,
+    fontWeight: "700",
   },
 });
+
+export default Button;
