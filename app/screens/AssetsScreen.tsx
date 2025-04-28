@@ -3,9 +3,7 @@ import {
   View,
   StyleSheet,
   ScrollView,
-  Image,
   Dimensions,
-  ActivityIndicator,
   SafeAreaView,
 } from "react-native";
 import {

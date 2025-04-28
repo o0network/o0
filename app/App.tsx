@@ -26,7 +26,7 @@ import * as SplashScreen from "expo-splash-screen";
 import { Nunito_600SemiBold, Nunito_700Bold } from "@expo-google-fonts/nunito";
 import { DMMono_500Medium } from "@expo-google-fonts/dm-mono";
 import { DynaPuff_700Bold } from "@expo-google-fonts/dynapuff";
-// import { SafeAreaProvider } from "react-native-safe-area-context";
+import { SafeAreaProvider } from "react-native-safe-area-context";
 
 import ExploreScreen from "./screens/ExploreScreen";
 import CreateScreen from "./screens/CreateScreen";
@@ -192,54 +192,58 @@ export default function App() {
     <GestureHandlerRootView style={{ flex: 1 }}>
       <Background />
       <PlatformProvider>
-        <SafeAreaView style={styles.safeArea}>
+        <View style={styles.container}>
           <StatusBar style="light" translucent backgroundColor="transparent" />
-          <NavigationContainer
-            ref={navigationRef}
-            theme={{
-              ...DefaultTheme,
-              colors: {
-                ...DefaultTheme.colors,
-                background: "transparent",
-              },
-            }}
-            onReady={onLayoutRootView}
-            linking={
-              Platform.OS === "web"
-                ? ({
-                    prefixes: [],
-                    config: {
-                      screens: {
-                        Explore: "explore/:address?",
-                        Create: "create",
-                        Assets: "assets/:address?",
-                        Network: "network",
-                      },
-                    },
-                  } as LinkingOptions<TabParamList>)
-                : undefined
-            }
-          >
-            <Tab.Navigator
-              tabBar={(props) => <CustomTabBar {...props} />}
-              screenOptions={screenOptions}
-              initialLayout={{ width }}
-            >
-              <Tab.Screen
-                name="Explore"
-                component={ExploreScreen}
-                initialParams={{ address: DEFAULT_ADDRESS }}
-              />
-              <Tab.Screen name="Create" component={CreateScreen} />
-              <Tab.Screen
-                name="Assets"
-                component={AssetsScreen}
-                initialParams={{ address: DEFAULT_ADDRESS }}
-              />
-              <Tab.Screen name="Network" component={TweaksScreen} />
-            </Tab.Navigator>
-          </NavigationContainer>
-        </SafeAreaView>
+          <SafeAreaProvider>
+            <SafeAreaView style={styles.safeArea}>
+              <NavigationContainer
+                ref={navigationRef}
+                theme={{
+                  ...DefaultTheme,
+                  colors: {
+                    ...DefaultTheme.colors,
+                    background: "transparent",
+                  },
+                }}
+                onReady={onLayoutRootView}
+                linking={
+                  Platform.OS === "web"
+                    ? ({
+                        prefixes: [],
+                        config: {
+                          screens: {
+                            Explore: "explore/:address?",
+                            Create: "create",
+                            Assets: "assets/:address?",
+                            Network: "network",
+                          },
+                        },
+                      } as LinkingOptions<TabParamList>)
+                    : undefined
+                }
+              >
+                <Tab.Navigator
+                  tabBar={(props) => <CustomTabBar {...props} />}
+                  screenOptions={screenOptions}
+                  initialLayout={{ width }}
+                >
+                  <Tab.Screen
+                    name="Explore"
+                    component={ExploreScreen}
+                    initialParams={{ address: DEFAULT_ADDRESS }}
+                  />
+                  <Tab.Screen name="Create" component={CreateScreen} />
+                  <Tab.Screen
+                    name="Assets"
+                    component={AssetsScreen}
+                    initialParams={{ address: DEFAULT_ADDRESS }}
+                  />
+                  <Tab.Screen name="Network" component={TweaksScreen} />
+                </Tab.Navigator>
+              </NavigationContainer>
+            </SafeAreaView>
+          </SafeAreaProvider>
+        </View>
       </PlatformProvider>
     </GestureHandlerRootView>
   );

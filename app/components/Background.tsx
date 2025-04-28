@@ -5,157 +5,116 @@ import * as THREE from "three";
 import { DeviceMotion } from "expo-sensors";
 import { Renderer } from "expo-three";
 
+const vertexShader = `
+  varying vec3 vDir;
+  void main() {
+    vDir = normalize(position);
+    gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+  }
+`;
+
 const fragmentShader = `
-  #ifdef GL_ES
   precision highp float;
-  #endif
 
   #define PI 3.14159265359
   #define TWO_PI 6.28318530718
 
   uniform float u_time;
-  uniform vec2 u_resolution;
-  uniform vec2 u_mouse;       // Web cursor [-1, 1]
-  // Send normalized device orientation angles
-  uniform float u_alpha;      // Yaw [0, 1] (normalized from 0 to 2PI)
-  uniform float u_beta;       // Pitch [-1, 1] (normalized from -PI/2 to PI/2)
-  uniform float u_gamma;      // Roll [-1, 1] (normalized from -PI to PI)
+  uniform vec2  u_mouse;
+  uniform float u_alpha;
+  uniform float u_beta;
+  uniform float u_gamma;
   uniform float u_is_mobile;
+  uniform mat3 u_rotMatrix;
 
-  // --- Rotation Matrices ---
-  // Rotation around X axis (Pitch)
-  mat3 rotX(float angle) {
-      float s = sin(angle);
-      float c = cos(angle);
-      return mat3(1.0, 0.0, 0.0,
-                  0.0, c,   -s,
-                  0.0, s,   c);
+  varying vec3 vDir;
+
+  // --- Rotation helpers ---
+  mat3 rotX(float a){
+    float s = sin(a), c = cos(a);
+    return mat3(1.0,0.0,0.0, 0.0,c,-s, 0.0,s,c);
+  }
+  mat3 rotY(float a){
+    float s = sin(a), c = cos(a);
+    return mat3(c,0.0,s, 0.0,1.0,0.0, -s,0.0,c);
+  }
+  mat3 rotZ(float a){
+    float s = sin(a), c = cos(a);
+    return mat3(c,-s,0.0, s,c,0.0, 0.0,0.0,1.0);
   }
 
-  // Rotation around Y axis (Yaw)
-  mat3 rotY(float angle) {
-      float s = sin(angle);
-      float c = cos(angle);
-      return mat3(c,   0.0, s,
-                  0.0, 1.0, 0.0,
-                  -s,  0.0, c);
+  vec3 paletteColor(float t) {
+    vec3 palette[8] = vec3[](
+      vec3(0.9490, 0.0000, 1.0000), // #F200FF
+      vec3(0.9608, 0.1961, 0.8627), // #F532DC
+      vec3(0.9804, 0.2353, 0.7255), // #FA3CB9
+      vec3(0.9882, 0.2745, 0.5686), // #FC4691
+      vec3(0.9961, 0.3137, 0.3922), // #FE5064
+      vec3(1.0000, 0.4706, 0.2549), // #FF7841
+      vec3(1.0000, 0.6275, 0.1176), // #FFA01E
+      vec3(1.0000, 0.7843, 0.0000)  // #FFC800
+    );
+    float idx = t * 7.0;
+    int i0 = int(floor(idx));
+    int i1 = int(ceil(idx));
+    return mix(palette[i0], palette[i1], fract(idx));
   }
 
-  // Rotation around Z axis (Roll)
-  mat3 rotZ(float angle) {
-      float s = sin(angle);
-      float c = cos(angle);
-      return mat3(c,   -s,  0.0,
-                  s,   c,   0.0,
-                  0.0, 0.0, 1.0);
+  // Hash & 3-D noise helpers (simple, cheap noise)
+  float hash(vec3 p){ return fract(sin(dot(p,vec3(127.1,311.7,74.7)))*43758.5453123); }
+  float noise(vec3 p){
+    vec3 i = floor(p); vec3 f = fract(p);
+    // Trilinear interpolation of 8 hashed corners
+    float n000 = hash(i);
+    float n100 = hash(i+vec3(1.0,0.0,0.0));
+    float n010 = hash(i+vec3(0.0,1.0,0.0));
+    float n110 = hash(i+vec3(1.0,1.0,0.0));
+    float n001 = hash(i+vec3(0.0,0.0,1.0));
+    float n101 = hash(i+vec3(1.0,0.0,1.0));
+    float n011 = hash(i+vec3(0.0,1.0,1.0));
+    float n111 = hash(i+vec3(1.0,1.0,1.0));
+    vec3 u = f*f*(3.0-2.0*f);
+    return mix(mix(mix(n000,n100,u.x), mix(n010,n110,u.x), u.y),
+               mix(mix(n001,n101,u.x), mix(n011,n111,u.x), u.y), u.z);
   }
 
-  // --- Pattern Functions (Unchanged) ---
-  vec3 rainbowColor(float p, float t) {
-    vec3 c[8] = vec3[](vec3(0.949,0.000,1.000),vec3(0.961,0.196,0.863),vec3(0.980,0.235,0.725),
-                       vec3(0.988,0.274,0.569),vec3(0.996,0.314,0.392),vec3(1.000,0.471,0.255),
-                       vec3(1.000,0.627,0.118),vec3(1.000,0.784,0.000));
-    float i = fract(p*0.5+t*0.1)*8.0; int i0=int(floor(i)),i1=int(ceil(i));
-    return mix(c[i0%8],c[i1%8],fract(i));
-  }
-  float random(vec2 st){return fract(sin(dot(st.xy,vec2(12.9898,78.233)))*43758.5453); }
-  float noise(vec2 st){ vec2 i=floor(st);vec2 f=fract(st); float a=random(i);float b=random(i+vec2(1.,0.));float c=random(i+vec2(0.,1.));float d=random(i+vec2(1.,1.)); vec2 u=f*f*(3.-2.*f); return mix(a,b,u.x)+(c-a)*u.y*(1.-u.x)+(d-b)*u.x*u.y; }
+  void main(){
+    vec3 dir = vDir;
 
-  // --- Cube Map Sampling Simulation ---
-  // Input: 3D direction vector
-  // Output: 2D coordinates on the corresponding cube face [0, 1]
-  vec2 directionToCubemapUv(vec3 dir) {
-      vec3 absDir = abs(dir);
-      vec2 uv;
-      if (absDir.x >= absDir.y && absDir.x >= absDir.z) {
-          // +X or -X face
-          uv = dir.x > 0.0 ? vec2(-dir.z, -dir.y) / absDir.x : vec2(dir.z, -dir.y) / absDir.x;
-      } else if (absDir.y >= absDir.x && absDir.y >= absDir.z) {
-          // +Y or -Y face
-          uv = dir.y > 0.0 ? vec2(dir.x, dir.z) / absDir.y : vec2(dir.x, -dir.z) / absDir.y;
-      } else {
-          // +Z or -Z face
-          uv = dir.z > 0.0 ? vec2(dir.x, -dir.y) / absDir.z : vec2(-dir.x, -dir.y) / absDir.z;
-      }
-      // Map from [-1, 1] to [0, 1]
-      return uv * 0.5 + 0.5;
-  }
-
-  void main() {
-    // --- Calculate View Direction for this Pixel ---
-    vec2 screen_uv = (gl_FragCoord.xy - 0.5 * u_resolution.xy) / min(u_resolution.x, u_resolution.y);
-    vec3 initial_dir = normalize(vec3(screen_uv.x, screen_uv.y, 1.0)); // Z=1 adjusts FOV
-
-    // --- Apply Device/Mouse Orientation as Camera Rotation ---
-    vec3 final_dir;
+    // Apply device or mouse orientation
     if (u_is_mobile > 0.5) {
-      // Mobile: Use Euler angles from device motion
-      float yaw_sensitivity = 1.0;
-      float pitch_sensitivity = 1.0;
-      float roll_sensitivity = 1.0;
-
-      // Apply a fixed 90-degree rotation around X axis first
-      mat3 baseRotation = rotX(PI / 2.0);
-
-      float yaw = u_alpha * TWO_PI * yaw_sensitivity;
-      float pitch = u_beta * PI * pitch_sensitivity * 0.5;
-      float roll = u_gamma * PI * roll_sensitivity;
-
-      // Apply device rotation after the base rotation
-      mat3 deviceRotation = rotY(yaw) * rotX(pitch) * rotZ(roll);
-      final_dir = initial_dir * baseRotation * transpose(deviceRotation);
+      dir = u_rotMatrix * dir;
     } else {
-      // Web: Mouse control
-      float mouse_sensitivity = 1.5;
-      float mouse_yaw = u_mouse.x * PI * mouse_sensitivity;
-      float mouse_pitch = u_mouse.y * (PI / 2.0) * mouse_sensitivity;
-
-      // Apply same 90-degree rotation for web mode for consistency
-      mat3 baseRotation = rotX(PI / 2.0);
-      mat3 mouseRotation = rotY(mouse_yaw) * rotX(mouse_pitch);
-      final_dir = initial_dir * baseRotation * transpose(mouseRotation);
+      float yaw   = u_mouse.x * PI;
+      float pitch = -u_mouse.y * PI * 0.5;
+      mat3 R = rotY(yaw) * rotX(pitch);
+      dir = R * dir;
     }
 
-    // --- Convert final direction to Cube Map UVs ---
-    vec2 cubemap_uv = directionToCubemapUv(final_dir);
-
-    // --- Pattern Generation using cubemap_uv ---
-    vec2 pattern_st = cubemap_uv * 4.0; // Scale UVs for pattern density
-
-    float noise_val = noise(pattern_st * 5.0 + u_time * 0.2) * 0.5;
-    float base_pattern = 0.0;
-    base_pattern += sin(pattern_st.x * 10.0 + u_time * 0.5) * 0.5 + 0.5;
-    base_pattern += cos(pattern_st.y * 10.0 + u_time * 0.3) * 0.5 + 0.5;
-    float combined_pattern = base_pattern * 0.7 + noise_val * 0.3;
-
-    // --- Final Color Calculation ---
-     float color_intensity = 0.0;
-     color_intensity += sin(pattern_st.x * 8.0 + cos(u_time * 0.5 + pattern_st.y * 10.0 + sin(pattern_st.x * 12.0 + u_time * 1.0))) * 0.8;
-     color_intensity += cos(pattern_st.y * 8.0 + sin(u_time * 0.3 + pattern_st.x * 10.0 + cos(pattern_st.y * 12.0 + u_time * 1.0))) * 0.8;
-
-    vec3 final_color = rainbowColor(color_intensity * 0.5 + 0.5, u_time * 0.5);
-
-    gl_FragColor = vec4(final_color, 1.0);
+    // 3-D moving noise on the direction vector, reduced intensity
+    float t = u_time * 0.1;
+    float n = noise(dir * 2.0 + t);
+    // Wave pattern with slower frequency
+    float w = sin((n + t) * TWO_PI * 2.0);
+    vec3 col = paletteColor(w * 0.5 + 0.5);
+    gl_FragColor = vec4(col, 1.0);
   }
 `;
 
 export default function Background() {
   const animationRef = useRef<number | null>(null);
   const mousePositionRef = useRef({ x: 0, y: 0 });
-  const deviceOrientationRef = useRef({ alpha: 0, beta: 0, gamma: 0 }); // Stores normalized values
-  const orientationStatusRef = useRef<string>("unknown"); // Store orientation status
+  const deviceOrientationRef = useRef({ alpha: 0, beta: 0, gamma: 0 });
+  const orientationStatusRef = useRef<string>("unknown");
   const motionSubscriptionRef = useRef<{ remove: () => void } | null>(null);
   const [isMobile] = useState(Platform.OS !== "web");
 
-  // Refs for Three.js objects
   const rendererRef = useRef<Renderer | null>(null);
   const sceneRef = useRef<THREE.Scene | null>(null);
-  const cameraRef = useRef<THREE.OrthographicCamera | null>(null);
+  const cameraRef = useRef<THREE.PerspectiveCamera | null>(null);
   const materialRef = useRef<THREE.ShaderMaterial | null>(null);
   const clockRef = useRef<THREE.Clock | null>(null);
-  const planeGeometryRef = useRef<THREE.PlaneGeometry | null>(null);
 
-  // --- Device Motion Handling ---
   useEffect(() => {
     if (!isMobile) {
       if (motionSubscriptionRef.current) {
@@ -165,11 +124,9 @@ export default function Background() {
       return;
     }
     let isMounted = true;
-    // Thresholds for orientation detection (in radians)
-    // Experiment with these values for better accuracy
-    const verticalThreshold = Math.PI / 3; // ~60 degrees from horizontal
-    const horizontalThreshold = Math.PI / 3; // ~60 degrees from vertical
-    const flatThreshold = Math.PI / 6; // ~30 degrees from flat
+    const verticalThreshold = Math.PI / 3;
+    const horizontalThreshold = Math.PI / 3;
+    const flatThreshold = Math.PI / 6;
 
     DeviceMotion.isAvailableAsync().then((isAvailable) => {
       if (isAvailable && isMounted && !motionSubscriptionRef.current) {
@@ -181,7 +138,6 @@ export default function Background() {
               gamma: 0,
             };
 
-            // --- Orientation Status Detection ---
             let currentStatus = "unknown";
             const absBeta = Math.abs(beta || 0);
             const absGamma = Math.abs(gamma || 0);
@@ -193,27 +149,21 @@ export default function Background() {
             } else if (absGamma > horizontalThreshold) {
               currentStatus = "horizontal (landscape)";
             } else {
-              currentStatus = "diagonal / intermediate"; // Optional: Handle intermediate state
+              currentStatus = "diagonal / intermediate";
             }
 
-            // Log status only if it changes to avoid flooding console
             if (currentStatus !== orientationStatusRef.current) {
-              console.log("Device Orientation:", currentStatus);
               orientationStatusRef.current = currentStatus;
             }
 
-            // --- Normalization for Shader (Unchanged) ---
-            const normAlpha = (alpha || 0) / (2 * Math.PI);
-            const normBeta = (beta || 0) / (Math.PI / 2);
-            const normGamma = (gamma || 0) / Math.PI;
             deviceOrientationRef.current = {
-              alpha: normAlpha,
-              beta: normBeta,
-              gamma: normGamma,
+              alpha: alpha || 0,
+              beta: beta || 0,
+              gamma: gamma || 0,
             };
           }
         );
-        DeviceMotion.setUpdateInterval(100); // Update less frequently if just for status logging (e.g., 100ms)
+        DeviceMotion.setUpdateInterval(100);
       }
     });
     return () => {
@@ -225,36 +175,36 @@ export default function Background() {
     };
   }, [isMobile]);
 
-  // --- Mouse Move Handling (Web) ---
   useEffect(() => {
     if (isMobile) return;
     const handleMouseMove = (event: MouseEvent) => {
       mousePositionRef.current = {
         x: (event.clientX / window.innerWidth) * 2 - 1,
-        y: -(event.clientY / window.innerHeight) * 2 + 1, // Invert Y
+        y: -(event.clientY / window.innerHeight) * 2 + 1,
       };
     };
     window.addEventListener("mousemove", handleMouseMove);
     return () => window.removeEventListener("mousemove", handleMouseMove);
   }, [isMobile]);
 
-  // --- WebGL Context & Rendering Setup ---
   const onContextCreate = useCallback(
     (gl: ExpoWebGLRenderingContext) => {
       rendererRef.current = new Renderer({ gl });
       sceneRef.current = new THREE.Scene();
-      cameraRef.current = new THREE.OrthographicCamera(-1, 1, 1, -1, 0.1, 10);
+      cameraRef.current = new THREE.PerspectiveCamera(
+        75,
+        gl.drawingBufferWidth / gl.drawingBufferHeight,
+        0.1,
+        1000
+      );
       clockRef.current = new THREE.Clock();
-      planeGeometryRef.current = new THREE.PlaneGeometry(2, 2);
 
       const { drawingBufferWidth: width, drawingBufferHeight: height } = gl;
       rendererRef.current.setSize(width, height);
       rendererRef.current.setClearColor(0x000000, 0);
-      cameraRef.current.position.z = 1;
+      cameraRef.current!.position.z = 1;
 
-      // Define uniforms including the individual orientation angles
       const uniformData = {
-        u_resolution: { value: new THREE.Vector2(width, height) },
         u_time: { value: 0.0 },
         u_mouse: {
           value: new THREE.Vector2(
@@ -266,22 +216,21 @@ export default function Background() {
         u_beta: { value: deviceOrientationRef.current.beta },
         u_gamma: { value: deviceOrientationRef.current.gamma },
         u_is_mobile: { value: isMobile ? 1.0 : 0.0 },
+        u_rotMatrix: { value: new THREE.Matrix3() },
       };
 
       materialRef.current = new THREE.ShaderMaterial({
+        vertexShader,
         fragmentShader,
-        vertexShader: THREE.ShaderLib.basic.vertexShader, // Basic pass-through vertex shader
+        side: THREE.BackSide,
         uniforms: uniformData,
         transparent: true,
       });
 
-      const mesh = new THREE.Mesh(
-        planeGeometryRef.current,
-        materialRef.current
-      );
-      (sceneRef.current as any).add(mesh); // Using 'any' cast
+      const geometry = new THREE.SphereGeometry(5, 128, 128);
+      const mesh = new THREE.Mesh(geometry, materialRef.current!);
+      sceneRef.current.add(mesh);
 
-      // --- Render Loop ---
       const renderLoop = () => {
         if (
           !rendererRef.current ||
@@ -299,14 +248,23 @@ export default function Background() {
         materialRef.current.uniforms.u_time.value =
           clockRef.current.getElapsedTime();
 
-        // Update motion uniforms
         if (isMobile) {
-          materialRef.current.uniforms.u_alpha.value =
-            deviceOrientationRef.current.alpha;
-          materialRef.current.uniforms.u_beta.value =
-            deviceOrientationRef.current.beta;
-          materialRef.current.uniforms.u_gamma.value =
-            deviceOrientationRef.current.gamma;
+          const euler = new THREE.Euler(
+            deviceOrientationRef.current.beta,
+            deviceOrientationRef.current.alpha,
+            -deviceOrientationRef.current.gamma,
+            "YXZ"
+          );
+          const quaternion = new THREE.Quaternion();
+          quaternion.setFromEuler(euler);
+          const q1 = new THREE.Quaternion();
+          q1.setFromAxisAngle(new THREE.Vector3(1, 0, 0), -Math.PI / 2);
+          quaternion.multiply(q1);
+          const rotationMatrix = new THREE.Matrix3();
+          rotationMatrix.setFromMatrix4(
+            new THREE.Matrix4().makeRotationFromQuaternion(quaternion)
+          );
+          materialRef.current.uniforms.u_rotMatrix.value = rotationMatrix;
         } else {
           materialRef.current.uniforms.u_mouse.value.set(
             mousePositionRef.current.x,
@@ -314,7 +272,7 @@ export default function Background() {
           );
         }
 
-        rendererRef.current.render(sceneRef.current, cameraRef.current);
+        rendererRef.current.render(sceneRef.current, cameraRef.current!);
         gl.endFrameEXP();
       };
       renderLoop();
@@ -322,7 +280,6 @@ export default function Background() {
     [isMobile]
   );
 
-  // --- Cleanup & Resize Handling (Unchanged) ---
   useEffect(() => {
     return () => {
       if (animationRef.current) {
@@ -330,20 +287,15 @@ export default function Background() {
         animationRef.current = null;
       }
       if (materialRef.current) materialRef.current.dispose();
-      if (planeGeometryRef.current) planeGeometryRef.current.dispose();
     };
   }, []);
 
   useEffect(() => {
     if (isMobile) return;
     const handleResize = () => {
-      if (rendererRef.current && materialRef.current) {
+      if (rendererRef.current) {
         const { innerWidth, innerHeight } = window;
         rendererRef.current.setSize(innerWidth, innerHeight);
-        materialRef.current.uniforms.u_resolution.value.set(
-          innerWidth,
-          innerHeight
-        );
       }
     };
     window.addEventListener("resize", handleResize);
@@ -357,7 +309,6 @@ export default function Background() {
   );
 }
 
-// --- Styles (Unchanged) ---
 const styles = StyleSheet.create({
   container: {
     position: "absolute",
