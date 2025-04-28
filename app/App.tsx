@@ -2,14 +2,12 @@ import {
   DefaultTheme,
   NavigationContainer,
   LinkingOptions,
-  NavigatorScreenParams,
 } from "@react-navigation/native";
 import {
   createMaterialTopTabNavigator,
   MaterialTopTabBarProps,
-  MaterialTopTabScreenProps,
+  MaterialTopTabNavigationOptions,
 } from "@react-navigation/material-top-tabs";
-import { createNativeStackNavigator } from "@react-navigation/native-stack";
 import { useRef, useCallback } from "react";
 import {
   StyleSheet,
@@ -28,35 +26,71 @@ import * as SplashScreen from "expo-splash-screen";
 import { Nunito_600SemiBold, Nunito_700Bold } from "@expo-google-fonts/nunito";
 import { DMMono_500Medium } from "@expo-google-fonts/dm-mono";
 import { DynaPuff_700Bold } from "@expo-google-fonts/dynapuff";
+// import { SafeAreaProvider } from "react-native-safe-area-context";
 
 import ExploreScreen from "./screens/ExploreScreen";
 import CreateScreen from "./screens/CreateScreen";
 import AssetsScreen from "./screens/AssetsScreen";
 import TweaksScreen from "./screens/TweaksScreen";
-import ComponentsScreen from "./screens/ComponentsScreen";
 import { PlatformProvider } from "./utils/platform";
 import { Background } from "./components";
 
-type HomeTabParamList = {
+type TabParamList = {
   Explore: { address?: string };
   Create: undefined;
   Assets: { address?: string };
   Network: undefined;
 };
 
-type RootStackParamList = {
-  Main: NavigatorScreenParams<HomeTabParamList>;
-  Components: undefined;
-};
-
-const Tab = createMaterialTopTabNavigator<HomeTabParamList>();
-const Stack = createNativeStackNavigator<RootStackParamList>();
 const { width } = Dimensions.get("window");
 
 const DEFAULT_ADDRESS = "o0.network";
 
-type TabScreenProps<T extends keyof HomeTabParamList = any> =
-  MaterialTopTabScreenProps<HomeTabParamList, T>;
+type TabBarItemProps = {
+  label: string;
+  isFocused: boolean;
+  onPress: () => void;
+  emoji: string;
+  bounceValue: Animated.Value;
+};
+
+const TabBarItem = ({
+  label,
+  isFocused,
+  onPress,
+  emoji,
+  bounceValue,
+}: TabBarItemProps) => (
+  <Animated.View style={{ transform: [{ translateX: bounceValue }] }}>
+    <TouchableOpacity
+      accessibilityRole="button"
+      accessibilityState={isFocused ? { selected: true } : {}}
+      onPress={onPress}
+      style={styles.touchableTabBase}
+    >
+      <Animated.View
+        style={[
+          styles.tabItemBase,
+          isFocused ? styles.tabItemActive : styles.tabItemInactive,
+        ]}
+      >
+        <RNText
+          style={[
+            styles.icon,
+            {
+              color: isFocused
+                ? styles.iconActive.color
+                : styles.iconInactive.color,
+            },
+          ]}
+        >
+          {emoji}
+        </RNText>
+        {isFocused && <RNText style={styles.label}>{label}</RNText>}
+      </Animated.View>
+    </TouchableOpacity>
+  </Animated.View>
+);
 
 function CustomTabBar({
   state,
@@ -72,7 +106,6 @@ function CustomTabBar({
       {state.routes.map((route, index) => {
         const { options } = descriptors[route.key];
         const label = route.name;
-
         const isFocused = state.index === index;
 
         let emoji = "🧭";
@@ -84,78 +117,27 @@ function CustomTabBar({
         const bounceValue = bounceValues[index];
 
         return (
-          <Animated.View // Outer view for bounce transform
+          <TabBarItem
             key={route.key}
-            style={{ transform: [{ translateX: bounceValue }] }}
-          >
-            <TouchableOpacity
-              accessibilityRole="button"
-              accessibilityState={isFocused ? { selected: true } : {}}
-              accessibilityLabel={options.tabBarAccessibilityLabel}
-              testID={options.tabBarTestID}
-              onPress={() => {
-                const event = navigation.emit({
-                  type: "tabPress",
-                  target: route.key,
-                  canPreventDefault: true,
-                });
+            label={label}
+            isFocused={isFocused}
+            emoji={emoji}
+            bounceValue={bounceValue}
+            onPress={() => {
+              const event = navigation.emit({
+                type: "tabPress",
+                target: route.key,
+                canPreventDefault: true,
+              });
 
-                if (!isFocused && !event.defaultPrevented) {
-                  navigation.navigate(route.name, route.params);
-                }
-              }}
-              style={styles.touchableTabBase}
-            >
-              <Animated.View
-                style={[
-                  styles.tabItemBase,
-                  isFocused ? styles.tabItemActive : styles.tabItemInactive,
-                ]}
-              >
-                <RNText
-                  style={[
-                    styles.icon,
-                    {
-                      color: isFocused
-                        ? styles.iconActive.color
-                        : styles.iconInactive.color,
-                    },
-                  ]}
-                >
-                  {emoji}
-                </RNText>
-                {isFocused && <RNText style={styles.label}>{label}</RNText>}
-              </Animated.View>
-            </TouchableOpacity>
-          </Animated.View>
+              if (!isFocused && !event.defaultPrevented) {
+                navigation.navigate(route.name, route.params);
+              }
+            }}
+          />
         );
       })}
     </View>
-  );
-}
-
-function HomeTabs() {
-  return (
-    <Tab.Navigator
-      initialLayout={{ width: Dimensions.get("window").width }}
-      tabBar={(props) => <CustomTabBar {...props} />}
-      screenOptions={{
-        swipeEnabled: false,
-      }}
-    >
-      <Tab.Screen
-        name="Explore"
-        component={ExploreScreen}
-        initialParams={{ address: DEFAULT_ADDRESS }}
-      />
-      <Tab.Screen name="Create" component={CreateScreen} />
-      <Tab.Screen
-        name="Assets"
-        component={AssetsScreen}
-        initialParams={{ address: DEFAULT_ADDRESS }}
-      />
-      <Tab.Screen name="Network" component={TweaksScreen} />
-    </Tab.Navigator>
   );
 }
 
@@ -178,78 +160,86 @@ export default function App() {
     return null;
   }
 
+  const Tab = createMaterialTopTabNavigator<TabParamList>({
+    screens: {
+      Explore: {
+        screen: ExploreScreen,
+        initialParams: { address: DEFAULT_ADDRESS },
+      },
+      Create: {
+        screen: CreateScreen,
+      },
+      Assets: {
+        screen: AssetsScreen,
+        initialParams: { address: DEFAULT_ADDRESS },
+      },
+      Network: {
+        screen: TweaksScreen,
+      },
+    },
+  });
+  const screenOptions: MaterialTopTabNavigationOptions = {
+    swipeEnabled: true,
+    lazy: true,
+    lazyPreloadDistance: 0,
+    tabBarItemStyle: { width: 100 },
+    tabBarScrollEnabled: false,
+    tabBarContentContainerStyle: styles.tabBarContentContainer,
+    tabBarStyle: styles.tabBar,
+  };
+
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
+      <Background />
       <PlatformProvider>
-        <View style={styles.container}>
-          <Background />
-          <SafeAreaView style={styles.safeArea}>
-            <NavigationContainer
-              ref={navigationRef}
-              theme={{
-                ...DefaultTheme,
-                colors: {
-                  ...DefaultTheme.colors,
-                  background: "transparent",
-                },
-              }}
-              onReady={onLayoutRootView}
-              linking={
-                Platform.OS === "web"
-                  ? ({
-                      prefixes: [],
-                      config: {
-                        screens: {
-                          Main: {
-                            screens: {
-                              Explore: "explore/:address?",
-                              Create: "create",
-                              Assets: "assets/:address?",
-                              Network: "network",
-                            },
-                          },
-                          Components: "components",
-                        },
+        <SafeAreaView style={styles.safeArea}>
+          <StatusBar style="light" translucent backgroundColor="transparent" />
+          <NavigationContainer
+            ref={navigationRef}
+            theme={{
+              ...DefaultTheme,
+              colors: {
+                ...DefaultTheme.colors,
+                background: "transparent",
+              },
+            }}
+            onReady={onLayoutRootView}
+            linking={
+              Platform.OS === "web"
+                ? ({
+                    prefixes: [],
+                    config: {
+                      screens: {
+                        Explore: "explore/:address?",
+                        Create: "create",
+                        Assets: "assets/:address?",
+                        Network: "network",
                       },
-                    } as LinkingOptions<RootStackParamList>)
-                  : undefined
-              }
+                    },
+                  } as LinkingOptions<TabParamList>)
+                : undefined
+            }
+          >
+            <Tab.Navigator
+              tabBar={(props) => <CustomTabBar {...props} />}
+              screenOptions={screenOptions}
+              initialLayout={{ width }}
             >
-              <Stack.Navigator
-                screenOptions={{
-                  headerShown: false,
-                  contentStyle: {
-                    backgroundColor: "transparent",
-                  },
-                }}
-              >
-                <Stack.Screen
-                  name="Main"
-                  component={HomeTabs}
-                  options={{
-                    contentStyle: {
-                      backgroundColor: "transparent",
-                    },
-                  }}
-                />
-                <Stack.Screen
-                  name="Components"
-                  component={ComponentsScreen}
-                  options={{
-                    headerShown: true,
-                    headerStyle: { backgroundColor: "#333" },
-                    headerTintColor: "#fff",
-                    title: "UI Components",
-                    contentStyle: {
-                      backgroundColor: "rgba(0, 0, 0, 0.7)",
-                    },
-                  }}
-                />
-              </Stack.Navigator>
-            </NavigationContainer>
-          </SafeAreaView>
-          <StatusBar style="light" />
-        </View>
+              <Tab.Screen
+                name="Explore"
+                component={ExploreScreen}
+                initialParams={{ address: DEFAULT_ADDRESS }}
+              />
+              <Tab.Screen name="Create" component={CreateScreen} />
+              <Tab.Screen
+                name="Assets"
+                component={AssetsScreen}
+                initialParams={{ address: DEFAULT_ADDRESS }}
+              />
+              <Tab.Screen name="Network" component={TweaksScreen} />
+            </Tab.Navigator>
+          </NavigationContainer>
+        </SafeAreaView>
       </PlatformProvider>
     </GestureHandlerRootView>
   );
@@ -259,6 +249,14 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: "transparent",
+  },
+  backgroundContainer: {
+    position: "absolute",
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    zIndex: -1,
   },
   safeArea: {
     flex: 1,
@@ -283,6 +281,14 @@ const styles = StyleSheet.create({
     shadowRadius: 4,
     elevation: 3,
     gap: 32,
+  },
+  tabBar: {
+    elevation: 0,
+    shadowOpacity: 0,
+    backgroundColor: "transparent",
+  },
+  tabBarContentContainer: {
+    flex: 1,
   },
   touchableTabBase: {},
   tabItemBase: {

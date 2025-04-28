@@ -2,7 +2,7 @@ import React from "react";
 import { Linking, Platform } from "react-native";
 import { detectPlatform, AppPlatform } from "./platform";
 
-export type NavigationType = "stack" | "tab" | "drawer";
+export type NavigationType = "stack" | "tab";
 
 export interface NavigationConfig {
   type: NavigationType;

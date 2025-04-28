@@ -8,6 +8,7 @@ import {
   Image,
   Share,
   Platform,
+  ScrollView,
 } from "react-native";
 import { useState, useEffect } from "react";
 import { Inbound, Outbound, Text, Button } from "../components";
@@ -199,7 +200,7 @@ export default function ExploreScreen({ initialAddress }: ExploreScreenProps) {
   };
 
   return (
-    <SafeAreaView style={styles.container}>
+    <ScrollView contentContainerStyle={styles.container}>
       <View style={styles.content}>
         {renderVideoContent()}
 
@@ -273,7 +274,7 @@ export default function ExploreScreen({ initialAddress }: ExploreScreenProps) {
           </Inbound>
         </Pressable>
       </View>
-    </SafeAreaView>
+    </ScrollView>
   );
 }
 

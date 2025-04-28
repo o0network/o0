@@ -103,5 +103,5 @@ const VideoNote: React.FC<VideoNoteProps> = ({ videoSource, texts }) => {
     </div>
   );
 };
-
 export default VideoNote;
+
