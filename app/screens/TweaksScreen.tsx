@@ -11,12 +11,12 @@ type RootStackParamList = {
 
 type NavigationProp = NativeStackNavigationProp<RootStackParamList>;
 
-interface ProposalCardProps {
+type ProposalCardProps = {
   title: string;
   description: string;
   percentage: number;
   status: "voting" | "approved" | "rejected";
-}
+};
 
 const proposalData: {
   key: string;
@@ -144,7 +144,7 @@ const TweaksScreen = () => {
             title="Open Components"
             icon="🪣"
             onPress={() => {
-              navigation.navigate("Components");
+              navigation.getParent()?.navigate("Components");
             }}
           />
         </Inbound>

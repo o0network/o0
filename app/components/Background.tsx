@@ -204,12 +204,15 @@ export default function Background() {
       rendererRef.current.setClearColor(0x000000, 0);
       cameraRef.current!.position.z = 1;
 
+      const mouseSensitivity = 0.04;
+      const currentQuat = new THREE.Quaternion();
+
       const uniformData = {
         u_time: { value: 0.0 },
         u_mouse: {
           value: new THREE.Vector2(
-            mousePositionRef.current.x,
-            mousePositionRef.current.y
+            mousePositionRef.current.x * mouseSensitivity,
+            mousePositionRef.current.y * mouseSensitivity
           ),
         },
         u_alpha: { value: deviceOrientationRef.current.alpha },
@@ -255,20 +258,21 @@ export default function Background() {
             -deviceOrientationRef.current.gamma,
             "YXZ"
           );
-          const quaternion = new THREE.Quaternion();
-          quaternion.setFromEuler(euler);
-          const q1 = new THREE.Quaternion();
-          q1.setFromAxisAngle(new THREE.Vector3(1, 0, 0), -Math.PI / 2);
-          quaternion.multiply(q1);
-          const rotationMatrix = new THREE.Matrix3();
-          rotationMatrix.setFromMatrix4(
-            new THREE.Matrix4().makeRotationFromQuaternion(quaternion)
+          const targetQuat = new THREE.Quaternion().setFromEuler(euler);
+          const alignQuat = new THREE.Quaternion().setFromAxisAngle(
+            new THREE.Vector3(1, 0, 0),
+            -Math.PI / 2
+          );
+          targetQuat.multiply(alignQuat);
+          currentQuat.slerp(targetQuat, 0.1);
+          const rotationMatrix = new THREE.Matrix3().setFromMatrix4(
+            new THREE.Matrix4().makeRotationFromQuaternion(currentQuat)
           );
           materialRef.current.uniforms.u_rotMatrix.value = rotationMatrix;
         } else {
           materialRef.current.uniforms.u_mouse.value.set(
-            mousePositionRef.current.x,
-            mousePositionRef.current.y
+            mousePositionRef.current.x * mouseSensitivity,
+            mousePositionRef.current.y * mouseSensitivity
           );
         }
 

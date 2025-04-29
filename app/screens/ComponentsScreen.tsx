@@ -7,7 +7,6 @@ import {
   Checkbox,
   ValueLabel,
   Slider,
-  BubbleBar,
   Background,
   Frame,
   Outbound,
@@ -109,13 +108,6 @@ export default function ComponentsScreen() {
             minimumValue={0}
             maximumValue={100}
             style={styles.slider}
-          />
-
-          <BubbleBar
-            items={bubbleItems}
-            selectedIndex={bubbleIndex}
-            onSelectIndex={setBubbleIndex}
-            style={styles.bubbleBar}
           />
 
           <Button
@@ -220,9 +212,6 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
     paddingVertical: 8,
-  },
-  bubbleBar: {
-    marginVertical: 8,
   },
   roundButtonRow: {
     flexDirection: "row",

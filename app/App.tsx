@@ -27,6 +27,8 @@ import { Nunito_600SemiBold, Nunito_700Bold } from "@expo-google-fonts/nunito";
 import { DMMono_500Medium } from "@expo-google-fonts/dm-mono";
 import { DynaPuff_700Bold } from "@expo-google-fonts/dynapuff";
 import { SafeAreaProvider } from "react-native-safe-area-context";
+import { createNativeStackNavigator } from "@react-navigation/native-stack";
+import ComponentsScreen from "./screens/ComponentsScreen";
 
 import ExploreScreen from "./screens/ExploreScreen";
 import CreateScreen from "./screens/CreateScreen";
@@ -40,6 +42,11 @@ type TabParamList = {
   Create: undefined;
   Assets: { address?: string };
   Network: undefined;
+};
+
+type RootStackParamList = {
+  Main: undefined;
+  Components: undefined;
 };
 
 const { width } = Dimensions.get("window");
@@ -188,6 +195,29 @@ export default function App() {
     tabBarStyle: styles.tabBar,
   };
 
+  const Stack = createNativeStackNavigator<RootStackParamList>();
+
+  const MainTabs = () => (
+    <Tab.Navigator
+      tabBar={(props) => <CustomTabBar {...props} />}
+      screenOptions={screenOptions}
+      initialLayout={{ width }}
+    >
+      <Tab.Screen
+        name="Explore"
+        component={ExploreScreen}
+        initialParams={{ address: DEFAULT_ADDRESS }}
+      />
+      <Tab.Screen name="Create" component={CreateScreen} />
+      <Tab.Screen
+        name="Assets"
+        component={AssetsScreen}
+        initialParams={{ address: DEFAULT_ADDRESS }}
+      />
+      <Tab.Screen name="Network" component={TweaksScreen} />
+    </Tab.Navigator>
+  );
+
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
       <Background />
@@ -222,24 +252,13 @@ export default function App() {
                     : undefined
                 }
               >
-                <Tab.Navigator
-                  tabBar={(props) => <CustomTabBar {...props} />}
-                  screenOptions={screenOptions}
-                  initialLayout={{ width }}
-                >
-                  <Tab.Screen
-                    name="Explore"
-                    component={ExploreScreen}
-                    initialParams={{ address: DEFAULT_ADDRESS }}
+                <Stack.Navigator screenOptions={{ headerShown: false }}>
+                  <Stack.Screen name="Main" component={MainTabs} />
+                  <Stack.Screen
+                    name="Components"
+                    component={ComponentsScreen}
                   />
-                  <Tab.Screen name="Create" component={CreateScreen} />
-                  <Tab.Screen
-                    name="Assets"
-                    component={AssetsScreen}
-                    initialParams={{ address: DEFAULT_ADDRESS }}
-                  />
-                  <Tab.Screen name="Network" component={TweaksScreen} />
-                </Tab.Navigator>
+                </Stack.Navigator>
               </NavigationContainer>
             </SafeAreaView>
           </SafeAreaProvider>
