@@ -3,9 +3,8 @@ import {
   View,
   StyleSheet,
   ScrollView,
-  Image,
   Dimensions,
-  ActivityIndicator,
+  SafeAreaView,
 } from "react-native";
 import {
   Switch,
@@ -17,7 +16,6 @@ import {
   Text,
   Button,
 } from "../components";
-import { SafeAreaView } from "react-native-safe-area-context";
 import { AssetData, PriceData } from "../data/api";
 import { ApiService } from "../data/api";
 
@@ -119,7 +117,7 @@ export const AssetsScreen = ({ initialAddress }: AssetsScreenProps) => {
       );
 
       return (
-        <ScrollView contentContainerStyle={styles.listContainer}>
+        <SafeAreaView style={styles.listContainer}>
           {filteredAssets.map((asset) => (
             <View key={asset.id} style={styles.assetCard}>
               <Text style={styles.assetSymbol}>{asset.symbol}</Text>
@@ -144,7 +142,7 @@ export const AssetsScreen = ({ initialAddress }: AssetsScreenProps) => {
               </View>
             </View>
           ))}
-        </ScrollView>
+        </SafeAreaView>
       );
     } else {
       return (
@@ -227,18 +225,16 @@ export const AssetsScreen = ({ initialAddress }: AssetsScreenProps) => {
   if (assets.length === 0 && address !== DEFAULT_ADDRESS) {
     return (
       <View style={styles.outerContainer}>
-        <SafeAreaView style={styles.safeArea}>
-          <View style={styles.loadingContainer}>
-            <Text>Loading assets for {address}...</Text>
-          </View>
-        </SafeAreaView>
+        <View style={styles.loadingContainer}>
+          <Text>Loading assets for {address}...</Text>
+        </View>
       </View>
     );
   }
 
   return (
     <View style={styles.outerContainer}>
-      <SafeAreaView style={styles.safeArea}>
+      <ScrollView contentContainerStyle={styles.scrollContainer}>
         <Outbound style={styles.frameContainer}>
           <View style={styles.headerContainer}>
             <View style={styles.addressBox}>
@@ -294,7 +290,7 @@ export const AssetsScreen = ({ initialAddress }: AssetsScreenProps) => {
             style={styles.nextVideoButton}
           />
         </Outbound>
-      </SafeAreaView>
+      </ScrollView>
     </View>
   );
 };
@@ -309,19 +305,10 @@ const styles = StyleSheet.create({
   },
   outerContainer: {
     flex: 1,
-    position: "relative",
-    justifyContent: "center",
-    alignItems: "center",
-    maxWidth: 512,
-    width: "100%",
-    alignSelf: "center",
   },
-  safeArea: {
-    flex: 1,
-    gap: 8,
-    width: "100%",
-    justifyContent: "flex-start",
-    alignItems: "center",
+  scrollContainer: {
+    flexGrow: 1,
+    paddingBottom: 20,
   },
   frameContainer: {},
   headerContainer: {

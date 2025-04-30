@@ -10,6 +10,5 @@ export { default as ValueLabel } from "./ValueLabel";
 export { default as Slider } from "./Slider";
 export { default as CellGrid } from "./CellGrid";
 export { default as Background } from "./Background";
-export { default as BubbleBar } from "./BubbleBar";
 export { default as Frame, Inbound, Outbound } from "./Frame";
 export { default as Text } from "./Text";

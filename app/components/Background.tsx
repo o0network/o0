@@ -1,243 +1,328 @@
-"use-dom";
-import { useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
+import { View, StyleSheet, Platform } from "react-native";
+import { GLView, ExpoWebGLRenderingContext } from "expo-gl";
 import * as THREE from "three";
-import { usePlatformContext } from "../utils/platform";
 import { DeviceMotion } from "expo-sensors";
-import { View, StyleSheet } from "react-native";
+import { Renderer } from "expo-three";
+
+const vertexShader = `
+  varying vec3 vDir;
+  void main() {
+    vDir = normalize(position);
+    gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+  }
+`;
 
 const fragmentShader = `
-  #ifdef GL_ES
-  precision mediump float;
-  #endif
+  precision highp float;
+
+  #define PI 3.14159265359
+  #define TWO_PI 6.28318530718
 
   uniform float u_time;
-  uniform vec2 u_resolution;
-  uniform vec2 u_mouse;
-  uniform vec2 u_orientation;
+  uniform vec2  u_mouse;
+  uniform float u_alpha;
+  uniform float u_beta;
+  uniform float u_gamma;
   uniform float u_is_mobile;
+  uniform mat3 u_rotMatrix;
 
-  vec3 rainbowColor(float position, float time) {
+  varying vec3 vDir;
+
+  // --- Rotation helpers ---
+  mat3 rotX(float a){
+    float s = sin(a), c = cos(a);
+    return mat3(1.0,0.0,0.0, 0.0,c,-s, 0.0,s,c);
+  }
+  mat3 rotY(float a){
+    float s = sin(a), c = cos(a);
+    return mat3(c,0.0,s, 0.0,1.0,0.0, -s,0.0,c);
+  }
+  mat3 rotZ(float a){
+    float s = sin(a), c = cos(a);
+    return mat3(c,-s,0.0, s,c,0.0, 0.0,0.0,1.0);
+  }
+
+  vec3 paletteColor(float t) {
     vec3 palette[8] = vec3[](
-      vec3(0.9490, 0.0000, 1.0000),   // #f200ff - bright magenta
-      vec3(0.9608, 0.1961, 0.8627),   // #f532dc - bright pink
-      vec3(0.9804, 0.2353, 0.7255),   // #fa3cb9 - hot pink
-      vec3(0.9882, 0.2745, 0.5686),   // #fc4691 - coral pink
-      vec3(0.9961, 0.3137, 0.3922),   // #fe5064 - bright coral
-      vec3(1.0000, 0.4706, 0.2549),   // #ff7841 - bright orange
-      vec3(1.0000, 0.6275, 0.1176),   // #ffa01e - bright amber
-      vec3(1.0000, 0.7843, 0.0000)    // #ffc800 - bright gold
+      vec3(0.9490, 0.0000, 1.0000), // #F200FF
+      vec3(0.9608, 0.1961, 0.8627), // #F532DC
+      vec3(0.9804, 0.2353, 0.7255), // #FA3CB9
+      vec3(0.9882, 0.2745, 0.5686), // #FC4691
+      vec3(0.9961, 0.3137, 0.3922), // #FE5064
+      vec3(1.0000, 0.4706, 0.2549), // #FF7841
+      vec3(1.0000, 0.6275, 0.1176), // #FFA01E
+      vec3(1.0000, 0.7843, 0.0000)  // #FFC800
     );
-
-    float pattern = fract(position * 0.5 + time * 0.1);
-    float index = pattern * 8.0;
-    int i0 = int(floor(index));
-    int i1 = int(ceil(index));
-    float t = fract(index);
-
-    i0 = i0 % 8;
-    i1 = i1 % 8;
-
-    return mix(palette[i0], palette[i1], t);
+    float idx = t * 7.0;
+    int i0 = int(floor(idx));
+    int i1 = int(ceil(idx));
+    return mix(palette[i0], palette[i1], fract(idx));
   }
 
-  float random(vec2 st) {
-      return fract(sin(dot(st.xy, vec2(12.9898, 78.233))) * 43758.5453123);
+  // Hash & 3-D noise helpers (simple, cheap noise)
+  float hash(vec3 p){ return fract(sin(dot(p,vec3(127.1,311.7,74.7)))*43758.5453123); }
+  float noise(vec3 p){
+    vec3 i = floor(p); vec3 f = fract(p);
+    // Trilinear interpolation of 8 hashed corners
+    float n000 = hash(i);
+    float n100 = hash(i+vec3(1.0,0.0,0.0));
+    float n010 = hash(i+vec3(0.0,1.0,0.0));
+    float n110 = hash(i+vec3(1.0,1.0,0.0));
+    float n001 = hash(i+vec3(0.0,0.0,1.0));
+    float n101 = hash(i+vec3(1.0,0.0,1.0));
+    float n011 = hash(i+vec3(0.0,1.0,1.0));
+    float n111 = hash(i+vec3(1.0,1.0,1.0));
+    vec3 u = f*f*(3.0-2.0*f);
+    return mix(mix(mix(n000,n100,u.x), mix(n010,n110,u.x), u.y),
+               mix(mix(n001,n101,u.x), mix(n011,n111,u.x), u.y), u.z);
   }
 
-  float noise(vec2 st) {
-      vec2 i = floor(st);
-      vec2 f = fract(st);
-      float a = random(i);
-      float b = random(i + vec2(1.0, 0.0));
-      float c = random(i + vec2(0.0, 1.0));
-      float d = random(i + vec2(1.0, 1.0));
-      vec2 u = f * f * (3.0 - 2.0 * f);
-      return mix(a, b, u.x) + (c - a) * u.y * (1.0 - u.x) + (d - b) * u.x * u.y;
-  }
+  void main(){
+    vec3 dir = vDir;
 
-  void main() {
-    vec2 st = gl_FragCoord.xy / u_resolution.xy;
-    float aspect = u_resolution.x / u_resolution.y;
-    st.x *= aspect;
+    // Apply device or mouse orientation
+    if (u_is_mobile > 0.5) {
+      dir = u_rotMatrix * dir;
+    } else {
+      float yaw   = u_mouse.x * PI;
+      float pitch = -u_mouse.y * PI * 0.5;
+      mat3 R = rotY(yaw) * rotX(pitch);
+      dir = R * dir;
+    }
 
-    vec2 influence = mix(u_mouse, u_orientation, u_is_mobile);
-    influence.y *= -1.0;
-    influence *= 2.0;
-
-    float base_pattern = 0.0;
-    base_pattern += sin(st.x * 10.0 + u_time * 0.5 + influence.x * 0.5) * 0.5 + 0.5;
-    base_pattern += cos(st.y * 10.0 + u_time * 0.3 + influence.y * 0.5) * 0.5 + 0.5;
-
-    float noise_val = noise(st * 5.0 + u_time * 0.2 + influence * 0.1) * 0.5;
-
-    float combined_pattern = base_pattern * 0.7 + noise_val * 0.3;
-
-    vec2 distorted_st = st + vec2(
-      cos(combined_pattern * 3.14159 * 2.0 + influence.x * 0.5) * 0.05,
-      sin(combined_pattern * 3.14159 * 2.0 + influence.y * 0.5) * 0.05
-    );
-
-    float color_intensity = 0.0;
-    color_intensity += sin(distorted_st.x * 8.0 + cos(u_time * 0.5 + distorted_st.y * 10.0 + sin(distorted_st.x * 12.0 + u_time * 1.0))) * 0.8;
-    color_intensity += cos(distorted_st.y * 8.0 + sin(u_time * 0.3 + distorted_st.x * 10.0 + cos(distorted_st.y * 12.0 + u_time * 1.0))) * 0.8;
-
-    vec3 final_color = rainbowColor(color_intensity * 0.5 + 0.5, u_time * 0.5);
-
-    gl_FragColor = vec4(final_color, 1.0);
+    // 3-D moving noise on the direction vector, reduced intensity
+    float t = u_time * 0.1;
+    float n = noise(dir * 2.0 + t);
+    // Wave pattern with slower frequency
+    float w = sin((n + t) * TWO_PI * 2.0);
+    vec3 col = paletteColor(w * 0.5 + 0.5);
+    gl_FragColor = vec4(col, 1.0);
   }
 `;
 
 export default function Background() {
-  const containerRef = useRef<HTMLDivElement>(null);
-  const { platform } = usePlatformContext();
   const animationRef = useRef<number | null>(null);
-  const rendererRef = useRef<THREE.WebGLRenderer | null>(null);
-  const materialRef = useRef<THREE.ShaderMaterial | null>(null);
   const mousePositionRef = useRef({ x: 0, y: 0 });
-  const deviceOrientationRef = useRef({ beta: 0, gamma: 0 });
+  const deviceOrientationRef = useRef({ alpha: 0, beta: 0, gamma: 0 });
+  const orientationStatusRef = useRef<string>("unknown");
   const motionSubscriptionRef = useRef<{ remove: () => void } | null>(null);
+  const [isMobile] = useState(Platform.OS !== "web");
+
+  const rendererRef = useRef<Renderer | null>(null);
+  const sceneRef = useRef<THREE.Scene | null>(null);
+  const cameraRef = useRef<THREE.PerspectiveCamera | null>(null);
+  const materialRef = useRef<THREE.ShaderMaterial | null>(null);
+  const clockRef = useRef<THREE.Clock | null>(null);
 
   useEffect(() => {
-    if (!containerRef.current) return;
-
-    const isMobilePlatform = platform === "mobile";
-
-    const scene = new THREE.Scene();
-
-    const camera = new THREE.OrthographicCamera(-1, 1, 1, -1, 0.1, 10);
-    camera.position.z = 1;
-
-    const renderer = new THREE.WebGLRenderer({ alpha: true });
-    renderer.setSize(window.innerWidth, window.innerHeight);
-    renderer.setClearColor(0x000000, 0);
-    containerRef.current.appendChild(renderer.domElement);
-    rendererRef.current = renderer;
-
-    const uniformData = {
-      u_resolution: {
-        value: new THREE.Vector2(window.innerWidth, window.innerHeight),
-      },
-      u_time: { value: 0.0 },
-      u_mouse: { value: new THREE.Vector2(0.0, 0.0) },
-      u_orientation: { value: new THREE.Vector2(0.0, 0.0) },
-      u_is_mobile: { value: isMobilePlatform ? 1.0 : 0.0 },
-    };
-
-    const planeGeometry = new THREE.PlaneGeometry(2, 2);
-
-    const shaderMaterial = new THREE.ShaderMaterial({
-      fragmentShader: fragmentShader,
-      uniforms: uniformData,
-    });
-    materialRef.current = shaderMaterial;
-
-    const mesh = new THREE.Mesh(planeGeometry, shaderMaterial);
-    scene.add(mesh);
-
-    const clock = new THREE.Clock();
-    const animate = () => {
-      if (!materialRef.current || !rendererRef.current) return;
-
-      materialRef.current.uniforms.u_time.value = clock.getElapsedTime();
-
-      if (isMobilePlatform) {
-        materialRef.current.uniforms.u_orientation.value.set(
-          deviceOrientationRef.current.gamma * 0.01,
-          deviceOrientationRef.current.beta * 0.01
-        );
-      } else {
-        materialRef.current.uniforms.u_mouse.value.set(
-          mousePositionRef.current.x,
-          mousePositionRef.current.y
-        );
-      }
-
-      rendererRef.current.render(scene, camera);
-      animationRef.current = requestAnimationFrame(animate);
-    };
-
-    animate();
-
-    const handleResize = () => {
-      if (!rendererRef.current || !materialRef.current) return;
-      rendererRef.current.setSize(window.innerWidth, window.innerHeight);
-      materialRef.current.uniforms.u_resolution.value.set(
-        window.innerWidth,
-        window.innerHeight
-      );
-    };
-
-    window.addEventListener("resize", handleResize);
-
-    const handleMouseMove = (event: MouseEvent) => {
-      mousePositionRef.current = {
-        x: (event.clientX / window.innerWidth) * 2 - 1,
-        y: -(event.clientY / window.innerHeight) * 2 + 1,
-      };
-    };
-
-    if (!isMobilePlatform) {
-      window.addEventListener("mousemove", handleMouseMove);
-    }
-
-    return () => {
-      if (animationRef.current) {
-        cancelAnimationFrame(animationRef.current);
-      }
-
-      if (containerRef.current && rendererRef.current) {
-        if (rendererRef.current.domElement.parentNode) {
-          containerRef.current.removeChild(rendererRef.current.domElement);
-        }
-      }
-
-      window.removeEventListener("resize", handleResize);
-
-      if (!isMobilePlatform) {
-        window.removeEventListener("mousemove", handleMouseMove);
-      }
-    };
-  }, [platform]);
-
-  useEffect(() => {
-    if (platform !== "mobile") {
+    if (!isMobile) {
       if (motionSubscriptionRef.current) {
         motionSubscriptionRef.current.remove();
         motionSubscriptionRef.current = null;
       }
       return;
     }
+    let isMounted = true;
+    const verticalThreshold = Math.PI / 3;
+    const horizontalThreshold = Math.PI / 3;
+    const flatThreshold = Math.PI / 6;
 
     DeviceMotion.isAvailableAsync().then((isAvailable) => {
-      if (isAvailable && !motionSubscriptionRef.current) {
-        motionSubscriptionRef.current = DeviceMotion.addListener((data) => {
-          const { beta, gamma } = data.rotation || { beta: 0, gamma: 0 };
-          deviceOrientationRef.current = { beta: beta || 0, gamma: gamma || 0 };
-        });
+      if (isAvailable && isMounted && !motionSubscriptionRef.current) {
+        motionSubscriptionRef.current = DeviceMotion.addListener(
+          (motionData) => {
+            const { alpha, beta, gamma } = motionData.rotation || {
+              alpha: 0,
+              beta: 0,
+              gamma: 0,
+            };
+
+            let currentStatus = "unknown";
+            const absBeta = Math.abs(beta || 0);
+            const absGamma = Math.abs(gamma || 0);
+
+            if (absBeta < flatThreshold && absGamma < flatThreshold) {
+              currentStatus = "horizontal (flat)";
+            } else if (absBeta > verticalThreshold) {
+              currentStatus = "vertical (portrait)";
+            } else if (absGamma > horizontalThreshold) {
+              currentStatus = "horizontal (landscape)";
+            } else {
+              currentStatus = "diagonal / intermediate";
+            }
+
+            if (currentStatus !== orientationStatusRef.current) {
+              orientationStatusRef.current = currentStatus;
+            }
+
+            deviceOrientationRef.current = {
+              alpha: alpha || 0,
+              beta: beta || 0,
+              gamma: gamma || 0,
+            };
+          }
+        );
+        DeviceMotion.setUpdateInterval(100);
       }
     });
-
     return () => {
+      isMounted = false;
       if (motionSubscriptionRef.current) {
         motionSubscriptionRef.current.remove();
         motionSubscriptionRef.current = null;
       }
     };
-  }, [platform]);
+  }, [isMobile]);
+
+  useEffect(() => {
+    if (isMobile) return;
+    const handleMouseMove = (event: MouseEvent) => {
+      mousePositionRef.current = {
+        x: (event.clientX / window.innerWidth) * 2 - 1,
+        y: -(event.clientY / window.innerHeight) * 2 + 1,
+      };
+    };
+    window.addEventListener("mousemove", handleMouseMove);
+    return () => window.removeEventListener("mousemove", handleMouseMove);
+  }, [isMobile]);
+
+  const onContextCreate = useCallback(
+    (gl: ExpoWebGLRenderingContext) => {
+      rendererRef.current = new Renderer({ gl });
+      sceneRef.current = new THREE.Scene();
+      cameraRef.current = new THREE.PerspectiveCamera(
+        75,
+        gl.drawingBufferWidth / gl.drawingBufferHeight,
+        0.1,
+        1000
+      );
+      clockRef.current = new THREE.Clock();
+
+      const { drawingBufferWidth: width, drawingBufferHeight: height } = gl;
+      rendererRef.current.setSize(width, height);
+      rendererRef.current.setClearColor(0x000000, 0);
+      cameraRef.current!.position.z = 1;
+
+      const mouseSensitivity = 0.04;
+      const currentQuat = new THREE.Quaternion();
+
+      const uniformData = {
+        u_time: { value: 0.0 },
+        u_mouse: {
+          value: new THREE.Vector2(
+            mousePositionRef.current.x * mouseSensitivity,
+            mousePositionRef.current.y * mouseSensitivity
+          ),
+        },
+        u_alpha: { value: deviceOrientationRef.current.alpha },
+        u_beta: { value: deviceOrientationRef.current.beta },
+        u_gamma: { value: deviceOrientationRef.current.gamma },
+        u_is_mobile: { value: isMobile ? 1.0 : 0.0 },
+        u_rotMatrix: { value: new THREE.Matrix3() },
+      };
+
+      materialRef.current = new THREE.ShaderMaterial({
+        vertexShader,
+        fragmentShader,
+        side: THREE.BackSide,
+        uniforms: uniformData,
+        transparent: true,
+      });
+
+      const geometry = new THREE.SphereGeometry(5, 128, 128);
+      const mesh = new THREE.Mesh(geometry, materialRef.current!);
+      sceneRef.current.add(mesh);
+
+      const renderLoop = () => {
+        if (
+          !rendererRef.current ||
+          !sceneRef.current ||
+          !cameraRef.current ||
+          !materialRef.current ||
+          !clockRef.current
+        ) {
+          if (animationRef.current) cancelAnimationFrame(animationRef.current);
+          animationRef.current = null;
+          return;
+        }
+        animationRef.current = requestAnimationFrame(renderLoop);
+
+        materialRef.current.uniforms.u_time.value =
+          clockRef.current.getElapsedTime();
+
+        if (isMobile) {
+          const euler = new THREE.Euler(
+            deviceOrientationRef.current.beta,
+            deviceOrientationRef.current.alpha,
+            -deviceOrientationRef.current.gamma,
+            "YXZ"
+          );
+          const targetQuat = new THREE.Quaternion().setFromEuler(euler);
+          const alignQuat = new THREE.Quaternion().setFromAxisAngle(
+            new THREE.Vector3(1, 0, 0),
+            -Math.PI / 2
+          );
+          targetQuat.multiply(alignQuat);
+          currentQuat.slerp(targetQuat, 0.1);
+          const rotationMatrix = new THREE.Matrix3().setFromMatrix4(
+            new THREE.Matrix4().makeRotationFromQuaternion(currentQuat)
+          );
+          materialRef.current.uniforms.u_rotMatrix.value = rotationMatrix;
+        } else {
+          materialRef.current.uniforms.u_mouse.value.set(
+            mousePositionRef.current.x * mouseSensitivity,
+            mousePositionRef.current.y * mouseSensitivity
+          );
+        }
+
+        rendererRef.current.render(sceneRef.current, cameraRef.current!);
+        gl.endFrameEXP();
+      };
+      renderLoop();
+    },
+    [isMobile]
+  );
+
+  useEffect(() => {
+    return () => {
+      if (animationRef.current) {
+        cancelAnimationFrame(animationRef.current);
+        animationRef.current = null;
+      }
+      if (materialRef.current) materialRef.current.dispose();
+    };
+  }, []);
+
+  useEffect(() => {
+    if (isMobile) return;
+    const handleResize = () => {
+      if (rendererRef.current) {
+        const { innerWidth, innerHeight } = window;
+        rendererRef.current.setSize(innerWidth, innerHeight);
+      }
+    };
+    window.addEventListener("resize", handleResize);
+    return () => window.removeEventListener("resize", handleResize);
+  }, [isMobile]);
 
   return (
-    <View style={StyleSheet.absoluteFillObject}>
-      <div
-        ref={containerRef}
-        style={{
-          position: "absolute",
-          top: 0,
-          left: 0,
-          width: "100%",
-          height: "100%",
-          zIndex: 0,
-        }}
-      />
+    <View style={styles.container}>
+      <GLView style={styles.glView} onContextCreate={onContextCreate} />
     </View>
   );
 }
+
+const styles = StyleSheet.create({
+  container: {
+    position: "absolute",
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    zIndex: -1,
+  },
+  glView: {
+    flex: 1,
+  },
+});
