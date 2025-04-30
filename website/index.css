@@ -1,0 +1,548 @@
+:root {
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  --dark: #ffffff;
+  --light: #000000;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --dark: #000000;
+    --light: #ffffff;
+  }
+}
+
+body {
+  width: 100vw;
+  height: 100vh;
+  background-color: var(--dark);
+  color: var(--light);
+  position: relative;
+  counter-reset: lightbox slides;
+  margin: 0;
+  overflow: hidden;
+}
+
+/* Tabs styling */
+.marquee {
+  position: relative;
+  left: 50%;
+  transform: translatex(-50%);
+  width: 200vw;
+  z-index: 10;
+  margin: 0;
+}
+
+.tabs {
+  width: 150vw;
+  display: flex;
+  flex-wrap: nowrap;
+  gap: 10px;
+  background-color: transparent;
+}
+
+.tab {
+  display: flex;
+  width: fit-content;
+  align-items: center;
+  padding: 8px 12px;
+  background-color: rgba(255, 255, 255, 0.1);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 8px 8px 0 0;
+  position: relative;
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  justify-content: space-between;
+}
+
+.tab-favicon {
+  margin-right: 10px;
+  width: 16px;
+  height: 16px;
+}
+
+.tab-title {
+  font-size: 12px;
+}
+
+.tab-content {
+  display: flex;
+  align-items: center;
+  flex: 1;
+}
+
+.tab span {
+  color: var(--light);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.close {
+  cursor: pointer;
+  padding: 0 5px;
+  margin-left: 8px;
+  color: var(--light);
+  opacity: 0.6;
+  font-weight: bold;
+  transition: opacity 0.2s;
+}
+
+.close:hover {
+  opacity: 1;
+}
+
+.noise-bg {
+  position: fixed;
+  inset: 0;
+  width: 100vw;
+  height: 100vh;
+  opacity: 0.3;
+  pointer-events: none;
+  z-index: 0;
+  object-fit: cover;
+}
+
+
+/* content */
+.nested-marquee {
+  width: 100%;
+}
+
+.marquee img,
+.marquee a {
+  pointer-events: auto;
+  position: relative;
+  z-index: 2;
+}
+
+.main {
+  width: 100vw;
+  height: 100vh;
+}
+
+.logo-section {
+  z-index: 100;
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  width: 15vw;
+  max-width: 300px;
+}
+
+.logo {
+  position: relative;
+  cursor: url('assets/dark.png') 16 16;
+}
+
+.logo-img {
+  position: relative;
+  width: 100%;
+  object-fit: contain;
+  user-drag: none;
+  -webkit-user-drag: none;
+  user-select: none;
+  -moz-user-select: none;
+  -webkit-user-select: none;
+  -ms-user-select: none;
+}
+
+.logo ~ .download {
+  animation: pulse 1s infinite;
+}
+.logo ~ .download:hover {
+  animation-play-state: paused;
+}
+.logo ~ .download:active {
+  animation: click 0.2s infinite;
+}
+
+.logo:active {
+  animation: click 0.2s infinite;
+}
+
+@keyframes pulse {
+  0% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(1.05);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+
+@keyframes click {
+  0% {
+    transform: scale(1);
+  }
+  100% {
+    transform: scale(1.02);
+  }
+}
+
+
+.download {
+  width: 100%;
+  padding: 2rem;
+  margin-top: .5rem;
+  height: auto;
+  background-image: url('assets/pill.png');
+  --scale: calc(6px + 1vw);
+  font-size: var(--scale);
+  padding: var(--scale);
+  background-position: center;
+  background-repeat: no-repeat;
+  background-size: contain;
+  aspect-ratio: 4 / 1;
+  border: none;
+  color: var(--light);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: monospace;
+  text-align: center;
+  text-decoration: none;
+  transition: all 0.2s ease;
+  white-space: nowrap;
+}
+
+.download:hover {
+  transform: scale(1.03);
+  transition: all 0.15s ease-in;
+}
+
+.download:active {
+  transform: scale(0.98);
+  transition: all 0.1s ease;
+}
+
+
+/* carousel */
+
+*::-webkit-scrollbar {
+  width: 0;
+}
+
+*::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+*::-webkit-scrollbar-thumb {
+  background: transparent;
+  border: none;
+}
+
+* {
+  -ms-overflow-style: none;
+}
+
+ol, li {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.carousel {
+  position: fixed;
+  inset: 0;
+  width: 100vw;
+  height: 100vh;
+  filter: drop-shadow(0 0 10px #0003);
+  perspective: 100px;
+  z-index: 1000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.image {
+  cursor: zoom-in ;
+  position: relative;
+}
+
+.image:after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  cursor: grab;
+}
+
+.viewport {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  overflow-x: scroll;
+  counter-reset: item;
+  scroll-behavior: smooth;
+  scroll-snap-type: x mandatory;
+  z-index: 1001;
+}
+
+.slide {
+  position: relative;
+  flex: 0 0 100%;
+  width: 100%;
+  height: 100%;
+  counter-increment: item;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+.slide img {
+  max-width: 90%;
+  max-height: 90vh;
+  object-fit: contain;
+  position: relative;
+  z-index: 1000;
+}
+
+/* Update all other carousel classes to remove carousel__ prefix */
+.snapper {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  scroll-snap-align: center;
+}
+
+.snapper img {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  object-fit: contain;
+  z-index: 9000;
+  cursor: auto;
+  user-drag: none;
+  -webkit-user-drag: none;
+  user-select: none;
+  -moz-user-select: none;
+  -webkit-user-select: none;
+  -ms-user-select: none;
+}
+
+@media (hover: hover) {
+  .snapper {
+    animation-name: none;
+  }
+
+  .slide:last-child .snapper {
+    animation-name: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .snapper {
+    animation-name: none;
+  }
+}
+
+.carousel:hover .snapper,
+.carousel:focus-within .snapper {
+  animation-name: none;
+}
+
+.navigation {
+  position: absolute;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  text-align: center;
+}
+
+.navigation-list,
+.navigation-item {
+  display: inline-block;
+}
+
+.navigation-button {
+  display: inline-block;
+  width: 1.5rem;
+  height: 1.5rem;
+  background-color: #333;
+  background-clip: content-box;
+  border: 0.25rem solid transparent;
+  border-radius: 50%;
+  font-size: 0;
+  transition: transform 0.1s;
+}
+
+.prev,
+.next {
+  position: fixed;
+  background-color: rgba(0, 0, 0, 0.1);
+  top: 50%;
+  border-radius: 50%;
+  width: 100px;
+  height: 100px;
+  align-items: center;
+  text-align: center;
+  align-content: center;
+  font-size: 2rem;
+  text-decoration: none;
+  color: var(--light);
+  z-index: 1000;
+  display: none;
+}
+
+.prev {
+  left: 0;
+}
+
+.next {
+  right: 0;
+}
+
+.lightbox:target ~ .prev,
+.lightbox:target ~ .next {
+  display: block;
+}
+
+@keyframes tonext {
+  75% {
+    left: 0;
+  }
+  95% {
+    left: 100%;
+  }
+  98% {
+    left: 100%;
+  }
+  99% {
+    left: 0;
+  }
+}
+
+@keyframes tostart {
+  75% {
+    left: 0;
+  }
+  95% {
+    left: -300%;
+  }
+  98% {
+    left: -300%;
+  }
+  99% {
+    left: 0;
+  }
+}
+
+@keyframes snap {
+  96% {
+    scroll-snap-align: center;
+  }
+  97% {
+    scroll-snap-align: none;
+  }
+  99% {
+    scroll-snap-align: none;
+  }
+  100% {
+    scroll-snap-align: center;
+  }
+}
+
+/* Lightbox */
+.lightbox:target .snapper img,
+.lightbox:target .prev,
+.lightbox:target .next {
+  cursor: auto;
+  pointer-events: auto;
+}
+
+.lightbox {
+  display: none;
+  position: fixed;
+  z-index: 999;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  cursor: zoom-out;
+  background: rgba(0, 0, 0, 0.8);
+}
+
+.lightbox:target {
+  display: block;
+}
+
+.lightbox-container {
+  position: relative;
+  counter-increment: slides;
+}
+
+.lightbox-container::after {
+  content: counter(slides) " / 9";
+  position: absolute;
+  bottom: 1rem;
+  right: 1rem;
+  background: rgba(0, 0, 0, 0.5);
+  color: white;
+  padding: 0.5rem 1rem;
+  border-radius: 1rem;
+  font-size: 0.875rem;
+  pointer-events: none;
+}
+
+.image-wrapper {
+  display: inline-block;
+  pointer-events: none;
+}
+
+.image-link {
+  display: inline-block;
+  pointer-events: auto;
+}
+
+.floating-image {
+  position: absolute;
+  will-change: transform;
+  z-index: 2;
+}
+
+.floating-image img,
+.floating-image a {
+  pointer-events: auto;
+  user-select: none;
+  -webkit-user-drag: none;
+}
+
+.tabs-bg {
+  position: fixed;
+  inset: 0;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  padding: 0;
+}
+
+.preview-bg {
+  position: fixed;
+  inset: 0;
+  overflow: hidden;
+}
+
+canvas {
+  position: absolute;
+  top: 0;
+  left: 0;
+  z-index: 1;
+}
+
+/* Add styles for better dragging experience */
+.floating-image.dragging {
+  cursor: grabbing;
+}
+
+.floating-image:hover {
+  cursor: grab;
+}
+
