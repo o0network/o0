@@ -1,4 +1,4 @@
-import JSConfetti from "https://cdn.skypack.dev/js-confetti";
+import JSConfetti from "js-confetti";
 
 const oouSound = document.getElementById("oouSound");
 const saveSound = document.getElementById("saveSound");
@@ -51,53 +51,56 @@ document.querySelector(".logo-wrapper").addEventListener("click", () => {
 
 const jsConfetti = new JSConfetti();
 
-document.querySelector(".download").addEventListener("click", async () => {
-  if (!hasDownloadPermission) {
-    await requestDownloadPermission();
-    if (!hasDownloadPermission) return;
-  }
+const downloadLink = document.querySelector(".download-link");
+if (downloadLink) {
+  downloadLink.addEventListener("click", async () => {
+    if (!hasDownloadPermission) {
+      await requestDownloadPermission();
+      if (!hasDownloadPermission) return;
+    }
 
-  const topLogo = document.querySelector(".logo-wrapper:nth-child(1)");
-  const bottomLogo = document.querySelector(".logo-wrapper:nth-child(2)");
+    const topLogo = document.querySelector(".logo-wrapper:nth-child(1)");
+    const bottomLogo = document.querySelector(".logo-wrapper:nth-child(2)");
 
-  topLogo.classList.add("fly-away");
-  bottomLogo.classList.add("move-up");
+    topLogo.classList.add("fly-away");
+    bottomLogo.classList.add("move-up");
 
-  setTimeout(() => {
-    topLogo.remove();
-
-    const newLogo = document.createElement("div");
-    newLogo.className = "logo-wrapper";
-    newLogo.innerHTML = `
-      <img class="logo-ghost" src="assets/logo.png" alt="o0 logo" />
-    `;
-
-    document.querySelector(".logo-stack").prepend(newLogo);
-    newLogo.offsetHeight;
-
-    bottomLogo.classList.remove("move-up");
-
-    newLogo.addEventListener("click", () => {
-      oouSound.currentTime = 0;
-      oouSound.play();
-      hasClickedLogo = true;
-    });
-  }, 1000);
-
-  jsConfetti.addConfetti({
-    emojis: ["🎉", "✨", "⭐️", "🌟", "💫"],
-    emojiSize: 100,
-    confettiNumber: 50,
-    confettiRadius: 50,
-  });
-
-  if (hasClickedLogo) {
-    saveSound.currentTime = 0;
     setTimeout(() => {
-      saveSound.play();
+      topLogo.remove();
+
+      const newLogo = document.createElement("div");
+      newLogo.className = "logo-wrapper";
+      newLogo.innerHTML = `
+        <img class="logo-ghost" src="assets/logo.png" alt="o0 logo" />
+      `;
+
+      document.querySelector(".logo-stack").prepend(newLogo);
+      newLogo.offsetHeight;
+
+      bottomLogo.classList.remove("move-up");
+
+      newLogo.addEventListener("click", () => {
+        oouSound.currentTime = 0;
+        oouSound.play();
+        hasClickedLogo = true;
+      });
     }, 1000);
-  }
-});
+
+    jsConfetti.addConfetti({
+      emojis: ["🎉", "✨", "⭐️", "🌟", "💫"],
+      emojiSize: 100,
+      confettiNumber: 50,
+      confettiRadius: 50,
+    });
+
+    if (hasClickedLogo) {
+      saveSound.currentTime = 0;
+      setTimeout(() => {
+        saveSound.play();
+      }, 1000);
+    }
+  });
+}
 
 document.querySelector(".logo-ghost").addEventListener("animationend", (e) => {
   if (e.animationName === "ghost-download") {

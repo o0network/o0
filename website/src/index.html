@@ -1,0 +1,175 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>o0</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=DynaPuff:wght@500&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="icon" href="./assets/logo.png" />
+    <link rel="stylesheet" href="./css/style.css" />
+    <link rel="stylesheet" href="./css/logo.css" />
+    <link rel="stylesheet" href="./css/preview.css" />
+  </head>
+  <body>
+    <audio id="oouSound" src="./assets/oou.mp3"></audio>
+    <audio id="saveSound" src="./assets/save.mp3"></audio>
+    <div id="lightboxes"></div>
+
+    <main class="main">
+      <div id="threejs"></div>
+      <div class="preview-bg"></div>
+
+      <section class="social-section">
+        <a
+          href="https://t.me/o0netbot"
+          target="_blank"
+          style="
+            z-index: 10;
+            width: 40px;
+            height: 40px;
+            position: absolute;
+            top: 20px;
+            left: 20px;
+          "
+        >
+          <img src="./assets/telegram.svg" alt="telegram icon" />
+        </a>
+
+        <button
+          style="z-index: 10; position: absolute; top: 20px; right: 20px"
+          class="more-button"
+          popovertarget="popover"
+        >
+          <ul popover="hint" class="popover">
+            <li><a href="https://x.com/o0netbot">X</a></li>
+            <li><a href="https://github.com/o0network/o0">GitHub</a></li>
+            <li><a href="https://o0.network/graypaper.pdf">Graypaper</a></li>
+            <li><a href="https://o0.network/privacy.pdf">Privacy Policy</a></li>
+          </ul>
+        </button>
+      </section>
+
+      <a href="https://o0.network/a">
+        <img
+          src="./assets/app-store.png"
+          style="
+            z-index: 10;
+            width: 64px;
+            height: 64px;
+            position: absolute;
+            bottom: 20px;
+            left: 20px;
+          "
+          alt="app store qr code"
+          class="app-store"
+        />
+      </a>
+      <a href="https://o0.network/g">
+        <img
+          src="./assets/google-play.png"
+          alt="google play qr code"
+          style="
+            z-index: 10;
+            width: 64px;
+            height: 64px;
+            position: absolute;
+            bottom: 20px;
+            right: 20px;
+          "
+          class="google-play"
+        />
+      </a>
+
+      <section class="logo-section">
+        <div class="logo-stack">
+          <div class="logo-wrapper">
+            <img class="logo-ghost" src="./assets/logo.png" alt="o0 logo" />
+          </div>
+          <div class="logo-wrapper">
+            <img class="logo-ghost" src="./assets/logo.png" alt="o0 logo" />
+          </div>
+        </div>
+
+        <div
+          class="download-container"
+          style="resize: horizontal; height: auto"
+        >
+          <a
+            class="download-link"
+            href="https://github.com/wtf403/o0/releases/download/test/README.md"
+            download
+            >Launch App
+          </a>
+          <div
+            class="download-button"
+            style="
+              display: flex;
+              height: var(--pill-height);
+              width: 100%;
+              position: relative;
+            "
+          >
+            <!-- Left Cap -->
+            <div
+              style="
+                flex: 0 0 var(--cap-radius);
+                height: 100%;
+                position: relative;
+                z-index: 1;
+              "
+            >
+              <img
+                src="./assets/gloriousButton/left.png"
+                alt=""
+                style="width: 100%; height: 100%; object-fit: cover"
+              />
+            </div>
+
+            <!-- Middle (Stretchable) -->
+            <div
+              style="
+                flex: 1 1 auto;
+                height: 100%;
+                margin-left: -1px;
+                margin-right: -1px;
+                position: relative;
+                z-index: 0;
+              "
+            >
+              <img
+                src="./assets/gloriousButton/center.png"
+                alt=""
+                style="width: 100%; height: 100%; object-fit: fill"
+              />
+            </div>
+
+            <!-- Right Cap -->
+            <div
+              style="
+                flex: 0 0 var(--cap-radius);
+                height: 100%;
+                position: relative;
+                z-index: 1;
+              "
+            >
+              <img
+                src="./assets/gloriousButton/right.png"
+                alt=""
+                style="width: 100%; height: 100%; object-fit: cover"
+              />
+            </div>
+          </div>
+        </div>
+      </section>
+    </main>
+    <script type="module" src="./js/script.js"></script>
+    <script type="module" src="./js/video.js"></script>
+    <script type="module" src="./js/background.js"></script>
+  </body>
+  <style></style>
+</html>

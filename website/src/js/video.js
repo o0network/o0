@@ -1,7 +1,13 @@
-import Matter from "https://cdn.skypack.dev/matter-js";
-
-const { Engine, Render, Runner, Bodies, Body, Composite, Events, Vector } =
-  Matter;
+import {
+  Engine,
+  Render,
+  Runner,
+  Bodies,
+  Body,
+  Composite,
+  Events,
+  Vector,
+} from "matter-js";
 
 document.addEventListener("DOMContentLoaded", () => {
   const engine = Engine.create({ enableSleeping: false });

@@ -1,3 +1,5 @@
+import * as THREE from "three";
+
 document.addEventListener("DOMContentLoaded", function () {
   const container = document.getElementById("threejs");
   if (!container) return;
