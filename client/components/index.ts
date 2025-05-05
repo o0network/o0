@@ -12,3 +12,5 @@ export { default as CellGrid } from "./CellGrid";
 export { default as Background } from "./Background";
 export { default as Frame, Inbound, Outbound } from "./Frame";
 export { default as Text } from "./Text";
+export { default as WebIcons } from "./WebIcons";
+export { default as GloriousButton } from "./GloriousButton";

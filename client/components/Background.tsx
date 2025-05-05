@@ -129,6 +129,7 @@ export default function Background() {
     const flatThreshold = Math.PI / 6;
 
     DeviceMotion.isAvailableAsync().then((isAvailable) => {
+      console.log("isAvailable", isAvailable);
       if (isAvailable && isMounted && !motionSubscriptionRef.current) {
         motionSubscriptionRef.current = DeviceMotion.addListener(
           (motionData) => {

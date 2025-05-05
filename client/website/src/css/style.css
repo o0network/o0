@@ -3,8 +3,6 @@
     "Helvetica Neue", Arial, sans-serif;
   --dark: #ffffff;
   --light: #000000;
-  --pill-height: 80px;
-  --cap-radius: calc(var(--pill-height) / 2);
 }
 
 @media (prefers-color-scheme: dark) {

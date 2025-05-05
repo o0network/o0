@@ -1,116 +1,116 @@
 import {
-  View,
   StyleSheet,
   TouchableOpacity,
   StyleProp,
   ViewStyle,
   TextStyle,
+  Image,
+  ImageSourcePropType,
+  View,
 } from "react-native";
-import { Text } from "../components";
-import ButtonSvg from "../assets/Button.svg";
+import { Outbound, Text } from "../components";
 
-type ButtonProps = {
-  title: string;
-  glorious?: boolean;
-  icon?: string;
+export type ButtonProps = {
+  title?: string;
+  iconPath?: ImageSourcePropType;
   onPress?: () => void;
   style?: StyleProp<ViewStyle>;
   textStyle?: StyleProp<TextStyle>;
+  disabled?: boolean;
+  iconPosition?: "left" | "right";
+  round?: boolean;
 };
 
-export const Button: React.FC<ButtonProps> = ({
+export const Button = ({
   title,
-  icon,
+  iconPath,
   onPress,
   style,
-  glorious,
   textStyle,
-}) => {
-  const containerStyles: StyleProp<ViewStyle>[] = [styles.container];
-  const textStyles: StyleProp<TextStyle>[] = [styles.textStyle];
-
-  if (glorious) {
-    containerStyles.push(styles.gloriousContainer);
-    textStyles.push(styles.gloriousTextStyle);
-  } else {
-    containerStyles.push(styles.defaultContainer);
-  }
-  containerStyles.push(style);
-  textStyles.push(textStyle);
-
-  return (
-    <TouchableOpacity
-      style={containerStyles}
-      onPress={onPress}
-      activeOpacity={glorious ? 0.8 : 0.2}
-    >
-      {glorious && (
-        <View style={styles.svgContainer}>
-          <ButtonSvg width="100%" height="100%" />
-        </View>
-      )}
-      <View style={styles.contentContainer}>
-        {icon && <Text style={styles.iconStyle}>{icon}</Text>}
-        <Text style={textStyles}>{title}</Text>
+  disabled,
+  iconPosition = "left",
+  round = false,
+}: ButtonProps) => {
+  // Handle round buttons differently
+  if (round) {
+    return (
+      <View style={{ width: 40, height: 40 }}>
+        <Outbound style={{ width: 40, height: 40, borderRadius: 20 }}>
+          <TouchableOpacity
+            style={[
+              {
+                width: 40,
+                height: 40,
+                borderRadius: 20,
+                justifyContent: "center",
+                alignItems: "center",
+              },
+              disabled && styles.disabled,
+            ]}
+            onPress={onPress}
+            activeOpacity={0.7}
+            disabled={disabled}
+          >
+            {iconPath && <Image style={styles.icon} source={iconPath} />}
+          </TouchableOpacity>
+        </Outbound>
       </View>
-    </TouchableOpacity>
+    );
+  }
+
+  // Regular button
+  return (
+    <Outbound>
+      <TouchableOpacity
+        style={[styles.container, disabled && styles.disabled, style]}
+        onPress={onPress}
+        activeOpacity={0.7}
+        disabled={disabled}
+      >
+        <View style={styles.contentContainer}>
+          {iconPath && iconPosition === "left" && (
+            <Image style={styles.icon} source={iconPath} />
+          )}
+          {title ? (
+            <Text style={[styles.textStyle, textStyle]}>{title}</Text>
+          ) : null}
+          {iconPath && iconPosition === "right" && (
+            <Image style={styles.icon} source={iconPath} />
+          )}
+        </View>
+      </TouchableOpacity>
+    </Outbound>
   );
 };
 
 const styles = StyleSheet.create({
   container: {
-    flexDirection: "row",
+    width: "100%",
+    borderRadius: 32,
     justifyContent: "center",
     alignItems: "center",
-    gap: 3,
-    paddingVertical: 10,
-    paddingHorizontal: 24,
-    minHeight: 44,
-    marginVertical: 5,
-    position: "relative",
     overflow: "hidden",
   },
-  defaultContainer: {
-    borderRadius: 20,
-    backgroundColor: "rgba(94, 94, 94, 0.18)",
-  },
-  gloriousContainer: {
-    borderRadius: 35,
-    minHeight: 54,
-  },
-  svgContainer: {
-    position: "absolute",
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    width: "100%",
-    height: "100%",
+  disabled: {
+    opacity: 0.5,
   },
   contentContainer: {
     flexDirection: "row",
-    justifyContent: "center",
     alignItems: "center",
-    gap: 3,
-    zIndex: 1,
+    justifyContent: "center",
+    gap: 8,
+    width: "100%",
   },
-  iconStyle: {
-    fontSize: 18,
-    fontWeight: "600",
-    textAlign: "center",
-    color: "#FFFFFF",
-    zIndex: 1,
+  icon: {
+    width: 24,
+    height: 24,
+    resizeMode: "contain",
   },
   textStyle: {
     fontSize: 16,
     fontWeight: "600",
-    textAlign: "center",
     color: "#FFFFFF",
-    zIndex: 1,
-  },
-  gloriousTextStyle: {
-    fontSize: 18,
-    fontWeight: "700",
+    textAlign: "center",
   },
 });
 

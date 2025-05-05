@@ -10,7 +10,6 @@ import {
 export type TabItemType = {
   key: string;
   label: string;
-  emoji: string;
   img?: ImageSourcePropType;
 };
 
@@ -32,14 +31,7 @@ type TabProps = {
   onPress: () => void;
 };
 
-const Tab = ({
-  tab,
-  active,
-  showLabels = true,
-  isPlatformWeb = false,
-  style,
-  onPress,
-}: TabProps) => {
+const Tab = ({ tab, active, style, onPress }: TabProps) => {
   return (
     <Pressable
       key={tab.key}
@@ -53,13 +45,6 @@ const Tab = ({
           resizeMode="contain"
         />
       ) : (
-        <Text
-          style={[styles.iconBase, styles.icon, active && styles.iconActive]}
-        >
-          {tab.emoji}
-        </Text>
-      )}
-      {(active || isPlatformWeb) && showLabels && (
         <Text style={styles.label}>{tab.label}</Text>
       )}
     </Pressable>

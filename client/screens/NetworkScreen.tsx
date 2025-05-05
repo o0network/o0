@@ -98,13 +98,13 @@ const ProposalCard: React.FC<ProposalCardProps> = ({
         <View style={styles.votingButtons}>
           <Button
             title="Yes"
-            icon="✅"
+            iconPath={require("../assets/emojis/check-mark.png")}
             onPress={() => console.log("Voted Yes")}
             style={styles.voteButton}
           />
           <Button
             title="No"
-            icon="🚫"
+            iconPath={require("../assets/emojis/prohibited.png")}
             onPress={() => console.log("Voted No")}
             style={styles.voteButton}
           />
@@ -118,7 +118,7 @@ const ProposalCard: React.FC<ProposalCardProps> = ({
   );
 };
 
-const TweaksScreen = () => {
+const NetworkScreen = () => {
   const navigation = useNavigation<NavigationProp>();
   const [reducedMotion, setReducedMotion] = useState(false);
 
@@ -133,7 +133,7 @@ const TweaksScreen = () => {
 
           <Button
             title="Disconnect Wallet"
-            icon="🔐"
+            iconPath={require("../assets/emojis/cross-mark.png")}
             onPress={() => {
               console.log("Disconnect wallet pressed");
             }}
@@ -142,7 +142,6 @@ const TweaksScreen = () => {
 
           <Button
             title="Open Components"
-            icon="🪣"
             onPress={() => {
               navigation.getParent()?.navigate("Components");
             }}
@@ -319,4 +318,4 @@ const styles = StyleSheet.create({
   },
 });
 
-export default TweaksScreen;
+export default NetworkScreen;

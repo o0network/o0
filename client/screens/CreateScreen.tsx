@@ -6,6 +6,7 @@ import {
   SafeAreaView,
   Linking,
   TouchableOpacity,
+  Image,
 } from "react-native";
 import { CameraView, useCameraPermissions } from "expo-camera";
 import { Frame, Button } from "../components";
@@ -203,7 +204,7 @@ export default function CreateScreen({}: CreateScreenProps) {
 
     return (
       <View style={[styles.camera, styles.cameraPlaceholder]}>
-        <Text style={styles.cameraPlaceholderText}>📹</Text>
+        <Image source={require("../assets/emojis/camera.png")} />
         <TouchableOpacity
           style={styles.permissionButton}
           onPress={requestCameraAccess}
@@ -221,7 +222,7 @@ export default function CreateScreen({}: CreateScreenProps) {
       <Button
         style={styles.telegramPill}
         onPress={() => Linking.openURL("https://t.me/o0netbot")}
-        title="open in Telegram bot 🤖"
+        title="open in Telegram bot"
       />
 
       <View style={styles.bottomSection}>
@@ -242,7 +243,6 @@ export default function CreateScreen({}: CreateScreenProps) {
         </Frame>
 
         <Button
-          glorious
           style={styles.sendButton}
           onPress={sendVideo}
           title={isSending ? "Sending..." : "Send"}

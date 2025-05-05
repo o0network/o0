@@ -1,6 +1,5 @@
 import React from "react";
 import { View, StyleSheet, TouchableOpacity } from "react-native";
-import { AddButton } from "./AddButton";
 
 // Figma Node: 2658:1356 (Dot Component)
 // Also represents other Dot frames like 2658:1081, 2658:1082
@@ -54,16 +53,6 @@ export default function DotSelector({
           <Dot color={option.color} selected={option.selected} />
         </TouchableOpacity>
       ))}
-
-      {showAddButton && (
-        <TouchableOpacity
-          style={styles.dotWrapper}
-          onPress={onAddPress}
-          activeOpacity={0.7}
-        >
-          <AddButton onPress={onAddPress} />
-        </TouchableOpacity>
-      )}
     </View>
   );
 };

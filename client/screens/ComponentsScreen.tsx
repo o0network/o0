@@ -1,9 +1,7 @@
 import { useState } from "react";
 import {
   Field,
-  Gallery,
   Button,
-  Switch,
   Checkbox,
   ValueLabel,
   Slider,
@@ -11,6 +9,7 @@ import {
   Frame,
   Outbound,
   Inbound,
+  GloriousButton,
 } from "../components";
 import {
   View,
@@ -18,6 +17,7 @@ import {
   SafeAreaView,
   ScrollView,
   TouchableOpacity,
+  Image,
 } from "react-native";
 import { Text } from "../components";
 
@@ -28,45 +28,27 @@ export default function ComponentsScreen() {
   const [dotIndex, setDotIndex] = useState(3);
   const [bubbleIndex, setBubbleIndex] = useState(0);
 
-  const galleryItems = [
-    { id: "1", name: "One", avatar: "👤" },
-    { id: "2", name: "Two", avatar: "👤" },
-    { id: "3", name: "Three", avatar: "👤" },
-    { id: "4", name: "Four", avatar: "👤" },
-  ];
-
-  const listItems = [
-    { id: "1", title: "One", symbol: "🖨️" },
-    { id: "2", title: "Two", symbol: "🖨️" },
-    { id: "3", title: "Three", symbol: "🖨️" },
-  ];
-
-  const cellGridColors = [
-    ["#FEFFFE", "#EBEBEB", "#D6D6D6"],
-    ["#C2C2C2", "#ADADAD", "#707070"],
-    ["#FEFFFE", "#EBEBEB", "#D6D6D6"],
-  ];
-
-  const bubbleItems = [
-    { label: "Map", icon: "🗺️" },
-    { label: "List", icon: "📃" },
-  ];
-
-  const dotOptions = [
-    { color: "#000000" },
-    { color: "#007AFF" },
-    { color: "#34C759" },
-    { color: "#FF4015" },
-  ];
-
   return (
     <SafeAreaView style={styles.container}>
-      <Background />
-
-      <Frame>💸</Frame>
-      <Inbound>💸</Inbound>
-      <Outbound>💸</Outbound>
-      <ScrollView contentContainerStyle={styles.scrollContent}>
+      <Frame>
+        <Image
+          style={{ width: 24, height: 24 }}
+          source={require("../assets/emojis/money-wings.png")}
+        />
+      </Frame>
+      <Inbound>
+        <Image
+          style={{ width: 24, height: 24 }}
+          source={require("../assets/emojis/money-wings.png")}
+        />
+      </Inbound>
+      <Outbound>
+        <Image
+          style={{ width: 24, height: 24 }}
+          source={require("../assets/emojis/money-wings.png")}
+        />
+      </Outbound>
+      <ScrollView>
         <Outbound style={styles.frameStyle}>
           <Inbound style={styles.card}>
             <Text>Nunito (SemiBold)</Text>
@@ -84,8 +66,6 @@ export default function ComponentsScreen() {
               <Text style={styles.grabber}>􀌇</Text>
             </View>
           </Inbound>
-
-          <Gallery items={galleryItems} selectedId="1" />
 
           <Field placeholder="Value" style={styles.field} />
           <Field placeholder="Search" style={styles.field} />
@@ -110,8 +90,7 @@ export default function ComponentsScreen() {
             style={styles.slider}
           />
 
-          <Button
-            glorious
+          <GloriousButton
             title="Glorious Button"
             onPress={() => {}}
             style={styles.gloriousButton}
@@ -119,8 +98,8 @@ export default function ComponentsScreen() {
 
           <Inbound style={styles.roundButtonRow}>
             <Button
-              icon="⚙️"
-              title=""
+              iconPath={require("../assets/emojis/compass.png")}
+              title="Pill Button"
               onPress={() => {}}
               style={styles.pillButton}
             />
@@ -137,12 +116,9 @@ const styles = StyleSheet.create({
     backgroundColor: "transparent",
     alignItems: "center",
     justifyContent: "center",
-  },
-  scrollContent: {
-    flexGrow: 1,
-    justifyContent: "center",
-    alignItems: "center",
-    paddingVertical: 16,
+    maxWidth: 512,
+    width: "100%",
+    alignSelf: "center",
   },
   frameStyle: {
     padding: 16,

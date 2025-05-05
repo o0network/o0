@@ -1,10 +1,20 @@
 // Import the runtime first for DOM components support
 import "@expo/metro-runtime";
-import "react-native-gesture-handler"; // Must be at the top of your entry file
+import "react-native-gesture-handler";
 import { registerRootComponent } from "expo";
 import App from "./App";
+import { init } from "@telegram-apps/sdk";
 
-// registerRootComponent calls AppRegistry.registerComponent('main', () => App);
-// It also ensures that whether you load the app in Expo Go or in a native build,
-// the environment is set up appropriately
+// Initialize Telegram Mini App SDK if running in Telegram WebView
+if (typeof window !== "undefined") {
+  try {
+    // This will automatically detect if the app is running inside Telegram
+    // and initialize accordingly
+    init();
+    console.log("Telegram Mini App SDK initialized successfully");
+  } catch (error) {
+    console.error("Failed to initialize Telegram Mini App SDK:", error);
+  }
+}
+
 registerRootComponent(App);

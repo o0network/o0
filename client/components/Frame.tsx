@@ -1,87 +1,99 @@
-import React, { ReactNode } from "react";
-import {
-  View,
-  StyleSheet,
-  StyleProp,
-  ViewStyle,
-  Dimensions,
-  Platform,
-} from "react-native";
+import { ReactNode } from "react";
+import { StyleSheet, StyleProp, ViewStyle, View } from "react-native";
+import { BlurView } from "expo-blur";
+import Svg, { Rect, Defs, LinearGradient, Stop } from "react-native-svg";
 
-interface FrameProps {
+type FrameProps = {
   children: ReactNode;
   style?: StyleProp<ViewStyle>;
-  intensity?: number; // Allow customizing intensity
-  // Simplify tint options to common cross-platform values
+  intensity?: number;
   tint?: "light" | "dark" | "default";
-  outbound?: boolean;
-  inbound?: boolean;
-}
+  borderRadius?: number;
+};
 
-const windowWidth = Dimensions.get("window").width;
-
-export const Frame: React.FC<FrameProps> = ({
+export const Frame = ({
   children,
   style,
-  outbound = false,
-  inbound = false,
-}) => {
-  const frameStyles = [
-    styles.container,
-    outbound && styles.outbound,
-    inbound && styles.inbound,
-    style,
-  ];
+  intensity = 100,
+  tint = "default",
+  borderRadius = 32,
+}: FrameProps) => {
+  const frameStyles = [styles.container, { borderRadius }, style];
 
   return (
-    // Use BlurView as the main container
     <View style={frameStyles}>
-      <View style={styles.contentContainer}>{children}</View>
+      <BlurView
+        intensity={intensity}
+        tint={tint}
+        style={[
+          StyleSheet.absoluteFillObject,
+          { borderRadius: borderRadius - 1 },
+        ]}
+      />
+      {children}
     </View>
   );
 };
 
-export const Outbound: React.FC<Omit<FrameProps, "outbound">> = (props) => {
-  return <Frame {...props} outbound={true} />;
+export const Outbound = ({
+  children,
+  ...props
+}: Omit<FrameProps, "outbound">) => {
+  return (
+    <Frame {...props} tint="light" intensity={30}>
+      {children}
+    </Frame>
+  );
 };
 
-export const Inbound: React.FC<Omit<FrameProps, "inbound">> = (props) => {
-  return <Frame {...props} inbound={true} />;
+export const Inbound = ({
+  children,
+  borderRadius = 32,
+  ...props
+}: Omit<FrameProps, "inbound">) => {
+  return (
+    <Frame {...props} tint="dark" intensity={10}>
+      <Svg width="100%" height="100%" style={StyleSheet.absoluteFill}>
+        <Defs>
+          <LinearGradient
+            id="gradient"
+            x1="0%"
+            y1="0%"
+            x2="100%"
+            y2="100%"
+            gradientUnits="userSpaceOnUse"
+          >
+            <Stop offset="0" stopColor="white" stopOpacity="0.7" />
+            <Stop offset="0.4" stopColor="white" stopOpacity="0.1" />
+            <Stop offset="0.6" stopColor="white" stopOpacity="0.1" />
+            <Stop offset="1" stopColor="white" stopOpacity="0.7" />
+          </LinearGradient>
+        </Defs>
+        <Rect
+          x="0.5"
+          y="0.5"
+          width="calc(100% - 1px)"
+          height="calc(100% - 1px)"
+          rx={borderRadius}
+          stroke="url(#gradient)"
+          strokeWidth="1"
+          fill="transparent"
+        />
+      </Svg>
+      {children}
+    </Frame>
+  );
 };
 
 const styles = StyleSheet.create({
   container: {
-    width: "95%",
-    maxWidth: 500,
-    borderRadius: 32, // Figma borderRadius
-    overflow: "hidden", // Important to clip blur correctly
-    alignSelf: "center",
-    // Add semi-transparent gray background *in addition* to the tint
-    // to achieve the desired gray glass look.
-    // Adjust color and opacity as needed.
-    backgroundColor: "rgba(100, 100, 100, 0.2)", // Example: semi-transparent gray
-    // Border can be applied directly here if needed
-    borderWidth: 1.4,
-    borderColor: "rgba(255, 255, 255, 0.2)", // Subtle white border
-    position: "relative", // Keep if needed for absolute children, might not be necessary
-  },
-  outbound: {
-    backgroundColor: "rgba(128, 128, 128, 0.3)",
-    borderColor: "rgba(255, 255, 255, 0.1)",
-  },
-  inbound: {
-    backgroundColor: "rgba(214, 214, 214, 0.45)",
-    borderColor: "rgba(255, 255, 255, 0.15)",
-  },
-  contentContainer: {
-    // Apply Figma layout properties (padding, gap)
-    paddingTop: 32,
-    paddingBottom: 24,
-    paddingHorizontal: 16,
-    gap: 16,
-    // Background color of content should be transparent
-    // so the blur effect shows through.
-    backgroundColor: "transparent",
+    width: "100%",
+    height: "100%",
+    position: "relative",
+    overflow: "hidden",
+    alignItems: "center",
+    justifyContent: "center",
+    flex: 1,
   },
 });
 

@@ -7,7 +7,7 @@ export type TabParamList = {
   Home: undefined;
   Create: undefined;
   Assets: undefined;
-  Tweaks: undefined;
+  Network: undefined;
 };
 
 export type RootStackParamList = {

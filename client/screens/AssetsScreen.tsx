@@ -20,9 +20,9 @@ import { AssetData, PriceData } from "../data/api";
 import { ApiService } from "../data/api";
 
 const mockListData = [
-  { id: "1", title: "Asset 1 - 0xabc...def", symbol: "🪙" },
-  { id: "2", title: "Asset 2 - sth.eth", symbol: "🪙" },
-  { id: "3", title: "Asset 3 - another.eth", symbol: "🪙" },
+  { id: "1", title: "Asset 1 - 0xabc...def" },
+  { id: "2", title: "Asset 2 - sth.eth" },
+  { id: "3", title: "Asset 3 - another.eth" },
 ];
 
 const DEFAULT_ADDRESS = "o0.network";
@@ -267,7 +267,6 @@ export const AssetsScreen = ({ initialAddress }: AssetsScreenProps) => {
                 tab={{
                   key: "map",
                   label: "Map",
-                  emoji: "🗺️",
                 }}
                 active={viewMode === "map"}
                 onPress={() => setViewMode("map")}
@@ -276,7 +275,6 @@ export const AssetsScreen = ({ initialAddress }: AssetsScreenProps) => {
                 tab={{
                   key: "list",
                   label: "List",
-                  emoji: "📄",
                 }}
                 active={viewMode === "list"}
                 onPress={() => setViewMode("list")}
@@ -305,6 +303,9 @@ const styles = StyleSheet.create({
   },
   outerContainer: {
     flex: 1,
+    maxWidth: 512,
+    width: "100%",
+    alignSelf: "center",
   },
   scrollContainer: {
     flexGrow: 1,

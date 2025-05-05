@@ -1,14 +1,10 @@
-import {
-  DefaultTheme,
-  NavigationContainer,
-  LinkingOptions,
-} from "@react-navigation/native";
+import { DefaultTheme, NavigationContainer } from "@react-navigation/native";
 import {
   createMaterialTopTabNavigator,
   MaterialTopTabBarProps,
   MaterialTopTabNavigationOptions,
 } from "@react-navigation/material-top-tabs";
-import { useRef, useCallback } from "react";
+import { useRef, useCallback, useState, useEffect } from "react";
 import {
   StyleSheet,
   View,
@@ -17,7 +13,7 @@ import {
   Text as RNText,
   TouchableOpacity,
   Animated,
-  Platform,
+  Image,
 } from "react-native";
 import { StatusBar } from "expo-status-bar";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
@@ -29,13 +25,18 @@ import { DynaPuff_700Bold } from "@expo-google-fonts/dynapuff";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 import { createNativeStackNavigator } from "@react-navigation/native-stack";
 import ComponentsScreen from "./screens/ComponentsScreen";
+import TelegramIntegration from "./components/TelegramIntegration";
 
 import ExploreScreen from "./screens/ExploreScreen";
 import CreateScreen from "./screens/CreateScreen";
 import AssetsScreen from "./screens/AssetsScreen";
-import TweaksScreen from "./screens/TweaksScreen";
-import { PlatformProvider } from "./utils/platform";
-import { Background } from "./components";
+import NetworkScreen from "./screens/NetworkScreen";
+import { PlatformProvider, usePlatform } from "./utils/platform";
+import { Background, WebIcons } from "./components";
+import CompassIcon from "./assets/emojis/compass.png";
+import DvdIcon from "./assets/emojis/dvd.png";
+import CoinIcon from "./assets/emojis/coin.png";
+import GlobeIcon from "./assets/emojis/globe.png";
 
 type TabParamList = {
   Explore: { address?: string };
@@ -57,16 +58,20 @@ type TabBarItemProps = {
   label: string;
   isFocused: boolean;
   onPress: () => void;
-  emoji: string;
+  icon: any;
   bounceValue: Animated.Value;
+  isLargeScreen?: boolean;
+  isTelegram?: boolean;
 };
 
 const TabBarItem = ({
   label,
   isFocused,
   onPress,
-  emoji,
+  icon,
   bounceValue,
+  isLargeScreen,
+  isTelegram,
 }: TabBarItemProps) => (
   <Animated.View style={{ transform: [{ translateX: bounceValue }] }}>
     <TouchableOpacity
@@ -79,21 +84,20 @@ const TabBarItem = ({
         style={[
           styles.tabItemBase,
           isFocused ? styles.tabItemActive : styles.tabItemInactive,
+          isTelegram && isFocused && styles.telegramTabItemActive,
+          isTelegram && !isFocused && styles.telegramTabItemInactive,
         ]}
       >
-        <RNText
-          style={[
-            styles.icon,
-            {
-              color: isFocused
-                ? styles.iconActive.color
-                : styles.iconInactive.color,
-            },
-          ]}
-        >
-          {emoji}
-        </RNText>
-        {isFocused && <RNText style={styles.label}>{label}</RNText>}
+        <Image
+          source={icon}
+          style={{
+            width: 24,
+            height: 24,
+          }}
+        />
+        {(isFocused || isLargeScreen) && !isTelegram && (
+          <RNText style={styles.label}>{label}</RNText>
+        )}
       </Animated.View>
     </TouchableOpacity>
   </Animated.View>
@@ -107,19 +111,31 @@ function CustomTabBar({
   const bounceValues = useRef(
     state.routes.map(() => new Animated.Value(0))
   ).current;
+  const { isPlatform } = usePlatform();
+  const [isLargeScreen, setIsLargeScreen] = useState(width > 512);
+
+  const isWeb = isPlatform("web");
+  const isTelegram = isPlatform("telegram");
 
   return (
-    <View style={styles.tabBarContainer}>
+    <View
+      style={[
+        styles.tabBarContainer,
+        isWeb && styles.webTabBarContainer,
+        isTelegram && styles.telegramTabBarContainer,
+        isLargeScreen && styles.largeScreenTabBarContainer,
+      ]}
+    >
       {state.routes.map((route, index) => {
         const { options } = descriptors[route.key];
         const label = route.name;
         const isFocused = state.index === index;
 
-        let emoji = "🧭";
-        if (route.name === "Explore") emoji = "🧭";
-        if (route.name === "Create") emoji = "🪩";
-        if (route.name === "Assets") emoji = "🪙";
-        if (route.name === "Network") emoji = "🌐";
+        let icon = CompassIcon;
+        if (route.name === "Explore") icon = CompassIcon;
+        if (route.name === "Create") icon = DvdIcon;
+        if (route.name === "Assets") icon = CoinIcon;
+        if (route.name === "Network") icon = GlobeIcon;
 
         const bounceValue = bounceValues[index];
 
@@ -128,8 +144,10 @@ function CustomTabBar({
             key={route.key}
             label={label}
             isFocused={isFocused}
-            emoji={emoji}
+            icon={icon}
             bounceValue={bounceValue}
+            isLargeScreen={isLargeScreen}
+            isTelegram={isTelegram}
             onPress={() => {
               const event = navigation.emit({
                 type: "tabPress",
@@ -167,24 +185,7 @@ export default function App() {
     return null;
   }
 
-  const Tab = createMaterialTopTabNavigator<TabParamList>({
-    screens: {
-      Explore: {
-        screen: ExploreScreen,
-        initialParams: { address: DEFAULT_ADDRESS },
-      },
-      Create: {
-        screen: CreateScreen,
-      },
-      Assets: {
-        screen: AssetsScreen,
-        initialParams: { address: DEFAULT_ADDRESS },
-      },
-      Network: {
-        screen: TweaksScreen,
-      },
-    },
-  });
+  const Tab = createMaterialTopTabNavigator<TabParamList>();
   const screenOptions: MaterialTopTabNavigationOptions = {
     swipeEnabled: true,
     lazy: true,
@@ -208,63 +209,70 @@ export default function App() {
         component={ExploreScreen}
         initialParams={{ address: DEFAULT_ADDRESS }}
       />
-      <Tab.Screen name="Create" component={CreateScreen} />
       <Tab.Screen
         name="Assets"
         component={AssetsScreen}
         initialParams={{ address: DEFAULT_ADDRESS }}
       />
-      <Tab.Screen name="Network" component={TweaksScreen} />
+      <Tab.Screen name="Create" component={CreateScreen} />
+      <Tab.Screen name="Network" component={NetworkScreen} />
     </Tab.Navigator>
   );
 
+  const { isPlatform } = usePlatform();
+  const isTelegram = isPlatform("telegram");
+
   return (
-    <GestureHandlerRootView style={{ flex: 1 }}>
-      <Background />
+    <SafeAreaProvider onLayout={onLayoutRootView}>
       <PlatformProvider>
-        <View style={styles.container}>
-          <StatusBar style="light" translucent backgroundColor="transparent" />
-          <SafeAreaProvider>
-            <SafeAreaView style={styles.safeArea}>
-              <NavigationContainer
-                ref={navigationRef}
-                theme={{
-                  ...DefaultTheme,
-                  colors: {
-                    ...DefaultTheme.colors,
-                    background: "transparent",
+        <GestureHandlerRootView style={{ flex: 1 }}>
+          <View style={styles.container}>
+            <StatusBar
+              style="light"
+              translucent
+              backgroundColor="transparent"
+            />
+            <Background />
+            <WebIcons />
+
+            {isTelegram && <TelegramIntegration />}
+
+            <NavigationContainer
+              ref={navigationRef}
+              theme={{
+                ...DefaultTheme,
+                colors: {
+                  ...DefaultTheme.colors,
+                  background: "transparent",
+                },
+              }}
+              onReady={onLayoutRootView}
+              linking={{
+                prefixes: [],
+                config: {
+                  screens: {
+                    ...(isPlatform("web") ? { Home: "home" } : {}),
+                    Explore: "explore/:address?",
+                    Assets: "assets/:address?",
+                    Create: "create",
+                    Network: "network",
                   },
-                }}
-                onReady={onLayoutRootView}
-                linking={
-                  Platform.OS === "web"
-                    ? ({
-                        prefixes: [],
-                        config: {
-                          screens: {
-                            Explore: "explore/:address?",
-                            Create: "create",
-                            Assets: "assets/:address?",
-                            Network: "network",
-                          },
-                        },
-                      } as LinkingOptions<TabParamList>)
-                    : undefined
-                }
-              >
-                <Stack.Navigator screenOptions={{ headerShown: false }}>
-                  <Stack.Screen name="Main" component={MainTabs} />
-                  <Stack.Screen
-                    name="Components"
-                    component={ComponentsScreen}
-                  />
-                </Stack.Navigator>
-              </NavigationContainer>
-            </SafeAreaView>
-          </SafeAreaProvider>
-        </View>
+                },
+              }}
+            >
+              <Stack.Navigator screenOptions={{ headerShown: false }}>
+                <Stack.Screen name="Main" path="/" component={MainTabs} />
+                <Stack.Screen
+                  name="Components"
+                  component={ComponentsScreen}
+                  options={{ animation: "slide_from_bottom" }}
+                />
+              </Stack.Navigator>
+            </NavigationContainer>
+          </View>
+        </GestureHandlerRootView>
       </PlatformProvider>
-    </GestureHandlerRootView>
+    </SafeAreaProvider>
   );
 }
 
@@ -305,6 +313,16 @@ const styles = StyleSheet.create({
     elevation: 3,
     gap: 32,
   },
+  webTabBarContainer: {
+    marginTop: 20,
+  },
+  telegramTabBarContainer: {
+    backgroundColor: "rgba(20, 20, 20, 0.8)",
+    gap: 24,
+  },
+  largeScreenTabBarContainer: {
+    gap: 16,
+  },
   tabBar: {
     elevation: 0,
     shadowOpacity: 0,
@@ -321,8 +339,8 @@ const styles = StyleSheet.create({
     height: 36,
   },
   tabItemActive: {
-    backgroundColor: "rgba(94, 94, 94, 0.18)",
-    borderRadius: 20,
+    backgroundColor: "rgba(94, 94, 94, 0.2)",
+    borderRadius: 999,
     paddingHorizontal: 8,
     gap: 4,
     shadowColor: "#000",
@@ -334,6 +352,12 @@ const styles = StyleSheet.create({
   tabItemInactive: {
     paddingHorizontal: 8,
     gap: 3,
+  },
+  telegramTabItemActive: {
+    backgroundColor: "rgba(255, 255, 255, 0.2)",
+  },
+  telegramTabItemInactive: {
+    backgroundColor: "transparent",
   },
   icon: {
     fontSize: 24,

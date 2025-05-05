@@ -15,6 +15,6 @@
       "favicon": "./assets/favicon.png",
       "bundler": "metro"
     },
-    "entryPoint": "./tg/index.tsx"
+    "entryPoint": "./index.telegram.tsx"
   }
 }
