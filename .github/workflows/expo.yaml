@@ -1,4 +1,4 @@
-name: Expo
+name: expo.yaml
 
 on:
   workflow_call:
@@ -16,6 +16,7 @@ on:
 
 jobs:
   build-and-submit:
+    if: false # TODO: Temporary disabled
     name: Build and Submit Mobile
     runs-on: ubuntu-latest
     steps:

@@ -1,0 +1,30 @@
+name: nginx.yaml
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - ".github/nginx.conf"
+
+jobs:
+  nginx:
+    name: Update Nginx Config
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Install SSH key
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.SSH_PRIVATE_KEY }}" > ~/.ssh/id_rsa
+          chmod 600 ~/.ssh/id_rsa
+          eval "$(ssh-agent -s)"
+          ssh-add ~/.ssh/id_rsa
+
+      - name: Copy and test nginx configuration
+        run: |
+          scp .github/nginx.conf ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }}:/etc/nginx/sites-available/o0.temp.conf
+          ssh ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }} "cd /etc/nginx/sites-available && sudo nginx -t -c o0.temp.conf \
+           && sudo mv o0.temp.conf o0.conf && sudo systemctl reload nginx"

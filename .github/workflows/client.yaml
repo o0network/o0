@@ -1,4 +1,4 @@
-name: Build
+name: build.yaml
 
 on:
   workflow_call:
