@@ -1,6 +1,7 @@
 import { defineConfig } from "vite";
 import { createHtmlPlugin } from "vite-plugin-html";
 import copy from "rollup-plugin-copy";
+import react from "@vitejs/plugin-react";
 
 export default defineConfig({
   root: "./src",
@@ -9,6 +10,7 @@ export default defineConfig({
     rollupOptions: {
       input: {
         main: "./src/index.html",
+        video: "./src/js/video.jsx",
       },
       output: {
         entryFileNames: "assets/[name].js",
@@ -18,6 +20,7 @@ export default defineConfig({
         },
       },
       plugins: [
+        react(),
         copy({
           targets: [{ src: "src/assets", dest: "dist" }],
           hook: "writeBundle",

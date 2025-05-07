@@ -5,8 +5,8 @@ import { useNavigation } from "@react-navigation/native";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
 
 type RootStackParamList = {
-  Components: undefined;
-  Main: undefined;
+  Preferences: undefined;
+  App: undefined;
 };
 
 type NavigationProp = NativeStackNavigationProp<RootStackParamList>;
@@ -139,13 +139,6 @@ const NetworkScreen = () => {
             }}
             style={styles.disconnectButton}
           />
-
-          <Button
-            title="Open Components"
-            onPress={() => {
-              navigation.getParent()?.navigate("Components");
-            }}
-          />
         </Inbound>
 
         <Outbound style={styles.governanceCard}>
@@ -172,6 +165,13 @@ const NetworkScreen = () => {
             </ScrollView>
           </Inbound>
         </Outbound>
+
+        <Button
+          title="Open Preferences"
+          onPress={() => {
+            navigation.getParent()?.navigate("Components");
+          }}
+        />
       </View>
     </SafeAreaView>
   );

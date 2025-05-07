@@ -6,7 +6,6 @@ import {
   StyleSheet,
   View,
   Text,
-  Platform,
   Pressable,
   GestureResponderEvent,
 } from "react-native";

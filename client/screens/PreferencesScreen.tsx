@@ -21,7 +21,7 @@ import {
 } from "react-native";
 import { Text } from "../components";
 
-export default function ComponentsScreen() {
+export default function PreferencesScreen() {
   const [switchValue, setSwitchValue] = useState(false);
   const [checkboxValue, setCheckboxValue] = useState(true);
   const [sliderValue, setSliderValue] = useState(50);

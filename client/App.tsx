@@ -24,8 +24,7 @@ import { DMMono_500Medium } from "@expo-google-fonts/dm-mono";
 import { DynaPuff_700Bold } from "@expo-google-fonts/dynapuff";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 import { createNativeStackNavigator } from "@react-navigation/native-stack";
-import ComponentsScreen from "./screens/ComponentsScreen";
-import TelegramIntegration from "./components/TelegramIntegration";
+import PreferencesScreen from "./screens/PreferencesScreen";
 
 import ExploreScreen from "./screens/ExploreScreen";
 import CreateScreen from "./screens/CreateScreen";
@@ -46,8 +45,8 @@ type TabParamList = {
 };
 
 type RootStackParamList = {
-  Main: undefined;
-  Components: undefined;
+  App: undefined;
+  Preferences: undefined;
 };
 
 const { width } = Dimensions.get("window");
@@ -220,59 +219,52 @@ export default function App() {
   );
 
   const { isPlatform } = usePlatform();
-  const isTelegram = isPlatform("telegram");
 
   return (
-    <SafeAreaProvider onLayout={onLayoutRootView}>
+    <GestureHandlerRootView style={{ flex: 1 }}>
+      <Background />
+      <WebIcons />
       <PlatformProvider>
-        <GestureHandlerRootView style={{ flex: 1 }}>
-          <View style={styles.container}>
-            <StatusBar
-              style="light"
-              translucent
-              backgroundColor="transparent"
-            />
-            <Background />
-            <WebIcons />
-
-            {isTelegram && <TelegramIntegration />}
-
-            <NavigationContainer
-              ref={navigationRef}
-              theme={{
-                ...DefaultTheme,
-                colors: {
-                  ...DefaultTheme.colors,
-                  background: "transparent",
-                },
-              }}
-              onReady={onLayoutRootView}
-              linking={{
-                prefixes: [],
-                config: {
-                  screens: {
-                    ...(isPlatform("web") ? { Home: "home" } : {}),
-                    Explore: "explore/:address?",
-                    Assets: "assets/:address?",
-                    Create: "create",
-                    Network: "network",
+        <View style={styles.container}>
+          <StatusBar style="light" translucent backgroundColor="transparent" />
+          <SafeAreaProvider>
+            <SafeAreaView style={styles.safeArea}>
+              <NavigationContainer
+                ref={navigationRef}
+                theme={{
+                  ...DefaultTheme,
+                  colors: {
+                    ...DefaultTheme.colors,
+                    background: "transparent",
                   },
-                },
-              }}
-            >
-              <Stack.Navigator screenOptions={{ headerShown: false }}>
-                <Stack.Screen name="Main" path="/" component={MainTabs} />
-                <Stack.Screen
-                  name="Components"
-                  component={ComponentsScreen}
-                  options={{ animation: "slide_from_bottom" }}
-                />
-              </Stack.Navigator>
-            </NavigationContainer>
-          </View>
-        </GestureHandlerRootView>
+                }}
+                onReady={onLayoutRootView}
+                linking={{
+                  prefixes: [],
+                  config: {
+                    screens: {
+                      ...(isPlatform("web") ? { Home: "home" } : {}),
+                      Explore: "explore/:address?",
+                      Assets: "assets/:address?",
+                      Create: "create",
+                      Network: "network",
+                    },
+                  },
+                }}
+              >
+                <Stack.Navigator screenOptions={{ headerShown: false }}>
+                  <Stack.Screen name="Main" component={MainTabs} />
+                  <Stack.Screen
+                    name="Preferences"
+                    component={PreferencesScreen}
+                  />
+                </Stack.Navigator>
+              </NavigationContainer>
+            </SafeAreaView>
+          </SafeAreaProvider>
+        </View>
       </PlatformProvider>
-    </SafeAreaProvider>
+    </GestureHandlerRootView>
   );
 }
 

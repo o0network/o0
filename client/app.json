@@ -1,10 +1,10 @@
 {
   "expo": {
-    "name": "App",
-    "slug": "app",
+    "name": "o0",
+    "slug": "o0",
     "version": "1.0.0",
     "orientation": "portrait",
-    "icon": "./assets/icon.png",
+    "icon": "./assets/favicon.png",
     "userInterfaceStyle": "light",
     "newArchEnabled": true,
     "splash": {
@@ -12,10 +12,9 @@
       "resizeMode": "contain",
       "backgroundColor": "#ffffff"
     },
-    "assetBundlePatterns": ["**/*"],
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.app.mobile"
+      "bundleIdentifier": "com.wtf403.o0"
     },
     "android": {
       "adaptiveIcon": {
@@ -23,19 +22,17 @@
         "backgroundColor": "#ffffff"
       },
       "permissions": ["MOTION_SENSORS"],
-      "package": "com.app.mobile",
+      "package": "com.wtf403.o0",
       "versionCode": 2
     },
     "web": {
-      "favicon": "./assets/favicon.png",
-      "bundler": "metro"
+      "favicon": "./assets/favicon.png"
     },
     "plugins": ["expo-font", "expo-video"],
     "extra": {
       "eas": {
         "projectId": "d7a847f4-ff7d-4996-b82a-e9d219ef9b2f"
       }
-    },
-    "entryPoint": "./index.js"
+    }
   }
 }

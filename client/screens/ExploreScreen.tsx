@@ -208,7 +208,13 @@ export default function ExploreScreen({ initialAddress }: ExploreScreenProps) {
 
         <GloriousButton
           title={isWalletConnected ? "Bump" : "Connect Wallet"}
-          onPress={handleConnectWallet}
+          onPress={() =>
+            WebApp.showPopup({
+              title: "Connect Wallet",
+              message: "Please connect your wallet to continue",
+              buttons: [{ text: "Connect", onPress: handleConnectWallet }],
+            })
+          }
         />
       </View>
     </ScrollView>
