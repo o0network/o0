@@ -1,17 +1,20 @@
-name: build.yaml
+name: client.yaml
 
 on:
-  workflow_call:
-    inputs:
-      node-version:
-        required: false
-        type: string
-        default: '20.x'
+  push:
+    branches:
+      - main
+    paths:
+      - "client/**"
 
 jobs:
   setup:
     name: Setup Environment
     runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: client
+
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -20,17 +23,11 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: ${{ inputs.node-version }}
-          cache: 'npm'
-          cache-dependency-path: 'app/package.json'
+          cache: 'yarn'
+          cache-dependency-path: 'client/package.json'
 
       - name: Install dependencies
-        working-directory: app
-        run: npm install
+        run: yarn install
 
-      - name: Cache app directory
-        uses: actions/cache@v4
-        with:
-          path: app
-          key: ${{ runner.os }}-app-${{ github.sha }}
-          restore-keys: |
-            ${{ runner.os }}-app-
+      - name: Build and Deploy
+        run: yarn build && rsync -avz --delete dist/ ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }}:/var/www/o0/client/

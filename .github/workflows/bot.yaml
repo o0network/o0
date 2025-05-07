@@ -1,9 +1,11 @@
-name: Deploy to Server
+name: bot.yaml
 
 on:
   push:
     branches:
       - main
+    paths:
+      - "bot/**"
 
 jobs:
   deploy:
@@ -24,15 +26,14 @@ jobs:
       - name: Add known hosts
         run: ssh-keyscan -H "${{ secrets.SSH_HOST }}" >> ~/.ssh/known_hosts
 
-      - name: Deploy code via rsync
+      - name: Deploy
+        working-directory: bot
         run: |
           rsync -avz --delete \
-            --exclude='.git/' \
-            --exclude='.github/' \
             --exclude='venv/' \
+            --exclude='env/' \
             --exclude='.env' \
-            . ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }}:/opt/peepholebot
+            . ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }}:/var/www/o0/bot
 
       - name: Reload service
-        run: |
-          ssh ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }} 'docker restart peepholebot'
+        run: ssh ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }} 'docker restart o0netbot'

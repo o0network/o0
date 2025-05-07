@@ -1,4 +1,4 @@
-name: diploma.yaml
+name: docs.yaml
 
 on:
   workflow_dispatch:

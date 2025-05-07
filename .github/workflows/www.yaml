@@ -1,0 +1,33 @@
+name: www.yaml
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - "www/**"
+
+jobs:
+  build:
+    name: Build and Deploy WWW
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: www
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ inputs.node-version }}
+          cache: 'yarn'
+          cache-dependency-path: 'www/yarn.lock'
+
+      - name: Install dependencies
+        run: yarn install
+
+      - name: Build and Deploy
+        run: yarn build && rsync -avz --delete dist/ ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }}:/var/www/o0/www/

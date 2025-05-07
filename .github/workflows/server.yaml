@@ -1,14 +1,20 @@
-name: Deploy to Server
+name: server.yaml
 
 on:
   push:
     branches:
       - main
+    paths:
+      - "server/**"
 
 jobs:
   deploy:
     name: Deploy
     runs-on: ubuntu-latest
+    defaults:
+     run:
+        working-directory: server
+
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -24,15 +30,12 @@ jobs:
       - name: Add known hosts
         run: ssh-keyscan -H "${{ secrets.SSH_HOST }}" >> ~/.ssh/known_hosts
 
-      - name: Deploy code via rsync
+      - name: Deploy
         run: |
           rsync -avz --delete \
-            --exclude='.git/' \
-            --exclude='.github/' \
-            --exclude='venv/' \
             --exclude='.env' \
-            . ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }}:/var/www/o0/bot/
+            . ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }}:/var/www/o0/server/
 
       - name: Reload service
         run: |
-          ssh ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }} 'docker restart o0netbot'
+          ssh ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }} 'docker restart server'
