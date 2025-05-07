@@ -4,18 +4,11 @@
   "main": "index.js",
   "scripts": {
     "start": "expo start",
-    "start:tg": "expo start --web --config app.tg.json",
-    "android": "expo run:android",
-    "ios": "expo run:ios",
-    "web": "expo start --web",
-    "build:web": "expo export -p web --config app.web.json",
-    "build:tg": "expo export -p web --config app.tg.json",
+    "build": "expo export -p web",
+    "preview": "vite preview",
     "build:android": "eas build --platform android --local --profile development",
     "build:ios": "eas build --platform ios --local --profile development",
-    "build:expo": "eas build --platform all --profile production",
-    "deploy:web": "expo export -p web --config app.web.json",
-    "deploy:tg": "expo export -p web --config app.tg.json",
-    "deploy:mobile": "eas build --platform all --profile production"
+    "build:expo": "eas build --platform all --profile production"
   },
   "dependencies": {
     "@expo-google-fonts/dm-mono": "^0.3.0",

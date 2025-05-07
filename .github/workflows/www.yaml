@@ -11,9 +11,6 @@ jobs:
   build:
     name: Build and Deploy WWW
     runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: www
 
     steps:
       - name: Checkout code
@@ -27,7 +24,7 @@ jobs:
           cache-dependency-path: 'www/yarn.lock'
 
       - name: Install dependencies
-        run: yarn install
+        run: cd www && yarn install
 
       - name: Build and Deploy
-        run: yarn build && rsync -avz --delete dist/ ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }}:/var/www/o0/www/
+        run: cd www && yarn build && rsync -avz --delete dist/ ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }}:/var/www/o0/www/
