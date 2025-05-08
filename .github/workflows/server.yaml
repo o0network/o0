@@ -1,6 +1,7 @@
 name: server.yaml
 
 on:
+  workflow_dispatch:
   push:
     branches:
       - main
@@ -12,7 +13,7 @@ jobs:
     name: Deploy
     runs-on: ubuntu-latest
     defaults:
-     run:
+      run:
         working-directory: server
 
     steps:

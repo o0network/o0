@@ -1,6 +1,7 @@
 name: www.yaml
 
 on:
+  workflow_dispatch:
   push:
     branches:
       - main
@@ -23,8 +24,8 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: ${{ inputs.node-version }}
-          cache: 'yarn'
-          cache-dependency-path: 'www/yarn.lock'
+          cache: "yarn"
+          cache-dependency-path: "www/yarn.lock"
 
       - name: Install dependencies
         run: yarn install

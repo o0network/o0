@@ -1,6 +1,7 @@
 name: nginx.yaml
 
 on:
+  workflow_dispatch:
   push:
     branches:
       - main

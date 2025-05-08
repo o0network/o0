@@ -11,6 +11,6 @@
     Pitch-based idea token launches through crowd-powered onchain steering wheel 🤯
     </p>
     <p align="center">
-      <strong><a href="https://o0.network">🌐 o0.network</a></strong>
+      <strong>🌐 <a href="https://o0.network">o0.network</a></strong>
     </p>
 </div>
