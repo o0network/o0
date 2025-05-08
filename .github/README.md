@@ -8,9 +8,9 @@
       <sup><b>/o oʊ/ <a target="_blank" href="https://github.com/user-attachments/assets/0f0f57b4-6542-4a6e-a179-83b158587dd1">&nbsp;🔉</a></b></sup>
     </p>
     <p align="center">
-      ⚡ Pitch-based idea token launches through crowd-powered onchain steering wheel
+    Pitch-based idea token launches through crowd-powered onchain steering wheel 🤯
     </p>
     <p align="center">
-      <strong><a href="https://o0.network">o0.network</a></strong>
+      <strong><a href="https://o0.network">🌐 o0.network</a></strong>
     </p>
 </div>
