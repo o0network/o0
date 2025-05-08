@@ -26,7 +26,7 @@ main_keyboard = ReplyKeyboardMarkup(
         [
             KeyboardButton(
                 text="🔥 Launch App 🔥",
-                web_app=WebAppInfo(url="https://o0.network"),
+                web_app=WebAppInfo(url="https://o0.network/explore"),
             ),
         ]
     ],
