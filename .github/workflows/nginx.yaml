@@ -7,6 +7,7 @@ on:
       - main
     paths:
       - ".github/nginx.conf"
+      - ".github/workflows/nginx.yaml"
 
 jobs:
   nginx:
@@ -27,8 +28,14 @@ jobs:
       - name: Add known hosts
         run: ssh-keyscan -H "${{ secrets.SSH_HOST }}" >> ~/.ssh/known_hosts
 
-      - name: Restart Nginx
+      - name: Update and Test Nginx Config
         run: |
           scp .github/nginx.conf ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }}:/etc/nginx/sites-available/o0.network.temp.conf
-          ssh ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }} "cd /etc/nginx/sites-available && sudo nginx -t -c o0.network.temp.conf \
-           && sudo mv o0.network.temp.conf o0.network.conf && sudo systemctl reload nginx"
+          ssh ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }} "
+            set -e;
+            [ -f /etc/nginx/sites-available/o0.network.conf ] && sudo cp /etc/nginx/sites-available/o0.network.conf /etc/nginx/sites-available/o0.network.conf.bak || true;
+            sudo mv /etc/nginx/sites-available/o0.network.temp.conf /etc/nginx/sites-available/o0.network.conf &&
+            sudo nginx -t &&
+            sudo systemctl reload nginx ||
+            (sudo mv /etc/nginx/sites-available/o0.network.conf.bak /etc/nginx/sites-available/o0.network.conf 2>/dev/null || true; exit 1)
+          "
