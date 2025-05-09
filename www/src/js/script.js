@@ -1,7 +1,7 @@
 import JSConfetti from "js-confetti";
 
 const oouSound = document.getElementById("oouSound");
-const saveSound = document.getElementById("saveSound");
+const rocketSound = document.getElementById("rocketSound");
 let hasClickedLogo = false;
 let hasDownloadPermission = false;
 
@@ -94,9 +94,9 @@ if (downloadLink) {
     });
 
     if (hasClickedLogo) {
-      saveSound.currentTime = 0;
+      rocketSound.currentTime = 0;
       setTimeout(() => {
-        saveSound.play();
+        rocketSound.play();
       }, 1000);
     }
   });
@@ -107,4 +107,37 @@ document.querySelector(".logo-ghost").addEventListener("animationend", (e) => {
     const logo = document.querySelector(".logo-ghost");
     logo.style.animation = "float-infinity 10s infinite ease-in-out";
   }
+});
+
+document.addEventListener("DOMContentLoaded", () => {
+  const downloadLink = document.querySelector(
+    'a.download-link[href="https://o0.network/explore"]'
+  );
+
+  if (downloadLink) {
+    downloadLink.addEventListener("click", function (event) {
+      event.preventDefault();
+      const href = this.href;
+      const originalText = this.textContent;
+      this.textContent = "Launching...";
+
+      // Play rocket sound and navigate after it ends
+      if (hasClickedLogo && rocketSound) {
+        rocketSound.currentTime = 0;
+        rocketSound.play();
+        const onEnded = () => {
+          window.location.href = href;
+          rocketSound.removeEventListener("ended", onEnded);
+        };
+        rocketSound.addEventListener("ended", onEnded);
+      } else {
+        // fallback: navigate after 1s if rocket sound not available
+        setTimeout(() => {
+          window.location.href = href;
+        }, 1000);
+      }
+    });
+  }
+
+  // You can add other general script logic for your page here
 });

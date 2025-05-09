@@ -4,6 +4,7 @@ import copy from "rollup-plugin-copy";
 
 export default defineConfig({
   root: "./src",
+  base: "/www/",
   build: {
     outDir: "../dist",
     rollupOptions: {

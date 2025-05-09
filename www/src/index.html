@@ -3,22 +3,27 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>o0</title>
+    <title>o0.network</title>
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link
       href="https://fonts.googleapis.com/css2?family=DynaPuff:wght@500&display=swap"
       rel="stylesheet"
     />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Nunito:wght@600&display=swap"
+      rel="stylesheet"
+    />
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no"
+    />
     <link rel="icon" href="./assets/logo.png" />
-    <link rel="stylesheet" href="./css/style.css" />
-    <link rel="stylesheet" href="./css/logo.css" />
-    <link rel="stylesheet" href="./css/preview.css" />
+    <link rel="stylesheet" href="./style.css" />
   </head>
   <body>
     <audio id="oouSound" src="./assets/oou.mp3"></audio>
-    <audio id="saveSound" src="./assets/save.mp3"></audio>
-    <div id="lightboxes"></div>
+    <audio id="rocketSound" src="./assets/rocket.mp3"></audio>
 
     <main class="main">
       <div id="threejs"></div>
@@ -35,55 +40,72 @@
             position: absolute;
             top: 20px;
             left: 20px;
+            user-select: none;
+            -webkit-user-drag: none;
           "
         >
           <img src="./assets/telegram.svg" alt="telegram icon" />
         </a>
 
         <button
-          style="z-index: 10; position: absolute; top: 20px; right: 20px"
           class="more-button"
           popovertarget="popover"
+          popoveraction="toggle"
+          aria-label="More"
+          style="z-index: 10; position: absolute; top: 20px; right: 20px"
         >
-          <ul popover="hint" class="popover">
-            <li><a href="https://x.com/o0netbot">X</a></li>
-            <li><a href="https://github.com/o0network/o0">GitHub</a></li>
-            <li><a href="https://o0.network/graypaper.pdf">Graypaper</a></li>
-            <li><a href="https://o0.network/privacy.pdf">Privacy Policy</a></li>
-          </ul>
+          <img
+            width="24"
+            height="24"
+            class="cloud"
+            src="./assets/important.png"
+            alt="cloud icon"
+            style="user-select: none; -webkit-user-drag: none"
+          />
+          <img
+            width="20"
+            height="20"
+            class="cross-mark"
+            src="./assets/cross-mark.png"
+            alt="cross mark icon"
+            style="user-select: none; -webkit-user-drag: none"
+          />
         </button>
-      </section>
+        <ul id="popover" class="popover" popover>
+          <li class="contact-link">
+            <a href="mailto:hi@o0.network">hi@o0.network</a>
+          </li>
+          <li><a href="https://o0.network/privacy.pdf">Privacy Policy</a></li>
+          <li><a href="https://o0.network/graypaper.pdf">Graypaper</a></li>
+          <li><a href="https://github.com/o0network/o0">GitHub</a></li>
+          <li><a href="https://x.com/o0netbot">X</a></li>
+        </ul>
 
-      <a href="https://o0.network/a">
-        <img
-          src="./assets/app-store.png"
-          style="
-            z-index: 10;
-            width: 64px;
-            height: 64px;
-            position: absolute;
-            bottom: 20px;
-            left: 20px;
-          "
-          alt="app store qr code"
-          class="app-store"
-        />
-      </a>
-      <a href="https://o0.network/g">
-        <img
-          src="./assets/google-play.png"
-          alt="google play qr code"
-          style="
-            z-index: 10;
-            width: 64px;
-            height: 64px;
-            position: absolute;
-            bottom: 20px;
-            right: 20px;
-          "
-          class="google-play"
-        />
-      </a>
+        <a href="https://o0.network/a">
+          <img
+            src="./assets/app-store-qr.png"
+            alt="app store"
+            class="app-store-qr"
+          />
+          <img
+            src="./assets/app-store-logo.png"
+            alt="app store"
+            class="app-store-logo"
+          />
+        </a>
+        <a href="https://o0.network/g">
+          <img
+            src="./assets/google-play-qr.png"
+            alt="google play"
+            class="google-play-qr"
+          />
+          <img
+            src="./assets/google-play-logo.png"
+            alt="google play"
+            class="google-play-logo"
+          />
+        </a>
+      </section>
 
       <section class="logo-section">
         <div class="logo-stack">
@@ -99,10 +121,7 @@
           class="download-container"
           style="resize: horizontal; height: auto"
         >
-          <a
-            class="download-link"
-            href="https://github.com/wtf403/o0/releases/download/test/README.md"
-            download
+          <a class="download-link" href="https://o0.network/explore"
             >Launch App
           </a>
           <div
@@ -114,7 +133,6 @@
               position: relative;
             "
           >
-            <!-- Left Cap -->
             <div
               style="
                 flex: 0 0 var(--cap-radius);
@@ -130,7 +148,6 @@
               />
             </div>
 
-            <!-- Middle (Stretchable) -->
             <div
               style="
                 flex: 1 1 auto;
@@ -148,7 +165,6 @@
               />
             </div>
 
-            <!-- Right Cap -->
             <div
               style="
                 flex: 0 0 var(--cap-radius);
@@ -170,6 +186,54 @@
     <script type="module" src="./js/script.js"></script>
     <script type="module" src="./js/video.js"></script>
     <script type="module" src="./js/background.js"></script>
+
+    <!-- Shader scripts for glow effect -->
+    <script id="glowVertexShader" type="x-shader/x-vertex">
+      varying vec2 vUv;
+      void main() {
+        vUv = uv;
+        gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+      }
+    </script>
+
+    <script id="glowFragmentShader" type="x-shader/x-fragment">
+      uniform sampler2D _mask;
+      uniform sampler2D _dist;
+      varying vec2 vUv;
+      uniform vec3 _color;
+      uniform float _time;
+      uniform float _scale;
+
+      void main() {
+        // Calculate distorted UV coordinates
+        vec2 distMapUV = vUv;
+        distMapUV = vec2(cos(_time / 40.0) * (distMapUV.x) + sin(_time / 40.0) * (distMapUV.y),
+                        -sin(_time / 40.0) * (distMapUV.x) + cos(_time / 40.0) * (distMapUV.y));
+
+        vec4 dist = texture2D(_dist, distMapUV);
+        vec4 mask = texture2D(_mask, vUv);
+
+        // Enhance color vibrancy with less white mixing
+        vec3 enhancedColor = _color;
+
+        // Boost color saturation
+        enhancedColor = clamp(enhancedColor * 1.5, 0.0, 1.0);
+
+        // Add subtle pulsing - reduced white mixing
+        enhancedColor = mix(enhancedColor, vec3(1.0, 1.0, 1.0), sin(_time * 0.05) * 0.1 + 0.05);
+
+        // Create a gradient based on UV position for more depth
+        enhancedColor = mix(enhancedColor, enhancedColor * 1.2, distMapUV.y);
+
+        vec4 texture = vec4(enhancedColor, 1.0);
+
+        // Apply alpha based on mask, distortion, and scale
+        float alphaMultiplier = mix(0.4, 1.0, distMapUV.y) * _scale;
+        texture.a = mask.a * alphaMultiplier;
+
+        gl_FragColor = texture;
+      }
+    </script>
+    <script type="module" src="./js/glow.js"></script>
   </body>
-  <style></style>
 </html>

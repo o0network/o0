@@ -4,8 +4,6 @@ document.addEventListener("DOMContentLoaded", function () {
   const container = document.getElementById("threejs");
   if (!container) return;
 
-  const isMobilePlatform = /Mobi|Android/i.test(navigator.userAgent);
-
   const scene = new THREE.Scene();
 
   const camera = new THREE.OrthographicCamera(-1, 1, 1, -1, 0.1, 10);
@@ -23,7 +21,7 @@ document.addEventListener("DOMContentLoaded", function () {
     u_time: { value: 0.0 },
     u_mouse: { value: new THREE.Vector2(0.0, 0.0) },
     u_orientation: { value: new THREE.Vector2(0.0, 0.0) },
-    u_is_mobile: { value: isMobilePlatform ? 1.0 : 0.0 },
+    u_is_mobile: { value: 0.0 },
   };
 
   const planeGeometry = new THREE.PlaneGeometry(2, 2);
@@ -84,7 +82,7 @@ document.addEventListener("DOMContentLoaded", function () {
         float aspect = u_resolution.x / u_resolution.y;
         st.x *= aspect;
 
-        vec2 influence = mix(u_mouse, u_orientation, u_is_mobile);
+        vec2 influence = u_mouse;
         influence.y *= -1.0;
         influence *= 2.0;
 
@@ -124,17 +122,7 @@ document.addEventListener("DOMContentLoaded", function () {
   const animate = () => {
     shaderMaterial.uniforms.u_time.value = clock.getElapsedTime();
 
-    if (isMobilePlatform) {
-      shaderMaterial.uniforms.u_orientation.value.set(
-        deviceOrientation.gamma * 0.01,
-        deviceOrientation.beta * 0.01
-      );
-    } else {
-      shaderMaterial.uniforms.u_mouse.value.set(
-        mousePosition.x,
-        mousePosition.y
-      );
-    }
+    shaderMaterial.uniforms.u_mouse.value.set(mousePosition.x, mousePosition.y);
 
     renderer.render(scene, camera);
     requestAnimationFrame(animate);
@@ -157,15 +145,5 @@ document.addEventListener("DOMContentLoaded", function () {
     mousePosition.y = -(event.clientY / window.innerHeight) * 2 + 1;
   };
 
-  if (!isMobilePlatform) {
-    window.addEventListener("mousemove", handleMouseMove);
-  }
-
-  const deviceOrientation = { beta: 0, gamma: 0 };
-  if (isMobilePlatform) {
-    window.addEventListener("deviceorientation", (event) => {
-      deviceOrientation.beta = event.beta || 0;
-      deviceOrientation.gamma = event.gamma || 0;
-    });
-  }
+  window.addEventListener("mousemove", handleMouseMove);
 });
