@@ -1,7 +1,7 @@
 import JSConfetti from "js-confetti";
 
 const oouSound = document.getElementById("oouSound");
-const rocketSound = document.getElementById("rocketSound");
+const confettiSound = document.getElementById("confettiSound");
 let hasClickedLogo = false;
 let hasDownloadPermission = false;
 
@@ -32,6 +32,16 @@ async function requestDownloadPermission() {
       document.body.style.animation = "";
     }, 2000);
   }
+}
+
+function navigate(href) {
+  const logo = document.querySelector(".logo-wrapper");
+  logo.classList.add("clicked");
+  oouSound.currentTime = 0;
+  oouSound.play();
+  setTimeout(() => {
+    window.location.href = href;
+  }, 3000); // 3 seconds for full animation
 }
 
 document.querySelector(".logo-wrapper").addEventListener("click", () => {
@@ -94,9 +104,9 @@ if (downloadLink) {
     });
 
     if (hasClickedLogo) {
-      rocketSound.currentTime = 0;
+      confettiSound.currentTime = 0;
       setTimeout(() => {
-        rocketSound.play();
+        confettiSound.play();
       }, 1000);
     }
   });
@@ -117,25 +127,7 @@ document.addEventListener("DOMContentLoaded", () => {
   if (downloadLink) {
     downloadLink.addEventListener("click", function (event) {
       event.preventDefault();
-      const href = this.href;
-      const originalText = this.textContent;
-      this.textContent = "Launching...";
-
-      // Play rocket sound and navigate after it ends
-      if (hasClickedLogo && rocketSound) {
-        rocketSound.currentTime = 0;
-        rocketSound.play();
-        const onEnded = () => {
-          window.location.href = href;
-          rocketSound.removeEventListener("ended", onEnded);
-        };
-        rocketSound.addEventListener("ended", onEnded);
-      } else {
-        // fallback: navigate after 1s if rocket sound not available
-        setTimeout(() => {
-          window.location.href = href;
-        }, 1000);
-      }
+      navigate(this.href);
     });
   }
 

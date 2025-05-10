@@ -14,6 +14,8 @@ document.addEventListener("DOMContentLoaded", function () {
   renderer.setClearColor(0x000000, 0);
   container.appendChild(renderer.domElement);
 
+  const isMobileDevice = /Mobi/i.test(navigator.userAgent);
+
   const uniformData = {
     u_resolution: {
       value: new THREE.Vector2(window.innerWidth, window.innerHeight),
@@ -21,7 +23,7 @@ document.addEventListener("DOMContentLoaded", function () {
     u_time: { value: 0.0 },
     u_mouse: { value: new THREE.Vector2(0.0, 0.0) },
     u_orientation: { value: new THREE.Vector2(0.0, 0.0) },
-    u_is_mobile: { value: 0.0 },
+    u_is_mobile: { value: isMobileDevice ? 1.0 : 0.0 },
   };
 
   const planeGeometry = new THREE.PlaneGeometry(2, 2);
@@ -122,7 +124,8 @@ document.addEventListener("DOMContentLoaded", function () {
   const animate = () => {
     shaderMaterial.uniforms.u_time.value = clock.getElapsedTime();
 
-    shaderMaterial.uniforms.u_mouse.value.set(mousePosition.x, mousePosition.y);
+    // u_mouse is updated by specific event handlers now
+    // shaderMaterial.uniforms.u_mouse.value.set(mousePosition.x, mousePosition.y);
 
     renderer.render(scene, camera);
     requestAnimationFrame(animate);
@@ -140,10 +143,38 @@ document.addEventListener("DOMContentLoaded", function () {
 
   window.addEventListener("resize", handleResize);
 
-  const handleMouseMove = (event) => {
-    mousePosition.x = (event.clientX / window.innerWidth) * 2 - 1;
-    mousePosition.y = -(event.clientY / window.innerHeight) * 2 + 1;
+  const handleMouseMoveOrTouch = (clientX, clientY) => {
+    mousePosition.x = (clientX / window.innerWidth) * 2 - 1;
+    mousePosition.y = -(clientY / window.innerHeight) * 2 + 1;
+    shaderMaterial.uniforms.u_mouse.value.set(mousePosition.x, mousePosition.y); // Update uniform directly
   };
 
-  window.addEventListener("mousemove", handleMouseMove);
+  if (isMobileDevice) {
+    window.addEventListener(
+      "touchmove",
+      (event) => {
+        if (event.touches.length > 0) {
+          handleMouseMoveOrTouch(
+            event.touches[0].clientX,
+            event.touches[0].clientY
+          );
+        }
+      },
+      { passive: true }
+    );
+    // Optional: Reset mouse position on touchend if visual effect should not persist
+    window.addEventListener(
+      "touchend",
+      () => {
+        // To make the effect fade or reset, you might set mousePosition to a neutral value
+        // For example: mousePosition.x = 0; mousePosition.y = 0;
+        // shaderMaterial.uniforms.u_mouse.value.set(mousePosition.x, mousePosition.y);
+      },
+      { passive: true }
+    );
+  } else {
+    window.addEventListener("mousemove", (event) => {
+      handleMouseMoveOrTouch(event.clientX, event.clientY);
+    });
+  }
 });

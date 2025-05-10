@@ -23,7 +23,7 @@
   </head>
   <body>
     <audio id="oouSound" src="./assets/oou.mp3"></audio>
-    <audio id="rocketSound" src="./assets/rocket.mp3"></audio>
+    <audio id="confettiSound" src="./assets/confetti.mp3"></audio>
 
     <main class="main">
       <div id="threejs"></div>
@@ -57,17 +57,8 @@
           <img
             width="24"
             height="24"
-            class="cloud"
-            src="./assets/important.png"
+            src="./assets/cloud.png"
             alt="cloud icon"
-            style="user-select: none; -webkit-user-drag: none"
-          />
-          <img
-            width="20"
-            height="20"
-            class="cross-mark"
-            src="./assets/cross-mark.png"
-            alt="cross mark icon"
             style="user-select: none; -webkit-user-drag: none"
           />
         </button>
@@ -76,9 +67,10 @@
             <a href="mailto:hi@o0.network">hi@o0.network</a>
           </li>
           <li><a href="https://o0.network/privacy.pdf">Privacy Policy</a></li>
+          <li><a href="https://t.me/o0network">Telegram</a></li>
           <li><a href="https://o0.network/graypaper.pdf">Graypaper</a></li>
           <li><a href="https://github.com/o0network/o0">GitHub</a></li>
-          <li><a href="https://x.com/o0netbot">X</a></li>
+          <li><a href="https://x.com/o0network">X</a></li>
         </ul>
 
         <a href="https://o0.network/a">
@@ -113,7 +105,12 @@
             <img class="logo-ghost" src="./assets/logo.png" alt="o0 logo" />
           </div>
           <div class="logo-wrapper">
-            <img class="logo-ghost" src="./assets/logo.png" alt="o0 logo" />
+            <img
+              preload
+              class="logo-ghost"
+              src="./assets/logo.png"
+              alt="o0 logo"
+            />
           </div>
         </div>
 
@@ -144,7 +141,12 @@
               <img
                 src="./assets/gloriousButton/left.png"
                 alt=""
-                style="width: 100%; height: 100%; object-fit: cover"
+                style="
+                  width: 100%;
+                  height: 100%;
+                  object-fit: cover;
+                  transform: translateX(-2px);
+                "
               />
             </div>
 
@@ -176,7 +178,12 @@
               <img
                 src="./assets/gloriousButton/right.png"
                 alt=""
-                style="width: 100%; height: 100%; object-fit: cover"
+                style="
+                  width: 100%;
+                  height: 100%;
+                  object-fit: cover;
+                  transform: translateX(-2px);
+                "
               />
             </div>
           </div>
@@ -186,54 +193,5 @@
     <script type="module" src="./js/script.js"></script>
     <script type="module" src="./js/video.js"></script>
     <script type="module" src="./js/background.js"></script>
-
-    <!-- Shader scripts for glow effect -->
-    <script id="glowVertexShader" type="x-shader/x-vertex">
-      varying vec2 vUv;
-      void main() {
-        vUv = uv;
-        gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
-      }
-    </script>
-
-    <script id="glowFragmentShader" type="x-shader/x-fragment">
-      uniform sampler2D _mask;
-      uniform sampler2D _dist;
-      varying vec2 vUv;
-      uniform vec3 _color;
-      uniform float _time;
-      uniform float _scale;
-
-      void main() {
-        // Calculate distorted UV coordinates
-        vec2 distMapUV = vUv;
-        distMapUV = vec2(cos(_time / 40.0) * (distMapUV.x) + sin(_time / 40.0) * (distMapUV.y),
-                        -sin(_time / 40.0) * (distMapUV.x) + cos(_time / 40.0) * (distMapUV.y));
-
-        vec4 dist = texture2D(_dist, distMapUV);
-        vec4 mask = texture2D(_mask, vUv);
-
-        // Enhance color vibrancy with less white mixing
-        vec3 enhancedColor = _color;
-
-        // Boost color saturation
-        enhancedColor = clamp(enhancedColor * 1.5, 0.0, 1.0);
-
-        // Add subtle pulsing - reduced white mixing
-        enhancedColor = mix(enhancedColor, vec3(1.0, 1.0, 1.0), sin(_time * 0.05) * 0.1 + 0.05);
-
-        // Create a gradient based on UV position for more depth
-        enhancedColor = mix(enhancedColor, enhancedColor * 1.2, distMapUV.y);
-
-        vec4 texture = vec4(enhancedColor, 1.0);
-
-        // Apply alpha based on mask, distortion, and scale
-        float alphaMultiplier = mix(0.4, 1.0, distMapUV.y) * _scale;
-        texture.a = mask.a * alphaMultiplier;
-
-        gl_FragColor = texture;
-      }
-    </script>
-    <script type="module" src="./js/glow.js"></script>
   </body>
 </html>

@@ -21,11 +21,14 @@ document.addEventListener("DOMContentLoaded", () => {
   let dragOffset = { x: 0, y: 0 };
   let clickStartTime = 0;
 
+  let backdropElement;
+  let currentZoomedVideoInfo = null;
+
   // Size based on viewport width
-  const isNarrowScreen = window.innerWidth < 600;
+  let isNarrowScreen = window.innerWidth < 600;
   // Calculate size in vw units and convert to pixels
-  const videoSizeVw = isNarrowScreen ? 15 : 22;
-  const videoSize = (window.innerWidth * videoSizeVw) / 100;
+  let videoSizeVw = isNarrowScreen ? 15 : 22;
+  let videoSize = Math.max(30, (window.innerWidth * videoSizeVw) / 100); // Ensure minimum size
 
   // Apply safe view height to the background container
   function updateBgHeight() {
@@ -36,6 +39,7 @@ document.addEventListener("DOMContentLoaded", () => {
   }
 
   updateBgHeight();
+  createBackdrop();
 
   const render = Render.create({
     element: bg,
@@ -54,7 +58,6 @@ document.addEventListener("DOMContentLoaded", () => {
   let canvasRect = bg.getBoundingClientRect();
 
   setupVideos();
-  setupOrbitalPath();
   setupDragHandling();
   setupEngineEvents();
   setupClickOutsideReset();
@@ -65,119 +68,73 @@ document.addEventListener("DOMContentLoaded", () => {
   const runner = Runner.create();
   Runner.run(runner, engine);
 
+  function createBackdrop() {
+    backdropElement = document.createElement("div");
+    backdropElement.className = "video-backdrop";
+    backdropElement.style.position = "fixed";
+    backdropElement.style.top = "0";
+    backdropElement.style.left = "0";
+    backdropElement.style.width = "100vw";
+    backdropElement.style.height = "100vh";
+    backdropElement.style.backgroundColor = "rgba(0, 0, 0, 0.5)";
+    backdropElement.style.display = "none";
+    backdropElement.style.zIndex = "9";
+    backdropElement.style.cursor = "pointer";
+    document.body.appendChild(backdropElement);
+
+    backdropElement.addEventListener("click", () => {
+      if (currentZoomedVideoInfo) {
+        unzoomVideo(currentZoomedVideoInfo.element);
+      }
+    });
+  }
+
   function setupVideos() {
     canvasRect = bg.getBoundingClientRect();
     const centerX = canvasRect.width / 2;
     const centerY = canvasRect.height / 2;
-
-    // Calculate orbital parameters based on screen dimensions
-    const aspectRatio = canvasRect.width / canvasRect.height;
-
-    // Adjust orbital size based on available space using vw and vh
-    const viewportMin = Math.min(window.innerWidth, window.innerHeight);
-    const orbitalSizeVw = isNarrowScreen ? 35 : 40;
-    const orbitalSize = viewportMin * (orbitalSizeVw / 100);
-
-    // Calculate horizontal and vertical radii
-    const horizontalRadius = Math.min(centerX * 0.85, orbitalSize);
-    const verticalRadius = Math.min(centerY * 0.85, orbitalSize);
-
-    // More oval for vertical screens, more circular for horizontal
-    const isVertical = window.innerWidth < window.innerHeight;
-    const orbitalA = isVertical ? horizontalRadius * 0.65 : horizontalRadius;
-    const orbitalB = isVertical ? verticalRadius : verticalRadius * 0.65;
-
     const count = 6;
+    // Remove old videos if any
+    videos.forEach((v) => v.element.remove());
+    videos = [];
+
+    // Responsive oval radii
+    const isVertical = window.innerWidth < window.innerHeight;
+    const isTiny = window.innerWidth < 420 || window.innerHeight < 420;
+    let ovalA = centerX * (isVertical ? 0.65 : 0.85);
+    let ovalB = centerY * (isVertical ? 0.85 : 0.65);
+    // Clamp minimums
+    ovalA = Math.max(ovalA, videoSize * 2);
+    ovalB = Math.max(ovalB, videoSize * 2);
+
     for (let i = 0; i < count; i++) {
-      const angle = (i / count) * Math.PI * 2;
-
-      // Elliptical coordinates
-      const spawnX = centerX + Math.cos(angle) * orbitalA;
-      const spawnY = centerY + Math.sin(angle) * orbitalB;
-
-      const body = createPhysicsBody(
-        spawnX,
-        spawnY,
-        i,
-        centerX,
-        centerY,
-        orbitalA,
-        orbitalB
-      );
-      const wrapper = createVideoElement(i + 1, body.id);
-      wrapper.style.transform = `translate3d(${spawnX - videoSize / 2}px, ${
-        spawnY - videoSize / 2
+      let x, y;
+      if (isTiny) {
+        // 3 on top, 3 on bottom
+        const row = i < 3 ? 0 : 1;
+        const col = i % 3;
+        const spacing = (canvasRect.width - videoSize * 3) / 4;
+        x = spacing + videoSize / 2 + col * (videoSize + spacing);
+        y =
+          row === 0
+            ? videoSize / 2 + spacing
+            : canvasRect.height - videoSize / 2 - spacing;
+      } else {
+        // Evenly around oval
+        const angle = (i / count) * Math.PI * 2 - Math.PI / 2;
+        x = centerX + Math.cos(angle) * ovalA;
+        y = centerY + Math.sin(angle) * ovalB;
+      }
+      const wrapper = createVideoElement(i + 1, null, i + 1);
+      wrapper.style.transform = `translate3d(${x - videoSize / 2}px, ${
+        y - videoSize / 2
       }px, 0)`;
-      videos.push({ body, element: wrapper, angle, orbitalA, orbitalB });
-      Composite.add(engine.world, body);
+      videos.push({ element: wrapper, angle: i, ovalA, ovalB });
       bg.appendChild(wrapper);
     }
   }
 
-  function createPhysicsBody(
-    spawnX,
-    spawnY,
-    index,
-    centerX,
-    centerY,
-    orbitalA,
-    orbitalB
-  ) {
-    const angle = (index / 6) * Math.PI * 2;
-
-    // Calculate tangent to the ellipse at this point
-    const tangentAngle =
-      Math.atan2(-orbitalA * Math.sin(angle), orbitalB * Math.cos(angle)) +
-      Math.PI / 2;
-
-    const ORBITAL_SPEED = 0.2;
-    const vx = Math.cos(tangentAngle) * ORBITAL_SPEED;
-    const vy = Math.sin(tangentAngle) * ORBITAL_SPEED;
-
-    const radius = videoSize / 2;
-    const body = Bodies.circle(spawnX, spawnY, radius, {
-      restitution: 0.8,
-      friction: 0.01,
-      frictionAir: 0.02,
-      density: 0.6,
-      inertia: Infinity,
-      render: { visible: false },
-      plugin: {
-        attractors: [
-          function (bodyA, bodyB) {
-            if (bodyB.isStatic || bodyA.isStatic) return null;
-
-            // Current position in relation to center
-            const dx = bodyA.position.x - centerX;
-            const dy = bodyA.position.y - centerY;
-
-            // Current distance from elliptical path
-            const currentAngle = Math.atan2(dy, dx);
-            const targetX = centerX + Math.cos(currentAngle) * orbitalA;
-            const targetY = centerY + Math.sin(currentAngle) * orbitalB;
-
-            // Force towards the elliptical path
-            const forceX = (targetX - bodyA.position.x) * 0.0001;
-            const forceY = (targetY - bodyA.position.y) * 0.0001;
-
-            return {
-              x: forceX,
-              y: forceY,
-            };
-          },
-        ],
-      },
-    });
-
-    Body.setVelocity(body, { x: vx, y: vy });
-    return body;
-  }
-
-  function setupOrbitalPath() {
-    // No physical walls, just orbital forces applied in setupEngineEvents
-  }
-
-  function createVideoElement(i, id) {
+  function createVideoElement(i, _body, id) {
     const wrapper = document.createElement("div");
     wrapper.className = "video-note";
     wrapper.style.width = `${videoSize}px`;
@@ -314,6 +271,11 @@ document.addEventListener("DOMContentLoaded", () => {
     const evt = e.touches?.[0] || e;
     const target = evt.target.closest(".video-note");
     if (!target) return;
+
+    if (target.classList.contains("zoomed")) {
+      isDragging = false;
+      return;
+    }
     clickStartTime = Date.now();
     isDragging = true;
     currentBody = videos.find(
@@ -326,9 +288,8 @@ document.addEventListener("DOMContentLoaded", () => {
       if (!target.classList.contains("playing")) {
         Body.setStatic(currentBody, true);
       }
-      const scale = render.options.pixelRatio;
-      const mouseX = (evt.clientX - canvasRect.left) * scale;
-      const mouseY = (evt.clientY - canvasRect.top) * scale;
+      const mouseX = evt.clientX - canvasRect.left;
+      const mouseY = evt.clientY - canvasRect.top;
       dragOffset.x = mouseX - currentBody.position.x;
       dragOffset.y = mouseY - currentBody.position.y;
     }
@@ -338,9 +299,8 @@ document.addEventListener("DOMContentLoaded", () => {
     if (!isDragging || !currentBody) return;
     e.preventDefault();
     const evt = e.touches?.[0] || e;
-    const scale = render.options.pixelRatio;
-    const mouseX = (evt.clientX - canvasRect.left) * scale;
-    const mouseY = (evt.clientY - canvasRect.top) * scale;
+    const mouseX = evt.clientX - canvasRect.left;
+    const mouseY = evt.clientY - canvasRect.top;
     const radius = videoSize / 2;
     const targetX = Math.max(
       radius,
@@ -360,45 +320,47 @@ document.addEventListener("DOMContentLoaded", () => {
       });
       document.body.classList.remove("dragging");
     }
-    if (!currentBody) return;
+    if (!currentBody) {
+      isDragging = false;
+      return;
+    }
 
     const isClick = Date.now() - clickStartTime < 200;
     const element = videos.find((vid) => vid.body === currentBody)?.element;
 
-    if (!element?.classList.contains("playing")) {
-      Body.setStatic(currentBody, false);
+    if (!isClick) {
+      if (element && !element.classList.contains("zoomed")) {
+        Body.setStatic(currentBody, false);
 
-      // Find original position on the elliptical path based on image's index
-      const centerX = canvasRect.width / 2;
-      const centerY = canvasRect.height / 2;
-      const videoData = videos.find((vid) => vid.body === currentBody);
+        const centerX = canvasRect.width / 2;
+        const centerY = canvasRect.height / 2;
+        const videoData = videos.find((vid) => vid.body === currentBody);
 
-      if (videoData) {
-        // Force immediate return to original position on the path
-        const idx = videos.indexOf(videoData);
-        const angle = (idx / videos.length) * Math.PI * 2;
-        const targetX = centerX + Math.cos(angle) * videoData.orbitalA;
-        const targetY = centerY + Math.sin(angle) * videoData.orbitalB;
+        if (videoData) {
+          const idx = videos.indexOf(videoData);
+          const angle = (idx / videos.length) * Math.PI * 2;
+          const targetX = centerX + Math.cos(angle) * videoData.ovalA;
+          const targetY = centerY + Math.sin(angle) * videoData.ovalB;
 
-        // Strong homing velocity toward the target position
-        const dx = targetX - currentBody.position.x;
-        const dy = targetY - currentBody.position.y;
-        const dist = Math.sqrt(dx * dx + dy * dy);
+          const dx = targetX - currentBody.position.x;
+          const dy = targetY - currentBody.position.y;
+          const dist = Math.sqrt(dx * dx + dy * dy);
 
-        // Calculate tangent vector at the target angle
-        const tangentAngle =
-          Math.atan2(
-            -videoData.orbitalA * Math.sin(angle),
-            videoData.orbitalB * Math.cos(angle)
-          ) +
-          Math.PI / 2;
+          const tangentAngle =
+            Math.atan2(
+              -videoData.ovalA * Math.sin(angle),
+              videoData.ovalB * Math.cos(angle)
+            ) +
+            Math.PI / 2;
 
-        // Stronger return velocity that increases with distance
-        const RETURN_SPEED = Math.min(0.5, 0.2 + dist * 0.001);
-        Body.setVelocity(currentBody, {
-          x: Math.cos(tangentAngle) * RETURN_SPEED + dx * 0.01,
-          y: Math.sin(tangentAngle) * RETURN_SPEED + dy * 0.01,
-        });
+          const RETURN_SPEED = Math.min(0.5, 0.2 + dist * 0.001);
+          Body.setVelocity(currentBody, {
+            x: Math.cos(tangentAngle) * RETURN_SPEED + dx * 0.01,
+            y: Math.sin(tangentAngle) * RETURN_SPEED + dy * 0.01,
+          });
+        }
+      } else if (element && element.classList.contains("zoomed")) {
+        Body.setStatic(currentBody, true);
       }
     }
 
@@ -417,90 +379,106 @@ document.addEventListener("DOMContentLoaded", () => {
     Events.on(engine, "afterUpdate", () => {
       canvasRect = bg.getBoundingClientRect();
 
-      videos.forEach(({ body, element, orbitalA, orbitalB }, index) => {
-        if (!isDragging || body !== currentBody) {
-          // Calculate target position on elliptical path based on original index
-          const targetAngle = (index / videos.length) * Math.PI * 2;
-          const targetX = centerX + Math.cos(targetAngle) * orbitalA;
-          const targetY = centerY + Math.sin(targetAngle) * orbitalB;
+      videos.forEach(({ body, element, ovalA, ovalB }, index) => {
+        if (element.classList.contains("zoomed")) {
+          // Zoomed videos are positioned via direct style manipulation (left, top, width, height)
+          // and their physics body is static. No transform update from physics needed here.
+        } else {
+          // Update transform for non-zoomed videos based on physics body
+          const currentVideoRadius = videoSize / 2;
+          element.style.transform = `translate3d(${
+            body.position.x - currentVideoRadius
+          }px, ${body.position.y - currentVideoRadius}px, 0) scale(1)`;
 
-          // Current position and angle
-          const currentDx = body.position.x - centerX;
-          const currentDy = body.position.y - centerY;
-          const currentAngle = Math.atan2(currentDy, currentDx);
+          // Physics logic for returning to slot (if not static and not dragged)
+          if (!body.isStatic && (!isDragging || body !== currentBody)) {
+            // Calculate target position on elliptical path based on original index
+            const targetAngle = (index / videos.length) * Math.PI * 2;
+            const targetX = centerX + Math.cos(targetAngle) * ovalA;
+            const targetY = centerY + Math.sin(targetAngle) * ovalB;
 
-          // Calculate forces to return to intended position
-          const dx = targetX - body.position.x;
-          const dy = targetY - body.position.y;
-          const dist = Math.sqrt(dx * dx + dy * dy);
+            // Current position and angle
+            const currentDx = body.position.x - centerX;
+            const currentDy = body.position.y - centerY;
 
-          // Stronger force with greater distance
-          const pathForceMultiplier = Math.min(0.004, 0.001 + dist * 0.00001);
-          const pathForceX = dx * pathForceMultiplier;
-          const pathForceY = dy * pathForceMultiplier;
+            // Calculate forces to return to intended position
+            const dx = targetX - body.position.x;
+            const dy = targetY - body.position.y;
+            const dist = Math.sqrt(dx * dx + dy * dy);
 
-          Body.applyForce(body, body.position, {
-            x: pathForceX,
-            y: pathForceY,
-          });
+            // Stronger force with greater distance
+            const pathForceMultiplier = Math.min(0.004, 0.001 + dist * 0.00001);
+            const pathForceX = dx * pathForceMultiplier;
+            const pathForceY = dy * pathForceMultiplier;
 
-          // Add tangential force to maintain orbital motion
-          const tangentAngle =
-            Math.atan2(
-              -orbitalA * Math.sin(targetAngle),
-              orbitalB * Math.cos(targetAngle)
-            ) +
-            Math.PI / 2;
-
-          const speed = Vector.magnitude(body.velocity);
-          if (speed < BASE_SPEED || dist > orbitalA * 0.2) {
-            // Stronger tangential force when far from orbital path
-            const tangentForceMagnitude = Math.min(
-              0.0004,
-              0.0001 + dist * 0.000001
-            );
             Body.applyForce(body, body.position, {
-              x: Math.cos(tangentAngle) * tangentForceMagnitude,
-              y: Math.sin(tangentAngle) * tangentForceMagnitude,
+              x: pathForceX,
+              y: pathForceY,
             });
-          }
 
-          // Damping to prevent too much oscillation/energy
-          if (speed > BASE_SPEED * 2) {
-            Body.setVelocity(body, {
-              x: body.velocity.x * 0.98,
-              y: body.velocity.y * 0.98,
-            });
+            // Add tangential force to maintain orbital motion (gentle nudge)
+            const tangentAngle =
+              Math.atan2(
+                -ovalA * Math.sin(targetAngle),
+                ovalB * Math.cos(targetAngle)
+              ) +
+              Math.PI / 2;
+            const speed = Vector.magnitude(body.velocity);
+            if (speed < BASE_SPEED || dist > ovalA * 0.2) {
+              const tangentForceMagnitude = Math.min(
+                0.0004,
+                0.0001 + dist * 0.000001
+              );
+              Body.applyForce(body, body.position, {
+                x: Math.cos(tangentAngle) * tangentForceMagnitude,
+                y: Math.sin(tangentAngle) * tangentForceMagnitude,
+              });
+            }
+
+            // Damping
+            if (speed > BASE_SPEED * 2) {
+              Body.setVelocity(body, {
+                x: body.velocity.x * 0.98,
+                y: body.velocity.y * 0.98,
+              });
+            }
           }
         }
 
-        // Clamp to bounds to prevent flying off
-        const radius = videoSize / 2;
-        const clampedX = Math.max(
-          radius,
-          Math.min(canvasRect.width - radius, body.position.x)
-        );
-        const clampedY = Math.max(
-          radius,
-          Math.min(canvasRect.height - radius, body.position.y)
-        );
-        if (clampedX !== body.position.x || clampedY !== body.position.y) {
-          Body.setPosition(body, { x: clampedX, y: clampedY });
-        }
+        // Clamp to bounds to prevent flying off (applies to all)
+        const radius = element.classList.contains("zoomed")
+          ? parseFloat(element.style.width) / 2
+          : videoSize / 2;
+        const itemIsZoomedAndCentered = element.classList.contains("zoomed");
 
-        // Apply transform with scale if playing
-        const scale = element.classList.contains("playing") ? 1.05 : 1;
-        element.style.transform = `translate3d(${
-          body.position.x - videoSize / 2
-        }px, ${body.position.y - videoSize / 2}px, 0) scale(${scale})`;
+        if (!itemIsZoomedAndCentered) {
+          const clampedX = Math.max(
+            radius,
+            Math.min(canvasRect.width - radius, body.position.x)
+          );
+          const clampedY = Math.max(
+            radius,
+            Math.min(canvasRect.height - radius, body.position.y)
+          );
+          if (clampedX !== body.position.x || clampedY !== body.position.y) {
+            Body.setPosition(body, { x: clampedX, y: clampedY });
+          }
+        }
       });
 
-      // Gentle repulsion between videos
+      // Gentle repulsion between videos (non-zoomed ones primarily)
       for (let i = 0; i < videos.length; i++) {
         for (let j = i + 1; j < videos.length; j++) {
           const A = videos[i].body,
             B = videos[j].body;
           if ((A === currentBody || B === currentBody) && isDragging) continue;
+          if (
+            currentZoomedVideoInfo &&
+            (A === currentZoomedVideoInfo.body ||
+              B === currentZoomedVideoInfo.body)
+          ) {
+            continue;
+          }
           const dx = B.position.x - A.position.x,
             dy = B.position.y - A.position.y;
           const distSq = dx * dx + dy * dy;
@@ -520,22 +498,19 @@ document.addEventListener("DOMContentLoaded", () => {
     document.addEventListener(
       "click",
       (e) => {
-        const playingWrapper = document.querySelector(".video-note.playing");
-        if (!playingWrapper) return;
-        if (!playingWrapper.contains(e.target)) {
-          const video = playingWrapper.querySelector("video");
-          const thumbnail = playingWrapper.querySelector("img");
-          if (video && video.style.display === "block") {
-            video.pause();
-            video.style.display = "none";
-            thumbnail.style.display = "block";
-            playingWrapper.querySelector(".play-indicator").style.opacity = "1";
-            playingWrapper.classList.remove("playing");
-            Body.setStatic(
-              videos.find((vid) => vid.element === playingWrapper).body,
-              false
-            );
-            playingWrapper.style.zIndex = "3";
+        if (currentZoomedVideoInfo && currentZoomedVideoInfo.element) {
+          const zoomedElement = currentZoomedVideoInfo.element;
+          if (e.target === backdropElement) {
+            return;
+          }
+          if (!zoomedElement.contains(e.target)) {
+            if (
+              e.target.closest(".video-note") &&
+              e.target.closest(".video-note") !== zoomedElement
+            ) {
+              return;
+            }
+            unzoomVideo(zoomedElement);
           }
         }
       },
@@ -543,52 +518,51 @@ document.addEventListener("DOMContentLoaded", () => {
     );
   }
 
-  function handleResize() {
-    const isVerticalNow = window.innerWidth < window.innerHeight;
-    const isNarrowScreenNow = window.innerWidth < 600;
+  function unzoomVideo(wrapper) {
+    if (!wrapper || !wrapper.classList.contains("zoomed")) return;
 
-    // Recalculate video size in vw
-    const videoSizeVwNew = isNarrowScreenNow ? 15 : 22;
-    const videoSizeNew = (window.innerWidth * videoSizeVwNew) / 100;
+    const videoData = videos.find((vid) => vid.element === wrapper);
+    if (!videoData) return;
 
-    // Update background height
-    updateBgHeight();
+    const video = wrapper.querySelector("video");
+    const thumbnail = wrapper.querySelector("img");
+    const playIndicator = wrapper.querySelector(".play-indicator");
 
-    // Get new dimensions
-    canvasRect = bg.getBoundingClientRect();
-    const centerX = canvasRect.width / 2;
-    const centerY = canvasRect.height / 2;
-
-    // Calculate new orbital parameters
-    const viewportMin = Math.min(window.innerWidth, window.innerHeight);
-    const orbitalSizeVw = isNarrowScreenNow ? 35 : 40;
-    const orbitalSize = viewportMin * (orbitalSizeVw / 100);
-
-    const horizontalRadius = Math.min(centerX * 0.85, orbitalSize);
-    const verticalRadius = Math.min(centerY * 0.85, orbitalSize);
-
-    const orbitalA = isVerticalNow ? horizontalRadius * 0.65 : horizontalRadius;
-    const orbitalB = isVerticalNow ? verticalRadius : verticalRadius * 0.65;
-
-    // Full reset is needed if major layout changes or size changes
-    if (
-      isVertical !== isVerticalNow ||
-      isNarrowScreen !== isNarrowScreenNow ||
-      Math.abs(videoSize - videoSizeNew) > 10
-    ) {
-      window.location.reload();
-      return;
+    if (video) {
+      video.pause();
+      video.style.display = "none";
     }
+    if (thumbnail) thumbnail.style.display = "block";
+    if (playIndicator) playIndicator.style.opacity = "1";
 
-    // Update render dimensions
-    render.canvas.width = canvasRect.width;
-    render.canvas.height = canvasRect.height;
+    wrapper.classList.remove("zoomed");
+    wrapper.classList.remove("playing");
+    Body.setStatic(videoData.body, false);
 
-    // Update orbital parameters for each video
-    videos.forEach((vid) => {
-      vid.orbitalA = orbitalA;
-      vid.orbitalB = orbitalB;
-    });
+    wrapper.style.width = `${videoSize}px`;
+    wrapper.style.height = `${videoSize}px`;
+    wrapper.style.left = "";
+    wrapper.style.top = "";
+    wrapper.style.zIndex = "3";
+
+    if (backdropElement) backdropElement.style.display = "none";
+    currentZoomedVideoInfo = null;
+  }
+
+  function handleResize() {
+    isNarrowScreen = window.innerWidth < 600;
+    videoSizeVw = isNarrowScreen ? 15 : 22;
+    const videoSizeNew = Math.max(30, (window.innerWidth * videoSizeVw) / 100);
+    updateBgHeight();
+    videoSize = videoSizeNew;
+    setupVideos();
+    if (currentZoomedVideoInfo && currentZoomedVideoInfo.element) {
+      const wrapper = currentZoomedVideoInfo.element;
+      const zoomedWidth = Math.min(window.innerWidth * 0.9, 512);
+      const zoomedHeight = zoomedWidth;
+      wrapper.style.width = `${zoomedWidth}px`;
+      wrapper.style.height = `${zoomedHeight}px`;
+    }
   }
 
   function debounce(func, wait) {
