@@ -538,3 +538,7 @@ body {
   pointer-events: none;
   mix-blend-mode: screen;
 }
+
+.zoomed {
+  z-index: 100;
+}

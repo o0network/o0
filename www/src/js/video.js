@@ -6,38 +6,29 @@ import {
   Body,
   Composite,
   Events,
-  Vector,
 } from "matter-js";
 
 document.addEventListener("DOMContentLoaded", () => {
-  const engine = Engine.create({ enableSleeping: false });
+  const engine = Engine.create({ enableSleeping: true });
   engine.world.gravity.y = 0;
   const bg = document.querySelector(".preview-bg");
   if (!bg) return;
 
   let videos = [];
   let isDragging = false;
-  let currentBody = null;
+  let currentDragBody = null;
   let dragOffset = { x: 0, y: 0 };
-  let clickStartTime = 0;
 
   let backdropElement;
   let currentZoomedVideoInfo = null;
 
-  // Size based on viewport width
-  let isNarrowScreen = window.innerWidth < 600;
-  // Calculate size in vw units and convert to pixels
-  let videoSizeVw = isNarrowScreen ? 15 : 22;
-  let videoSize = Math.max(30, (window.innerWidth * videoSizeVw) / 100); // Ensure minimum size
+  let videoNoteWidth = 150;
+  let videoNoteHeight = videoNoteWidth;
 
-  // Apply safe view height to the background container
   function updateBgHeight() {
-    // Use svh (safe viewport height) with fallback
     const safeHeight = window.innerHeight;
-    bg.style.height = `100svh`; // Modern browsers with safe viewport units
-    bg.style.height = `${safeHeight}px`; // Fallback
+    bg.style.height = `${safeHeight}px`;
   }
-
   updateBgHeight();
   createBackdrop();
 
@@ -52,516 +43,543 @@ document.addEventListener("DOMContentLoaded", () => {
       pixelRatio: window.devicePixelRatio,
     },
   });
-
   render.canvas.style.display = "none";
 
   let canvasRect = bg.getBoundingClientRect();
 
   setupVideos();
   setupDragHandling();
-  setupEngineEvents();
+  setupEngineRenderLoop();
   setupClickOutsideReset();
 
-  window.addEventListener("resize", debounce(handleResize, 100));
-  window.addEventListener("orientationchange", debounce(handleResize, 100));
+  window.addEventListener("resize", debounce(handleResize, 150));
+  window.addEventListener("orientationchange", debounce(handleResize, 150));
 
   const runner = Runner.create();
   Runner.run(runner, engine);
 
+  function calculateVideoSizes() {
+    videoNoteWidth = Math.max(80, Math.min(180, window.innerWidth * 0.15));
+    videoNoteHeight = videoNoteWidth;
+  }
+
   function createBackdrop() {
     backdropElement = document.createElement("div");
     backdropElement.className = "video-backdrop";
-    backdropElement.style.position = "fixed";
-    backdropElement.style.top = "0";
-    backdropElement.style.left = "0";
-    backdropElement.style.width = "100vw";
-    backdropElement.style.height = "100vh";
-    backdropElement.style.backgroundColor = "rgba(0, 0, 0, 0.5)";
-    backdropElement.style.display = "none";
-    backdropElement.style.zIndex = "9";
-    backdropElement.style.cursor = "pointer";
+    Object.assign(backdropElement.style, {
+      position: "fixed",
+      top: "0",
+      left: "0",
+      width: "100vw",
+      height: "100vh",
+      backgroundColor: "rgba(0, 0, 0, 0.7)",
+      display: "none",
+      zIndex: "990",
+      cursor: "pointer",
+    });
     document.body.appendChild(backdropElement);
-
     backdropElement.addEventListener("click", () => {
-      if (currentZoomedVideoInfo) {
-        unzoomVideo(currentZoomedVideoInfo.element);
-      }
+      if (currentZoomedVideoInfo) unzoomVideo(currentZoomedVideoInfo.element);
     });
   }
 
   function setupVideos() {
+    videos.forEach((vid) => {
+      vid.element.remove();
+      if (vid.body) Composite.remove(engine.world, vid.body);
+    });
+    videos = [];
+    Composite.clear(engine.world, false);
+
     canvasRect = bg.getBoundingClientRect();
     const centerX = canvasRect.width / 2;
     const centerY = canvasRect.height / 2;
     const count = 6;
-    // Remove old videos if any
-    videos.forEach((v) => v.element.remove());
-    videos = [];
 
-    // Responsive oval radii
-    const isVertical = window.innerWidth < window.innerHeight;
-    const isTiny = window.innerWidth < 420 || window.innerHeight < 420;
-    let ovalA = centerX * (isVertical ? 0.65 : 0.85);
-    let ovalB = centerY * (isVertical ? 0.85 : 0.65);
-    // Clamp minimums
-    ovalA = Math.max(ovalA, videoSize * 2);
-    ovalB = Math.max(ovalB, videoSize * 2);
+    calculateVideoSizes();
+
+    const aspectRatio = canvasRect.width / canvasRect.height;
+    const useArchLayout = aspectRatio < 1.1;
+
+    let ovalA, ovalB;
 
     for (let i = 0; i < count; i++) {
       let x, y;
-      if (isTiny) {
-        // 3 on top, 3 on bottom
-        const row = i < 3 ? 0 : 1;
-        const col = i % 3;
-        const spacing = (canvasRect.width - videoSize * 3) / 4;
-        x = spacing + videoSize / 2 + col * (videoSize + spacing);
-        y =
-          row === 0
-            ? videoSize / 2 + spacing
-            : canvasRect.height - videoSize / 2 - spacing;
+
+      if (useArchLayout) {
+        const numInRow = 3;
+        const row = i < numInRow ? 0 : 1;
+        const col = i % numInRow;
+
+        const totalVideoWidthInRow = numInRow * videoNoteWidth;
+        const spacing = Math.max(
+          videoNoteWidth * 0.2,
+          (canvasRect.width - totalVideoWidthInRow) / (numInRow + 1)
+        );
+        x = spacing + col * (videoNoteWidth + spacing) + videoNoteWidth / 2;
+        if (
+          totalVideoWidthInRow + (numInRow + 1) * spacing <
+          canvasRect.width
+        ) {
+          x +=
+            (canvasRect.width -
+              (totalVideoWidthInRow + (numInRow + 1) * spacing)) /
+            2;
+        }
+
+        const archDepth = videoNoteHeight * 0.3;
+        let yOffsetForRow = 0;
+        if (col === 1) {
+          yOffsetForRow = row === 0 ? -archDepth : archDepth;
+        } else {
+          yOffsetForRow = row === 0 ? -archDepth * 0.5 : archDepth * 0.5;
+        }
+
+        const verticalRowBase = canvasRect.height * (row === 0 ? 0.3 : 0.7);
+        y = verticalRowBase + yOffsetForRow;
+
+        const verticalPadding = videoNoteHeight * 0.2;
+        y = Math.max(y, verticalPadding + videoNoteHeight / 2);
+        y = Math.min(
+          y,
+          canvasRect.height - videoNoteHeight / 2 - verticalPadding
+        );
       } else {
-        // Evenly around oval
+        if (i === 0) {
+          ovalA = centerX * (aspectRatio < 1 ? 0.65 : 0.8);
+          ovalB = centerY * (aspectRatio < 1 ? 0.8 : 0.65);
+          ovalA = Math.max(
+            ovalA,
+            videoNoteWidth * 1.8 * (count / (Math.PI * 2))
+          );
+          ovalB = Math.max(
+            ovalB,
+            videoNoteHeight * 1.8 * (count / (Math.PI * 2))
+          );
+        }
         const angle = (i / count) * Math.PI * 2 - Math.PI / 2;
         x = centerX + Math.cos(angle) * ovalA;
         y = centerY + Math.sin(angle) * ovalB;
       }
-      const wrapper = createVideoElement(i + 1, null, i + 1);
-      wrapper.style.transform = `translate3d(${x - videoSize / 2}px, ${
-        y - videoSize / 2
-      }px, 0)`;
-      videos.push({ element: wrapper, angle: i, ovalA, ovalB });
-      bg.appendChild(wrapper);
+
+      const videoInfo = createVideoElement(i + 1, x, y);
+      videos.push(videoInfo);
+      bg.appendChild(videoInfo.element);
+      if (videoInfo.body) Composite.add(engine.world, videoInfo.body);
     }
   }
 
-  function createVideoElement(i, _body, id) {
+  function createVideoElement(id, spawnX, spawnY) {
     const wrapper = document.createElement("div");
     wrapper.className = "video-note";
-    wrapper.style.width = `${videoSize}px`;
-    wrapper.style.height = `${videoSize}px`;
-    wrapper.style.willChange = "transform";
-    wrapper.style.borderRadius = "50%";
-    wrapper.style.position = "absolute";
-    wrapper.style.overflow = "hidden";
-    wrapper.style.zIndex = "3";
-    wrapper.dataset.bodyId = id;
-
-    const playerRing = document.createElement("div");
-    playerRing.className = "player-ring";
-    playerRing.style.position = "absolute";
-    playerRing.style.width = "100%";
-    playerRing.style.height = "100%";
-    playerRing.style.borderRadius = "50%";
-    playerRing.style.border = "2px solid rgba(255, 255, 255, 0.8)";
-    playerRing.style.boxSizing = "border-box";
-    playerRing.style.boxShadow = "0 0 0 2px rgba(0, 0, 0, 0.1)";
-    playerRing.style.zIndex = "1";
-
-    const videoContainer = document.createElement("div");
-    videoContainer.className = "video-container";
-    videoContainer.style.width = "100%";
-    videoContainer.style.height = "100%";
-    videoContainer.style.borderRadius = "50%";
-    videoContainer.style.overflow = "hidden";
-    videoContainer.style.position = "relative";
-    videoContainer.style.display = "flex";
-    videoContainer.style.alignItems = "center";
-    videoContainer.style.justifyContent = "center";
+    Object.assign(wrapper.style, {
+      width: `${videoNoteWidth}px`,
+      height: `${videoNoteHeight}px`,
+      position: "absolute",
+      overflow: "hidden",
+      zIndex: "10",
+      cursor: "pointer",
+      borderRadius: "50%",
+      transform: `translate3d(${spawnX - videoNoteWidth / 2}px, ${
+        spawnY - videoNoteHeight / 2
+      }px, 0)`,
+      willChange: "transform, position, width, height, z-index",
+      boxShadow: "0 4px 12px rgba(0,0,0,0.2)",
+    });
+    wrapper.dataset.videoId = id;
 
     const thumbnail = document.createElement("img");
-    thumbnail.src = `assets/thumbnails/${i}.jpg`;
-    thumbnail.alt = `Video ${i} preview`;
-    thumbnail.style.width = "100%";
-    thumbnail.style.height = "100%";
-    thumbnail.style.objectFit = "cover";
-    thumbnail.style.objectPosition = "center";
-    thumbnail.style.cursor = "pointer";
+    thumbnail.src = `assets/thumbnails/${id}.jpg`;
+    thumbnail.alt = `Video ${id} preview`;
+    Object.assign(thumbnail.style, {
+      width: "100%",
+      height: "100%",
+      objectFit: "cover",
+      display: "block",
+      position: "absolute",
+      borderRadius: "50%",
+    });
     thumbnail.draggable = false;
 
     const video = document.createElement("video");
-    video.src = `assets/media/${i}.mp4`;
-    video.style.width = "100%";
-    video.style.height = "100%";
-    video.style.objectFit = "cover";
-    video.style.objectPosition = "center";
-    video.style.display = "none";
+    video.src = `assets/media/${id}.mp4`;
+    Object.assign(video.style, {
+      width: "100%",
+      height: "100%",
+      objectFit: "cover",
+      display: "none",
+      position: "absolute",
+      borderRadius: "50%",
+    });
     video.controls = false;
     video.draggable = false;
+    video.preload = "metadata";
+    video.playsInline = true;
+    video.setAttribute("playsinline", "");
 
-    const playIndicator = document.createElement("div");
-    playIndicator.className = "play-indicator";
-    playIndicator.style.position = "absolute";
-    playIndicator.style.top = "50%";
-    playIndicator.style.left = "50%";
-    playIndicator.style.transform = "translate(-50%, -50%)";
-    playIndicator.style.transition = "opacity 0.2s";
-    playIndicator.style.zIndex = "4";
-    playIndicator.innerHTML = `
-<svg width="41" height="47" viewBox="0 0 41 47" fill="none" xmlns="http://www.w3.org/2000/svg">
-  <path d="M2 23.5L2 4.46282C2 2.9235 3.66611 1.96122 4.99944 2.73045L37.9972 21.7676C39.3313 22.5373 39.3313 24.4627 37.9972 25.2324L4.99944 44.2695C3.66611 45.0388 2 44.0765 2 42.5372L2 23.5Z" fill="#EEEEEE" stroke="#EEEEEE" stroke-width="4" stroke-linejoin="round"/>
-</svg>`;
+    wrapper.appendChild(thumbnail);
+    wrapper.appendChild(video);
+
+    const physicsBody = Bodies.rectangle(
+      spawnX,
+      spawnY,
+      videoNoteWidth,
+      videoNoteHeight,
+      {
+        isStatic: true,
+        render: { visible: false },
+        chamfer: { radius: videoNoteWidth / 2 },
+      }
+    );
+    physicsBody.id = `video-${id}`;
 
     wrapper.addEventListener("click", function (e) {
-      if (isDragging || Date.now() - clickStartTime < 200) return;
+      const pressStartTimeString = this.dataset.pressStartTime || "0";
+      const pressStartTime = parseInt(pressStartTimeString);
+      const movedDuringPress = this.dataset.mouseMoved === "true";
 
-      if (video.style.display === "none") {
+      this.dataset.pressStartTime = "0";
+      this.dataset.mouseMoved = "false";
+
+      const duration = Date.now() - pressStartTime;
+
+      if (pressStartTime === 0 || movedDuringPress || duration > 250) {
+        return;
+      }
+
+      if (wrapper.classList.contains("zoomed")) {
+        if (!video.paused) {
+          video.pause();
+        } else {
+          video.play();
+        }
+        return;
+      }
+
+      const isPlayingThis = video.style.display === "block" && !video.paused;
+
+      videos.forEach((vidInfo) => {
+        if (vidInfo.id !== id && vidInfo.videoEl.style.display === "block") {
+          vidInfo.videoEl.pause();
+          vidInfo.videoEl.style.display = "none";
+          vidInfo.thumbnailEl.style.display = "block";
+          vidInfo.element.classList.remove("playing");
+          if (vidInfo.body && !vidInfo.element.classList.contains("zoomed"))
+            Body.setStatic(vidInfo.body, true);
+          vidInfo.element.style.zIndex = "10";
+        }
+      });
+
+      if (isPlayingThis) {
+        video.pause();
+      } else {
         thumbnail.style.display = "none";
         video.style.display = "block";
-        playIndicator.style.opacity = "0";
-        video.play();
+        video.currentTime = 0;
+        video
+          .play()
+          .catch((error) => console.error("Play interrupted:", error));
         wrapper.classList.add("playing");
-        Body.setStatic(
-          videos.find((vid) => vid.body.id === parseInt(id)).body,
-          true
-        );
-        wrapper.style.zIndex = "5";
-
-        document.querySelectorAll(".video-note video").forEach((v) => {
-          if (v !== video && v.style.display === "block") {
-            const otherWrapper = v.closest(".video-note");
-            v.pause();
-            v.style.display = "none";
-            otherWrapper.querySelector("img").style.display = "block";
-            otherWrapper.querySelector(".play-indicator").style.opacity = "1";
-            otherWrapper.classList.remove("playing");
-            const otherBody = videos.find(
-              (vid) => vid.element === otherWrapper
-            ).body;
-            Body.setStatic(otherBody, false);
-            otherWrapper.style.zIndex = "3";
-          }
-        });
-      } else if (!video.paused) {
-        video.pause();
-        playIndicator.style.opacity = "1";
-      } else {
-        video.play();
-        playIndicator.style.opacity = "0";
+        zoomVideo(wrapper, physicsBody);
       }
     });
 
     video.addEventListener("ended", function () {
       video.style.display = "none";
       thumbnail.style.display = "block";
-      playIndicator.style.opacity = "1";
       wrapper.classList.remove("playing");
-      Body.setStatic(videos.find((vid) => vid.element === wrapper).body, false);
-      wrapper.style.zIndex = "3";
+      if (!wrapper.classList.contains("zoomed") && physicsBody) {
+        Body.setStatic(physicsBody, true);
+      }
+      if (!wrapper.classList.contains("zoomed")) {
+        wrapper.style.zIndex = "10";
+      }
     });
 
-    videoContainer.appendChild(thumbnail);
-    videoContainer.appendChild(video);
-    videoContainer.appendChild(playIndicator);
-    wrapper.appendChild(videoContainer);
-    wrapper.appendChild(playerRing);
+    return {
+      element: wrapper,
+      videoEl: video,
+      thumbnailEl: thumbnail,
+      id,
+      body: physicsBody,
+      initialX: spawnX,
+      initialY: spawnY,
+    };
+  }
 
-    return wrapper;
+  function zoomVideo(wrapper, body) {
+    if (wrapper.classList.contains("zoomed")) return;
+
+    const videoData = videos.find((v) => v.element === wrapper);
+    if (!videoData) return;
+
+    videoData.originalParent = wrapper.parentElement;
+    videoData.originalNextSibling = wrapper.nextSibling;
+    currentZoomedVideoInfo = videoData;
+
+    videos.forEach((vid) => {
+      if (vid.element !== wrapper) {
+        if (!vid.videoEl.paused) {
+          vid.videoEl.pause();
+          vid.videoEl.style.display = "none";
+          vid.thumbnailEl.style.display = "block";
+          vid.element.classList.remove("playing");
+        }
+        vid.element.style.zIndex = "10";
+        if (vid.body) Body.setStatic(vid.body, true);
+      }
+    });
+
+    if (videoData.videoEl.paused) {
+      videoData.thumbnailEl.style.display = "none";
+      videoData.videoEl.style.display = "block";
+      videoData.videoEl
+        .play()
+        .catch((e) => console.error("Error playing video on zoom:", e));
+      wrapper.classList.add("playing");
+    }
+
+    const screenWidth = window.innerWidth;
+    const screenHeight = window.innerHeight;
+    const targetSize = Math.min(screenWidth * 0.8, screenHeight * 0.8, 600);
+    const targetWidth = targetSize;
+    const targetHeight = targetSize;
+
+    document.body.appendChild(wrapper);
+    wrapper.classList.add("zoomed");
+
+    Object.assign(wrapper.style, {
+      position: "fixed",
+      width: `${targetWidth}px`,
+      height: `${targetHeight}px`,
+      left: `${(screenWidth - targetWidth) / 2}px`,
+      top: `${(screenHeight - targetHeight) / 2}px`,
+      transform: "translate3d(0,0,0)",
+      zIndex: "999",
+      borderRadius: "50%",
+    });
+    if (body) Body.setStatic(body, true);
+    backdropElement.style.display = "block";
+  }
+
+  function unzoomVideo(wrapper) {
+    if (
+      !wrapper ||
+      !wrapper.classList.contains("zoomed") ||
+      !currentZoomedVideoInfo
+    )
+      return;
+
+    const videoData = currentZoomedVideoInfo;
+    wrapper.classList.remove("zoomed");
+
+    if (videoData.videoEl) {
+      videoData.videoEl.pause();
+      videoData.videoEl.currentTime = 0;
+      videoData.videoEl.style.display = "none";
+    }
+    if (videoData.thumbnailEl) {
+      videoData.thumbnailEl.style.display = "block";
+    }
+    wrapper.classList.remove("playing");
+
+    Object.assign(wrapper.style, {
+      position: "absolute",
+      width: `${videoNoteWidth}px`,
+      height: `${videoNoteHeight}px`,
+      left: "",
+      top: "",
+      zIndex: wrapper.classList.contains("playing") ? "20" : "10",
+      transform: `translate3d(${videoData.initialX - videoNoteWidth / 2}px, ${
+        videoData.initialY - videoNoteHeight / 2
+      }px, 0)`,
+      borderRadius: "50%",
+    });
+
+    if (videoData.originalParent) {
+      videoData.originalParent.insertBefore(
+        wrapper,
+        videoData.originalNextSibling
+      );
+    }
+
+    if (videoData.body) {
+      Body.setStatic(videoData.body, true);
+      Body.setPosition(videoData.body, {
+        x: videoData.initialX,
+        y: videoData.initialY,
+      });
+      Body.setVelocity(videoData.body, { x: 0, y: 0 });
+      Body.setAngle(videoData.body, 0);
+    }
+
+    backdropElement.style.display = "none";
+    currentZoomedVideoInfo = null;
   }
 
   function setupDragHandling() {
-    document.addEventListener("mousedown", startDrag);
-    document.addEventListener("mousemove", handleDrag);
-    document.addEventListener("mouseup", endDrag);
-    document.addEventListener("touchstart", startDrag, { passive: false });
-    document.addEventListener("touchmove", handleDrag, { passive: false });
-    document.addEventListener("touchend", endDrag, { passive: false });
+    document.addEventListener("mousedown", handlePressDown, { passive: true });
+    document.addEventListener("mousemove", handlePressMove, { passive: false });
+    document.addEventListener("mouseup", handlePressUp, { passive: true });
+    document.addEventListener("touchstart", handlePressDown, { passive: true });
+    document.addEventListener("touchmove", handlePressMove, { passive: false });
+    document.addEventListener("touchend", handlePressUp, { passive: true });
   }
 
-  function startDrag(e) {
+  function handlePressDown(e) {
     const evt = e.touches?.[0] || e;
-    const target = evt.target.closest(".video-note");
-    if (!target) return;
-
-    if (target.classList.contains("zoomed")) {
+    const targetElement = evt.target.closest(".video-note");
+    if (!targetElement || targetElement.classList.contains("zoomed")) {
       isDragging = false;
+      currentDragBody = null;
+      if (targetElement) {
+        targetElement.dataset.pressStartTime = "0";
+        targetElement.dataset.mouseMoved = "false";
+      }
       return;
     }
-    clickStartTime = Date.now();
-    isDragging = true;
-    currentBody = videos.find(
-      (vid) => vid.body.id === parseInt(target.dataset.bodyId)
-    )?.body;
-    if (currentBody) {
-      target.classList.add("dragging");
+
+    targetElement.dataset.pressStartTime = Date.now().toString();
+    targetElement.dataset.mouseMoved = "false";
+
+    const videoId = parseInt(targetElement.dataset.videoId);
+    const videoData = videos.find((v) => v.id === videoId);
+
+    if (videoData && videoData.body) {
+      isDragging = true;
+      currentDragBody = videoData.body;
+      Body.setStatic(currentDragBody, false);
+      targetElement.classList.add("dragging");
+      targetElement.style.zIndex = "30";
       document.body.classList.add("dragging");
-      Body.setVelocity(currentBody, { x: 0, y: 0 });
-      if (!target.classList.contains("playing")) {
-        Body.setStatic(currentBody, true);
-      }
+
       const mouseX = evt.clientX - canvasRect.left;
       const mouseY = evt.clientY - canvasRect.top;
-      dragOffset.x = mouseX - currentBody.position.x;
-      dragOffset.y = mouseY - currentBody.position.y;
+      dragOffset.x = mouseX - currentDragBody.position.x;
+      dragOffset.y = mouseY - currentDragBody.position.y;
+
+      if (!videoData.videoEl.paused) {
+        videoData.videoEl.pause();
+      }
+    } else {
+      isDragging = false;
+      currentDragBody = null;
     }
   }
 
-  function handleDrag(e) {
-    if (!isDragging || !currentBody) return;
+  function handlePressMove(e) {
+    if (!isDragging || !currentDragBody) return;
     e.preventDefault();
     const evt = e.touches?.[0] || e;
+
+    const videoData = videos.find((v) => v.body === currentDragBody);
+    if (videoData && videoData.element) {
+      videoData.element.dataset.mouseMoved = "true";
+    }
+
     const mouseX = evt.clientX - canvasRect.left;
     const mouseY = evt.clientY - canvasRect.top;
-    const radius = videoSize / 2;
-    const targetX = Math.max(
-      radius,
-      Math.min(canvasRect.width - radius, mouseX - dragOffset.x)
-    );
-    const targetY = Math.max(
-      radius,
-      Math.min(canvasRect.height - radius, mouseY - dragOffset.y)
-    );
-    Body.setPosition(currentBody, { x: targetX, y: targetY });
+    const targetX = mouseX - dragOffset.x;
+    const targetY = mouseY - dragOffset.y;
+    Body.setPosition(currentDragBody, { x: targetX, y: targetY });
   }
 
-  function endDrag(e) {
-    if (e.type === "mouseup" || e.type === "touchend") {
-      document.querySelectorAll(".video-note.dragging").forEach((el) => {
-        el.classList.remove("dragging");
-      });
-      document.body.classList.remove("dragging");
-    }
-    if (!currentBody) {
-      isDragging = false;
-      return;
-    }
-
-    const isClick = Date.now() - clickStartTime < 200;
-    const element = videos.find((vid) => vid.body === currentBody)?.element;
-
-    if (!isClick) {
-      if (element && !element.classList.contains("zoomed")) {
-        Body.setStatic(currentBody, false);
-
-        const centerX = canvasRect.width / 2;
-        const centerY = canvasRect.height / 2;
-        const videoData = videos.find((vid) => vid.body === currentBody);
-
-        if (videoData) {
-          const idx = videos.indexOf(videoData);
-          const angle = (idx / videos.length) * Math.PI * 2;
-          const targetX = centerX + Math.cos(angle) * videoData.ovalA;
-          const targetY = centerY + Math.sin(angle) * videoData.ovalB;
-
-          const dx = targetX - currentBody.position.x;
-          const dy = targetY - currentBody.position.y;
-          const dist = Math.sqrt(dx * dx + dy * dy);
-
-          const tangentAngle =
-            Math.atan2(
-              -videoData.ovalA * Math.sin(angle),
-              videoData.ovalB * Math.cos(angle)
-            ) +
-            Math.PI / 2;
-
-          const RETURN_SPEED = Math.min(0.5, 0.2 + dist * 0.001);
-          Body.setVelocity(currentBody, {
-            x: Math.cos(tangentAngle) * RETURN_SPEED + dx * 0.01,
-            y: Math.sin(tangentAngle) * RETURN_SPEED + dy * 0.01,
-          });
-        }
-      } else if (element && element.classList.contains("zoomed")) {
-        Body.setStatic(currentBody, true);
-      }
-    }
+  function handlePressUp(e) {
+    const releasedBody = currentDragBody;
+    const draggedElement = releasedBody
+      ? videos.find((v) => v.body === releasedBody)?.element
+      : null;
 
     isDragging = false;
-    currentBody = null;
+    currentDragBody = null;
+    document.body.classList.remove("dragging");
+
+    if (releasedBody && draggedElement) {
+      const videoData = videos.find((v) => v.body === releasedBody);
+      if (videoData) {
+        videoData.element.classList.remove("dragging");
+
+        const pressStartTime = parseInt(
+          draggedElement.dataset.pressStartTime || "0"
+        );
+        const movedDuringPress = draggedElement.dataset.mouseMoved === "true";
+        const duration = Date.now() - pressStartTime;
+        let wasDragOrLongPress = false;
+
+        if (pressStartTime > 0 && (movedDuringPress || duration > 250)) {
+          wasDragOrLongPress = true;
+        }
+
+        if (wasDragOrLongPress) {
+          videoData.initialX = releasedBody.position.x;
+          videoData.initialY = releasedBody.position.y;
+        }
+
+        if (
+          !videoData.element.classList.contains("zoomed") &&
+          !videoData.element.classList.contains("playing")
+        ) {
+          videoData.element.style.zIndex = "10";
+        } else if (
+          videoData.element.classList.contains("playing") &&
+          !videoData.element.classList.contains("zoomed")
+        ) {
+          videoData.element.style.zIndex = "20";
+        }
+        Body.setStatic(releasedBody, true);
+      }
+    }
   }
 
-  function setupEngineEvents() {
-    const BASE_SPEED = 0.05;
-    const REPULSION_STRENGTH = 0.001;
-    const REPULSION_DISTANCE = 120;
-    const REPULSION_DISTANCE_SQ = REPULSION_DISTANCE * REPULSION_DISTANCE;
-    const centerX = canvasRect.width / 2;
-    const centerY = canvasRect.height / 2;
-
+  function setupEngineRenderLoop() {
     Events.on(engine, "afterUpdate", () => {
-      canvasRect = bg.getBoundingClientRect();
-
-      videos.forEach(({ body, element, ovalA, ovalB }, index) => {
-        if (element.classList.contains("zoomed")) {
-          // Zoomed videos are positioned via direct style manipulation (left, top, width, height)
-          // and their physics body is static. No transform update from physics needed here.
-        } else {
-          // Update transform for non-zoomed videos based on physics body
-          const currentVideoRadius = videoSize / 2;
-          element.style.transform = `translate3d(${
-            body.position.x - currentVideoRadius
-          }px, ${body.position.y - currentVideoRadius}px, 0) scale(1)`;
-
-          // Physics logic for returning to slot (if not static and not dragged)
-          if (!body.isStatic && (!isDragging || body !== currentBody)) {
-            // Calculate target position on elliptical path based on original index
-            const targetAngle = (index / videos.length) * Math.PI * 2;
-            const targetX = centerX + Math.cos(targetAngle) * ovalA;
-            const targetY = centerY + Math.sin(targetAngle) * ovalB;
-
-            // Current position and angle
-            const currentDx = body.position.x - centerX;
-            const currentDy = body.position.y - centerY;
-
-            // Calculate forces to return to intended position
-            const dx = targetX - body.position.x;
-            const dy = targetY - body.position.y;
-            const dist = Math.sqrt(dx * dx + dy * dy);
-
-            // Stronger force with greater distance
-            const pathForceMultiplier = Math.min(0.004, 0.001 + dist * 0.00001);
-            const pathForceX = dx * pathForceMultiplier;
-            const pathForceY = dy * pathForceMultiplier;
-
-            Body.applyForce(body, body.position, {
-              x: pathForceX,
-              y: pathForceY,
-            });
-
-            // Add tangential force to maintain orbital motion (gentle nudge)
-            const tangentAngle =
-              Math.atan2(
-                -ovalA * Math.sin(targetAngle),
-                ovalB * Math.cos(targetAngle)
-              ) +
-              Math.PI / 2;
-            const speed = Vector.magnitude(body.velocity);
-            if (speed < BASE_SPEED || dist > ovalA * 0.2) {
-              const tangentForceMagnitude = Math.min(
-                0.0004,
-                0.0001 + dist * 0.000001
-              );
-              Body.applyForce(body, body.position, {
-                x: Math.cos(tangentAngle) * tangentForceMagnitude,
-                y: Math.sin(tangentAngle) * tangentForceMagnitude,
-              });
-            }
-
-            // Damping
-            if (speed > BASE_SPEED * 2) {
-              Body.setVelocity(body, {
-                x: body.velocity.x * 0.98,
-                y: body.velocity.y * 0.98,
-              });
-            }
-          }
-        }
-
-        // Clamp to bounds to prevent flying off (applies to all)
-        const radius = element.classList.contains("zoomed")
-          ? parseFloat(element.style.width) / 2
-          : videoSize / 2;
-        const itemIsZoomedAndCentered = element.classList.contains("zoomed");
-
-        if (!itemIsZoomedAndCentered) {
-          const clampedX = Math.max(
-            radius,
-            Math.min(canvasRect.width - radius, body.position.x)
-          );
-          const clampedY = Math.max(
-            radius,
-            Math.min(canvasRect.height - radius, body.position.y)
-          );
-          if (clampedX !== body.position.x || clampedY !== body.position.y) {
-            Body.setPosition(body, { x: clampedX, y: clampedY });
-          }
-        }
-      });
-
-      // Gentle repulsion between videos (non-zoomed ones primarily)
-      for (let i = 0; i < videos.length; i++) {
-        for (let j = i + 1; j < videos.length; j++) {
-          const A = videos[i].body,
-            B = videos[j].body;
-          if ((A === currentBody || B === currentBody) && isDragging) continue;
-          if (
-            currentZoomedVideoInfo &&
-            (A === currentZoomedVideoInfo.body ||
-              B === currentZoomedVideoInfo.body)
-          ) {
-            continue;
-          }
-          const dx = B.position.x - A.position.x,
-            dy = B.position.y - A.position.y;
-          const distSq = dx * dx + dy * dy;
-          if (distSq > 0 && distSq < REPULSION_DISTANCE_SQ) {
-            const dist = Math.sqrt(distSq);
-            const forceMag = REPULSION_STRENGTH / dist;
-            const force = { x: dx * forceMag, y: dy * forceMag };
-            Body.applyForce(A, A.position, { x: -force.x, y: -force.y });
-            Body.applyForce(B, B.position, force);
-          }
+      if (isDragging && currentDragBody) {
+        const videoData = videos.find((v) => v.body === currentDragBody);
+        if (videoData) {
+          const { x, y } = currentDragBody.position;
+          videoData.element.style.transform = `translate3d(${
+            x - videoNoteWidth / 2
+          }px, ${y - videoNoteHeight / 2}px, 0) scale(1)`;
         }
       }
     });
   }
 
   function setupClickOutsideReset() {
-    document.addEventListener(
-      "click",
-      (e) => {
-        if (currentZoomedVideoInfo && currentZoomedVideoInfo.element) {
-          const zoomedElement = currentZoomedVideoInfo.element;
-          if (e.target === backdropElement) {
-            return;
-          }
-          if (!zoomedElement.contains(e.target)) {
-            if (
-              e.target.closest(".video-note") &&
-              e.target.closest(".video-note") !== zoomedElement
-            ) {
-              return;
-            }
-            unzoomVideo(zoomedElement);
-          }
+    bg.addEventListener("click", (e) => {
+      if (currentZoomedVideoInfo && currentZoomedVideoInfo.element) {
+        if (!e.target.closest(".video-note")) {
+          unzoomVideo(currentZoomedVideoInfo.element);
         }
-      },
-      true
-    );
-  }
-
-  function unzoomVideo(wrapper) {
-    if (!wrapper || !wrapper.classList.contains("zoomed")) return;
-
-    const videoData = videos.find((vid) => vid.element === wrapper);
-    if (!videoData) return;
-
-    const video = wrapper.querySelector("video");
-    const thumbnail = wrapper.querySelector("img");
-    const playIndicator = wrapper.querySelector(".play-indicator");
-
-    if (video) {
-      video.pause();
-      video.style.display = "none";
-    }
-    if (thumbnail) thumbnail.style.display = "block";
-    if (playIndicator) playIndicator.style.opacity = "1";
-
-    wrapper.classList.remove("zoomed");
-    wrapper.classList.remove("playing");
-    Body.setStatic(videoData.body, false);
-
-    wrapper.style.width = `${videoSize}px`;
-    wrapper.style.height = `${videoSize}px`;
-    wrapper.style.left = "";
-    wrapper.style.top = "";
-    wrapper.style.zIndex = "3";
-
-    if (backdropElement) backdropElement.style.display = "none";
-    currentZoomedVideoInfo = null;
+      }
+    });
   }
 
   function handleResize() {
-    isNarrowScreen = window.innerWidth < 600;
-    videoSizeVw = isNarrowScreen ? 15 : 22;
-    const videoSizeNew = Math.max(30, (window.innerWidth * videoSizeVw) / 100);
     updateBgHeight();
-    videoSize = videoSizeNew;
+    canvasRect = bg.getBoundingClientRect();
+    Render.setPixelRatio(render, window.devicePixelRatio);
+    render.options.width = canvasRect.width;
+    render.options.height = canvasRect.height;
+
+    calculateVideoSizes();
     setupVideos();
+
     if (currentZoomedVideoInfo && currentZoomedVideoInfo.element) {
       const wrapper = currentZoomedVideoInfo.element;
-      const zoomedWidth = Math.min(window.innerWidth * 0.9, 512);
-      const zoomedHeight = zoomedWidth;
-      wrapper.style.width = `${zoomedWidth}px`;
-      wrapper.style.height = `${zoomedHeight}px`;
+      const screenWidth = window.innerWidth;
+      const screenHeight = window.innerHeight;
+      const targetSize = Math.min(screenWidth * 0.8, screenHeight * 0.8, 600);
+      const targetWidth = targetSize;
+      const targetHeight = targetSize;
+
+      Object.assign(wrapper.style, {
+        width: `${targetWidth}px`,
+        height: `${targetHeight}px`,
+        left: `${(screenWidth - targetWidth) / 2}px`,
+        top: `${(screenHeight - targetHeight) / 2}px`,
+        borderRadius: "50%",
+      });
     }
   }
 
