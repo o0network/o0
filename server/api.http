@@ -1,0 +1,26 @@
+@host = http://localhost:5555
+
+###
+# Get all videos
+GET {{host}}/api/videos
+
+###
+# Get a specific video by ID
+# @prompt id
+@id = 1
+GET {{host}}/api/videos/{{id}}
+
+###
+# Store data in IPFS
+POST {{host}}/api/store
+Content-Type: application/json
+
+{
+  "example": "data",
+  "foo": "bar"
+}
+
+###
+# Retrieve data from IPFS by CID
+# @prompt cid
+GET {{host}}/api/retrieve/{{cid}}

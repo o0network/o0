@@ -1,0 +1,20 @@
+{
+  "name": "o0-server",
+  "version": "1.0.0",
+  "description": "Backend server for o0 app with IPFS database",
+  "license": "MIT",
+  "main": "index.js",
+  "scripts": {
+    "dev": "nodemon server.js"
+  },
+  "dependencies": {
+    "@fastify/cors": "^7.0.0",
+    "dotenv": "^16.5.0",
+    "fastify": "^3.27.0",
+    "fastify-static": "^4.5.0",
+    "ipfs-core": "^0.14.0"
+  },
+  "devDependencies": {
+    "nodemon": "^2.0.15"
+  }
+}
