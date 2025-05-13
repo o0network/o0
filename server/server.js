@@ -1,175 +1,81 @@
-const fastify = require("fastify")({ logger: true });
-const IPFS = require("ipfs-core");
-const path = require("path");
-const env = require("dotenv");
-const fs = require("fs");
-const { execFile } = require("child_process");
+import Fastify from "fastify";
+import path from "path";
+import fs from "fs/promises";
+import { fileURLToPath } from "url";
+import { dirname } from "path";
+import { execFile } from "child_process";
+import crypto from "crypto";
+import base58 from "bs58";
 
-let ipfs;
-(async () => {
-  ipfs = await IPFS.create();
-  fastify.log.info("IPFS node started");
-})();
-
-env.config();
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = dirname(__filename);
 
 const ffmpegPath = process.env.FFMPEG_PATH || "ffmpeg";
+const videosDir = path.join(__dirname, "videos");
+const thumbnailsDir = path.join(__dirname, "thumbnails");
 
-fastify.register(require("@fastify/cors"), {
+await fs.mkdir(videosDir, { recursive: true });
+await fs.mkdir(thumbnailsDir, { recursive: true });
+
+const fastify = Fastify({
+  logger: true,
+});
+
+if (process.env.NODE_ENV === "development") {
+  try {
+    const { default: mcpPlugin } = await import("@mcp-it/fastify");
+    await fastify.register(mcpPlugin, {
+      name: "O0 Video API",
+      description: "API for exploring and accessing videos",
+    });
+    fastify.log.info("MCP plugin registered for development");
+  } catch (err) {
+    fastify.log.warn("Failed to register MCP plugin:", err.message);
+  }
+}
+
+await fastify.register(import("@fastify/cors"), {
   origin: "*",
 });
 
-fastify.register(require("fastify-static"), {
-  root: path.join(__dirname, "videos"),
-  prefix: "/api/videos/",
+await fastify.register(import("@fastify/static"), {
+  root: videosDir,
+  prefix: "/api/video/",
   decorateReply: false,
 });
 
-fastify.register(require("fastify-static"), {
-  root: path.join(__dirname, "thumbnails"),
-  prefix: "/api/thumbnails/",
-  decorateReply: false,
-});
+function generateIpfsCid() {
+  const randomBytes = crypto.randomBytes(32);
+  const multihash = Buffer.concat([Buffer.from([0x12, 0x20]), randomBytes]);
+  return base58.encode(multihash);
+}
 
-const createVideoObject = (file, videoDir) => {
-  const id = path.basename(file, ".mp4");
-  const stats = fs.statSync(path.join(videoDir, file));
-  const address = `video-${id}`;
-
+function createVideoNoteFromFile(filename) {
+  const address = path.basename(filename, ".mp4");
+  const timestamp = Math.floor(Date.now() / 1000);
   return {
-    id,
     address,
-    filename: file,
-    videoUrl: `/api/videos/${file}`,
-    thumbnailUrl: `/api/thumbnails/${id}.jpg`,
-    timestamp: Math.floor(stats.mtime.getTime() / 1000),
-    size: stats.size,
-    stats: [
-      `${(Math.random() * 0.01).toFixed(4)} ETH`,
-      `${Math.floor(Math.random() * 30)} minted`,
-      `${(Math.random() * 0.5).toFixed(2)}$ value`,
-    ],
-    source: `/api/videos/${file}`,
+    thumbnailUrl: `/api/thumbnail/${address}`,
+    source: `/api/video/${address}`,
+    timestamp,
+    stats: {
+      price: (Math.random() * 0.01).toFixed(4),
+      minted: `${Math.floor(Math.random() * 30)} minted`,
+      value: (Math.random() * 0.5).toFixed(2),
+    },
   };
-};
+}
 
-fastify.get("/api/videos", async (request, reply) => {
-  try {
-    const videoDir = path.join(__dirname, "videos");
-    const files = fs
-      .readdirSync(videoDir)
-      .filter((file) => file.endsWith(".mp4"));
-
-    const videos = files.map((file) => createVideoObject(file, videoDir));
-    return videos;
-  } catch (err) {
-    fastify.log.error(err);
-    reply.code(500).send({ error: "Failed to retrieve videos" });
-  }
-});
-
-fastify.get("/api/videos/:id", async (request, reply) => {
-  try {
-    const { id } = request.params;
-    const videoFilename = `${id}.mp4`;
-    const videoPath = path.join(__dirname, "videos", videoFilename);
-
-    if (!fs.existsSync(videoPath)) {
-      return reply.code(404).send({ error: "Video not found" });
-    }
-
-    return createVideoObject(videoFilename, path.join(__dirname, "videos"));
-  } catch (err) {
-    fastify.log.error(err);
-    reply.code(500).send({ error: "Failed to retrieve video" });
-  }
-});
-
-fastify.get("/api/videos/next", async (request, reply) => {
-  try {
-    const threshold = parseInt(request.query.threshold) || 0;
-    const limit = parseInt(request.query.limit) || 9;
-    const screenRatio = parseFloat(request.query.screenRatio) || 1;
-
-    const adjustedLimit = screenRatio > 1 ? Math.ceil(limit * 1.5) : limit;
-
-    const videoDir = path.join(__dirname, "videos");
-    const allFiles = fs
-      .readdirSync(videoDir)
-      .filter((file) => file.endsWith(".mp4"))
-      .sort((a, b) => {
-        const statA = fs.statSync(path.join(videoDir, a));
-        const statB = fs.statSync(path.join(videoDir, b));
-        return statB.mtime.getTime() - statA.mtime.getTime();
-      });
-
-    const paginatedFiles = allFiles.slice(threshold, threshold + adjustedLimit);
-
-    const thumbnailsDir = path.join(__dirname, "thumbnails");
-    if (!fs.existsSync(thumbnailsDir)) {
-      fs.mkdirSync(thumbnailsDir, { recursive: true });
-    }
-
-    for (const file of paginatedFiles) {
-      const videoId = path.basename(file, ".mp4");
-      const thumbnailPath = path.join(thumbnailsDir, `${videoId}.jpg`);
-      const videoFilePath = path.join(videoDir, file);
-
-      if (!fs.existsSync(thumbnailPath)) {
-        try {
-          request.log.info(`Generating thumbnail for ${videoId}`);
-          await generateThumbnail(videoFilePath, thumbnailsDir, videoId);
-          request.log.info(`Thumbnail generated for ${videoId}`);
-        } catch (thumbError) {
-          request.log.error(
-            thumbError,
-            `Failed to generate thumbnail for ${videoId}`
-          );
-        }
-      }
-    }
-
-    const videoData = paginatedFiles.map((file) =>
-      createVideoObject(file, videoDir)
-    );
-
-    return videoData;
-  } catch (error) {
-    request.log.error(error, "Error fetching videos");
-    return reply.code(500).send({ error: "Failed to fetch videos" });
-  }
-});
-
-fastify.post("/api/store", async (request, reply) => {
-  const data = request.body;
-  const result = await ipfs.add(JSON.stringify(data));
-  return { cid: result.cid.toString() };
-});
-
-fastify.get("/api/retrieve/:cid", async (request, reply) => {
-  const cid = request.params.cid;
-  const stream = ipfs.cat(cid);
-  let data = "";
-  for await (const chunk of stream) {
-    data += chunk.toString();
-  }
-  return JSON.parse(data);
-});
-
-async function generateThumbnail(videoFilePath, outputDir, thumbnailName) {
+async function generateThumbnail(videoPath, outputDir, thumbnailName) {
   const thumbnailFile = `${thumbnailName}.jpg`;
   const thumbnailFullPath = path.join(outputDir, thumbnailFile);
-
-  if (!fs.existsSync(outputDir)) {
-    fs.mkdirSync(outputDir, { recursive: true });
-  }
 
   const args = [
     "-y",
     "-ss",
     "00:00:00",
     "-i",
-    videoFilePath,
+    videoPath,
     "-vframes",
     "1",
     "-q:v",
@@ -180,30 +86,284 @@ async function generateThumbnail(videoFilePath, outputDir, thumbnailName) {
   return new Promise((resolve, reject) => {
     execFile(ffmpegPath, args, (error, stdout, stderr) => {
       if (error) {
-        console.error(`Error executing ffmpeg: ${error.message}`);
-        console.error(`ffmpeg stderr: ${stderr}`);
-        if (error.code === "ENOENT") {
-          console.error(
-            `ffmpeg executable not found at ${ffmpegPath}. Make sure ffmpeg is installed and FFMPEG_PATH is correct if set.`
-          );
-        }
+        fastify.log.error(`FFmpeg error: ${error.message}`);
         reject(error);
         return;
       }
-      console.log(`Thumbnail generated: ${thumbnailFullPath}`);
       resolve(thumbnailFullPath);
     });
   });
 }
 
-const start = async () => {
-  try {
-    await fastify.listen({ port: 5555, host: "0.0.0.0" });
-    fastify.log.info(`Server listening on ${fastify.server.address().port}`);
-  } catch (err) {
-    fastify.log.error(err);
-    process.exit(1);
+fastify.get(
+  "/api/explore",
+  {
+    schema: {
+      operationId: "get_all_videos",
+      summary: "Get all videos",
+      description: "Returns all available videos",
+      querystring: {
+        type: "object",
+        properties: {
+          amount: {
+            type: "integer",
+            default: 10,
+            description: "Number of videos to return",
+          },
+        },
+      },
+      response: {
+        200: {
+          description: "Successful response",
+          type: "array",
+          items: {
+            type: "object",
+            properties: {
+              address: { type: "string" },
+              thumbnailUrl: { type: "string" },
+              source: { type: "string" },
+              timestamp: { type: "integer" },
+              stats: {
+                type: "object",
+                properties: {
+                  price: { type: "string" },
+                  minted: { type: "string" },
+                  value: { type: "string" },
+                },
+              },
+            },
+          },
+        },
+      },
+    },
+  },
+  async (request, reply) => {
+    try {
+      const amount = request.query.amount || 10;
+      const files = (await fs.readdir(videosDir))
+        .filter((file) => file.endsWith(".mp4"))
+        .slice(0, amount);
+      if (!files.length) {
+        return reply.code(404).send({ error: "No videos found" });
+      }
+      const videoNotes = files.map(createVideoNoteFromFile);
+      return videoNotes;
+    } catch (err) {
+      fastify.log.error(err);
+      return reply.code(500).send({ error: "Failed to fetch videos" });
+    }
   }
-};
+);
 
-start();
+fastify.get(
+  "/api/videos/next",
+  {
+    schema: {
+      operationId: "get_next_videos",
+      summary: "Get next batch of videos",
+      description: "Returns next batch of videos based on threshold and limit",
+      querystring: {
+        type: "object",
+        properties: {
+          threshold: {
+            type: "integer",
+            default: 0,
+            description: "Pagination threshold",
+          },
+          limit: {
+            type: "integer",
+            default: 9,
+            description: "Number of videos to return",
+          },
+          screenRatio: {
+            type: "number",
+            default: 1,
+            description: "Client screen ratio for layout optimization",
+          },
+        },
+      },
+      response: {
+        200: {
+          description: "Successful response",
+          type: "array",
+          items: {
+            type: "object",
+            properties: {
+              address: { type: "string" },
+              thumbnailUrl: { type: "string" },
+              source: { type: "string" },
+              timestamp: { type: "integer" },
+              stats: {
+                type: "object",
+                properties: {
+                  price: { type: "number" },
+                  minted: { type: "integer" },
+                  value: { type: "number" },
+                },
+              },
+            },
+          },
+        },
+      },
+    },
+  },
+  async (request, reply) => {
+    try {
+      const threshold = parseInt(request.query.threshold) || 0;
+      const limit = parseInt(request.query.limit) || 9;
+      const screenRatio = parseFloat(request.query.screenRatio) || 1;
+
+      const adjustedLimit = screenRatio > 1 ? Math.ceil(limit * 1.5) : limit;
+
+      const files = (await fs.readdir(videosDir))
+        .filter((file) => file.endsWith(".mp4"))
+        .slice(threshold, threshold + adjustedLimit);
+
+      if (!files.length) {
+        return reply.code(404).send({ error: "No more videos available" });
+      }
+
+      // generate thumbnails in advance
+      for (const file of files) {
+        const fileBase = path.basename(file, ".mp4");
+        const videoPath = path.join(videosDir, file);
+        const thumbnailPath = path.join(thumbnailsDir, `${fileBase}.jpg`);
+
+        try {
+          await fs.access(thumbnailPath);
+        } catch (err) {
+          try {
+            await generateThumbnail(videoPath, thumbnailsDir, fileBase);
+          } catch (thumbError) {
+            fastify.log.error(`Failed to generate thumbnail for ${fileBase}`);
+          }
+        }
+      }
+
+      const videoNotes = files.map(createVideoNoteFromFile);
+      return videoNotes;
+    } catch (err) {
+      fastify.log.error(err);
+      return reply.code(500).send({ error: "Failed to fetch videos" });
+    }
+  }
+);
+
+fastify.get(
+  "/api/thumbnail/:addr",
+  {
+    schema: {
+      operationId: "get_thumbnail",
+      summary: "Get thumbnail by address",
+      description: "Returns a thumbnail image for a video",
+      params: {
+        type: "object",
+        required: ["addr"],
+        properties: {
+          addr: { type: "string", description: "Video address" },
+        },
+      },
+    },
+  },
+  async (request, reply) => {
+    try {
+      let { addr } = request.params;
+      if (addr.endsWith(".jpg")) addr = addr.slice(0, -4);
+      const videoPath = path.join(videosDir, `${addr}.mp4`);
+      const thumbnailPath = path.join(thumbnailsDir, `${addr}.jpg`);
+      try {
+        await fs.access(videoPath);
+      } catch (err) {
+        fastify.log.error(`Video not found for thumbnail: ${videoPath}`);
+        return reply.code(404).send({ error: "Video not found" });
+      }
+      try {
+        await fs.access(thumbnailPath);
+      } catch (err) {
+        try {
+          await generateThumbnail(videoPath, thumbnailsDir, addr);
+        } catch (genErr) {
+          fastify.log.error(`Failed to generate thumbnail: ${genErr.message}`);
+          return reply
+            .code(500)
+            .send({ error: "Failed to generate thumbnail" });
+        }
+      }
+      reply.header("Content-Type", "image/jpeg");
+      try {
+        return reply.sendFile(`${addr}.jpg`, thumbnailsDir);
+      } catch (sendFileErr) {
+        try {
+          const data = await fs.readFile(thumbnailPath);
+          return reply.send(data);
+        } catch (readErr) {
+          fastify.log.error(`Failed to read thumbnail: ${readErr.message}`);
+          return reply.code(500).send({ error: "Failed to read thumbnail" });
+        }
+      }
+    } catch (err) {
+      fastify.log.error(`Failed to retrieve thumbnail: ${err.message}`);
+      return reply.code(500).send({ error: "Failed to retrieve thumbnail" });
+    }
+  }
+);
+
+fastify.get(
+  "/api/video/:addr",
+  {
+    schema: {
+      operationId: "get_video",
+      summary: "Get video by address",
+      description: "Returns a video file",
+      params: {
+        type: "object",
+        required: ["addr"],
+        properties: {
+          addr: { type: "string", description: "Video address" },
+        },
+      },
+    },
+  },
+  async (request, reply) => {
+    try {
+      let { addr } = request.params;
+      if (addr.endsWith(".mp4")) addr = addr.slice(0, -4);
+      const videoPath = path.join(videosDir, `${addr}.mp4`);
+      try {
+        await fs.access(videoPath);
+      } catch (err) {
+        fastify.log.error(`Video not found: ${videoPath}`);
+        return reply.code(404).send({ error: "Video not found" });
+      }
+      reply.header("Content-Type", "video/mp4");
+      try {
+        return reply.sendFile(`${addr}.mp4`, videosDir);
+      } catch (sendFileErr) {
+        try {
+          const data = await fs.readFile(videoPath);
+          return reply.send(data);
+        } catch (readErr) {
+          fastify.log.error(`Failed to read video: ${readErr.message}`);
+          return reply.code(500).send({ error: "Failed to read video" });
+        }
+      }
+    } catch (err) {
+      fastify.log.error(`Failed to retrieve video: ${err.message}`);
+      return reply.code(500).send({ error: "Failed to retrieve video" });
+    }
+  }
+);
+
+// Start the server
+try {
+  await fastify.listen({ port: 5555, host: "0.0.0.0" });
+  console.log(`Server is running at ${fastify.server.address().port}`);
+  console.log(
+    `MCP SSE server running at http://localhost:${
+      fastify.server.address().port
+    }/mcp/sse`
+  );
+} catch (err) {
+  fastify.log.error(err);
+  process.exit(1);
+}
