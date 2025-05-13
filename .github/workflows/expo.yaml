@@ -16,7 +16,7 @@ on:
 
 jobs:
   build-and-submit:
-    if: false # TODO: Temporary disabled
+    if: false # Temporary disabled
     name: Build and Submit Mobile
     runs-on: ubuntu-latest
     steps:
