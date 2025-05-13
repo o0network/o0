@@ -8,7 +8,8 @@ import {
   ImageSourcePropType,
   View,
 } from "react-native";
-import { Outbound, Text } from "../components";
+import { Outbound } from "./Frame";
+import Text from "./Text";
 
 export type ButtonProps = {
   title?: string;

@@ -1,15 +1,7 @@
-import { useState } from "react";
-import { StyleSheet, View, ScrollView, Text, SafeAreaView } from "react-native";
-import { Toggle, Button, Inbound, Outbound } from "../components";
-import { useNavigation } from "@react-navigation/native";
-import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
-
-type RootStackParamList = {
-  Preferences: undefined;
-  App: undefined;
-};
-
-type NavigationProp = NativeStackNavigationProp<RootStackParamList>;
+import { StyleSheet, View, ScrollView, Text } from "react-native";
+import { Button, Inbound, Outbound, SafeAreaView } from "../components";
+import { useModal } from "../contexts/ModalContext";
+import { isPlatform } from "../utils/platform";
 
 type ProposalCardProps = {
   title: string;
@@ -119,60 +111,38 @@ const ProposalCard: React.FC<ProposalCardProps> = ({
 };
 
 const NetworkScreen = () => {
-  const navigation = useNavigation<NavigationProp>();
-  const [reducedMotion, setReducedMotion] = useState(false);
+  const { openPreferences } = useModal();
 
   return (
     <SafeAreaView style={styles.container}>
-      <View style={styles.container}>
-        <Inbound style={styles.settingsCard}>
-          <View style={styles.toggleRow}>
-            <Text style={styles.toggleLabel}>Reduced motion</Text>
-            <Toggle value={reducedMotion} onValueChange={setReducedMotion} />
-          </View>
+      <Outbound style={styles.governanceCard}>
+        <View style={styles.governanceHeader}>
+          <Text style={styles.governanceTitle}>DAO Governance</Text>
+          <Text style={styles.governanceDescription}>
+            Use your votes as a decision making power to shape the future we'll
+            build. Your balance reflects your voting power, we don't withdraw
+            any tokens from your balance. Feel free to vote.
+          </Text>
+        </View>
 
-          <Button
-            title="Disconnect Wallet"
-            iconPath={require("../assets/emojis/cross-mark.png")}
-            onPress={() => {
-              console.log("Disconnect wallet pressed");
-            }}
-            style={styles.disconnectButton}
-          />
+        <Inbound style={styles.proposalsContainer}>
+          <ScrollView>
+            {proposalData.map((p) => (
+              <ProposalCard
+                key={p.key}
+                title={p.title}
+                description={p.description}
+                percentage={p.percentage}
+                status={p.status}
+              />
+            ))}
+          </ScrollView>
         </Inbound>
+      </Outbound>
 
-        <Outbound style={styles.governanceCard}>
-          <View style={styles.governanceHeader}>
-            <Text style={styles.governanceTitle}>DAO Governance</Text>
-            <Text style={styles.governanceDescription}>
-              Use your votes as a decision making power to shape the future
-              we'll build. Your balance reflects your voting power, we don't
-              withdraw any tokens from your balance. Feel free to vote.
-            </Text>
-          </View>
-
-          <Inbound style={styles.proposalsContainer}>
-            <ScrollView>
-              {proposalData.map((p) => (
-                <ProposalCard
-                  key={p.key}
-                  title={p.title}
-                  description={p.description}
-                  percentage={p.percentage}
-                  status={p.status}
-                />
-              ))}
-            </ScrollView>
-          </Inbound>
-        </Outbound>
-
-        <Button
-          title="Open Preferences"
-          onPress={() => {
-            navigation.getParent()?.navigate("Components");
-          }}
-        />
-      </View>
+      {!isPlatform("telegram") && (
+        <Button title="Open Preferences" onPress={openPreferences} />
+      )}
     </SafeAreaView>
   );
 };

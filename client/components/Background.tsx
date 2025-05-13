@@ -4,6 +4,28 @@ import { GLView, ExpoWebGLRenderingContext } from "expo-gl";
 import * as THREE from "three";
 import { DeviceMotion } from "expo-sensors";
 import { Renderer } from "expo-three";
+import { on, postEvent } from "@telegram-apps/sdk";
+import { usePlatform } from "../utils/platform";
+
+try {
+  postEvent("web_app_start_accelerometer", { refresh_rate: 20 });
+  postEvent("web_app_start_device_orientation", { refresh_rate: 20 });
+  postEvent("web_app_start_gyroscope", { refresh_rate: 20 });
+} catch (error) {
+  console.error("Error starting motion events", error);
+}
+
+on("accelerometer_changed", (payload) => {
+  console.log("accelerometer_changed", payload);
+});
+
+on("device_orientation_changed", (payload) => {
+  console.log("device_orientation_changed", payload);
+});
+
+on("gyroscope_changed", (payload) => {
+  console.log("gyroscope_changed", payload);
+});
 
 const vertexShader = `
   varying vec3 vDir;
@@ -108,6 +130,9 @@ export default function Background() {
   const orientationStatusRef = useRef<string>("unknown");
   const motionSubscriptionRef = useRef<{ remove: () => void } | null>(null);
   const [isMobile] = useState(Platform.OS !== "web");
+  const { isPlatform } = usePlatform();
+  const isTelegram = isPlatform("telegram");
+  const hasSensors = isTelegram || isMobile;
 
   const rendererRef = useRef<Renderer | null>(null);
   const sceneRef = useRef<THREE.Scene | null>(null);
@@ -177,6 +202,24 @@ export default function Background() {
   }, [isMobile]);
 
   useEffect(() => {
+    if (!isTelegram) return;
+    try {
+      postEvent("web_app_start_device_orientation", { refresh_rate: 1000 });
+    } catch (error) {
+      console.error("Error starting telegram sensors", error);
+    }
+    const handleOrientation = (payload: {
+      alpha?: number;
+      beta?: number;
+      gamma?: number;
+    }) => {
+      const { alpha = 0, beta = 0, gamma = 0 } = payload;
+      deviceOrientationRef.current = { alpha, beta, gamma };
+    };
+    on("device_orientation_changed", handleOrientation);
+  }, [isTelegram]);
+
+  useEffect(() => {
     if (isMobile) return;
     const handleMouseMove = (event: MouseEvent) => {
       mousePositionRef.current = {
@@ -219,7 +262,7 @@ export default function Background() {
         u_alpha: { value: deviceOrientationRef.current.alpha },
         u_beta: { value: deviceOrientationRef.current.beta },
         u_gamma: { value: deviceOrientationRef.current.gamma },
-        u_is_mobile: { value: isMobile ? 1.0 : 0.0 },
+        u_is_mobile: { value: hasSensors ? 1.0 : 0.0 },
         u_rotMatrix: { value: new THREE.Matrix3() },
       };
 
@@ -252,7 +295,7 @@ export default function Background() {
         materialRef.current.uniforms.u_time.value =
           clockRef.current.getElapsedTime();
 
-        if (isMobile) {
+        if (hasSensors) {
           const euler = new THREE.Euler(
             deviceOrientationRef.current.beta,
             deviceOrientationRef.current.alpha,
@@ -265,7 +308,7 @@ export default function Background() {
             -Math.PI / 2
           );
           targetQuat.multiply(alignQuat);
-          currentQuat.slerp(targetQuat, 0.1);
+          currentQuat.slerp(targetQuat, isTelegram ? 1.0 : 0.1);
           const rotationMatrix = new THREE.Matrix3().setFromMatrix4(
             new THREE.Matrix4().makeRotationFromQuaternion(currentQuat)
           );
@@ -282,7 +325,7 @@ export default function Background() {
       };
       renderLoop();
     },
-    [isMobile]
+    [hasSensors]
   );
 
   useEffect(() => {

@@ -1,306 +1,371 @@
-import {
-  View,
-  StyleSheet,
-  Linking,
-  Image,
-  Platform,
-  ScrollView,
-} from "react-native";
-import { useState, useEffect } from "react";
+import { View, StyleSheet, Linking, Image, Platform } from "react-native";
+import { useState, useEffect, useRef } from "react";
 import { Text, GloriousButton, Button } from "../components";
 import VideoNote from "../components/VideoNote";
 import { ApiService } from "../data/api";
 import StorageService from "../data/storage";
+import SafeAreaView from "../components/SafeAreaView";
+import { useScreen } from "../contexts/ScreenContext";
+import { isPlatform } from "../utils/platform";
+import {
+  Animated,
+  Dimensions,
+  TouchableOpacity,
+  NativeSyntheticEvent,
+  NativeScrollEvent,
+} from "react-native";
+import type { VideoData } from "../data/api";
 
-const BASE_URL =
-  Platform.OS === "web" ? window.location.origin : "https://o0.network";
 const EXPLORE_PATH = "/explore";
 
-type ExploreScreenProps = {
-  initialAddress?: string | null;
+type CanvasVideo = VideoData & {
+  x: number;
+  y: number;
+  speed: number;
+  scale: Animated.Value;
+  focused: boolean;
+  timestamp?: number;
 };
 
-export default function ExploreScreen({ initialAddress }: ExploreScreenProps) {
-  const [currentVideoId, setCurrentVideoId] = useState<string>("1");
-  const [isWalletConnected, setIsWalletConnected] = useState(false);
-  const [isLoading, setIsLoading] = useState(true);
+const { width, height } = Dimensions.get("window");
+const ITEM_WIDTH = 100;
+const ITEM_HEIGHT = 100;
 
-  const allVideos = ApiService.getAllVideos();
-  const hasVideos = allVideos.length > 0;
-  const currentVideo = hasVideos
-    ? ApiService.getVideoByAddress(currentVideoId) || allVideos[0]
-    : null;
-  const currentIndex = hasVideos
-    ? allVideos.findIndex((video) => video.address === currentVideoId)
-    : -1;
+export default function ExploreScreen({
+  initialAddress,
+}: {
+  initialAddress?: string | null;
+}) {
+  const { isLargeScreen } = useScreen();
+  const scrollY = useRef(new Animated.Value(0)).current;
+  const [videos, setVideos] = useState<CanvasVideo[]>([]);
+  const [threshold, setThreshold] = useState(0);
+  const [focusedVideo, setFocusedVideo] = useState<string | null>(null);
+  const maxMintedRef = useRef(1);
+  const canvasHeight = useRef(height * 10);
 
-  const isLastVideo = currentIndex === allVideos.length - 1;
-  const isFirstVideo = currentIndex === 0;
+  const batchSize = Math.max(
+    9,
+    Math.floor((width * height) / (ITEM_WIDTH * ITEM_HEIGHT * 2))
+  );
 
   useEffect(() => {
-    async function loadWalletStatus() {
-      const connected = await StorageService.isWalletConnected();
-      setIsWalletConnected(connected);
-    }
-
-    loadWalletStatus();
+    loadVideos();
   }, []);
 
   useEffect(() => {
     if (initialAddress) {
-      setIsLoading(true);
-      const video = ApiService.getVideoByAddress(initialAddress);
-      if (video) {
-        setCurrentVideoId(video.address);
+      const videoExists = videos.some((v) => v.address === initialAddress);
+      if (videoExists) {
+        console.log("Initial address video exists:", initialAddress);
+      } else {
+        console.log("Initial address video not loaded yet:", initialAddress);
       }
-      setIsLoading(false);
-    } else {
-      setIsLoading(true);
-      setTimeout(() => setIsLoading(false), 1000);
-    }
-  }, [initialAddress]);
-
-  useEffect(() => {
-    if (Platform.OS === "web" && currentVideo && currentVideo.address) {
-      window.history.replaceState(
-        {},
-        "",
-        `${EXPLORE_PATH}/${currentVideo.address}`
-      );
-    }
-  }, [currentVideoId, currentVideo]);
-
-  useEffect(() => {
-    if (Platform.OS === "web" && !initialAddress) {
+      if (Platform.OS === "web") {
+        window.history.replaceState(
+          {},
+          "",
+          `${EXPLORE_PATH}/${initialAddress}`
+        );
+      }
+    } else if (Platform.OS === "web") {
       const path = window.location.pathname;
-
       if (path.startsWith(EXPLORE_PATH + "/")) {
         const address = path.substring(EXPLORE_PATH.length + 1);
         if (address) {
-          const video = ApiService.getVideoByAddress(address);
-          if (video) {
-            setCurrentVideoId(video.address);
-          }
+          console.log("Deep link address found:", address);
         }
       } else if (path !== EXPLORE_PATH) {
         window.history.replaceState({}, "", EXPLORE_PATH);
       }
     }
-  }, [initialAddress]);
+  }, [initialAddress, videos]);
 
   useEffect(() => {
-    if (currentVideo) {
-      ApiService.preloadNextVideo(currentVideo.address);
+    if (Platform.OS === "web") {
+      const newPath = focusedVideo
+        ? `${EXPLORE_PATH}/${focusedVideo}`
+        : EXPLORE_PATH;
+      window.history.replaceState({}, "", newPath);
     }
-  }, [currentVideo]);
+  }, [focusedVideo]);
 
-  const videoStats = currentVideo?.stats
-    ? [
-        currentVideo.stats[0] || "",
-        currentVideo.stats[1] || "",
-        currentVideo.stats[2] || "",
-      ].filter((stat) => stat !== "")
-    : [];
-
-  const handleConnectWallet = async () => {
-    setIsWalletConnected(true);
-    await StorageService.setWalletConnected(true);
-  };
-
-  const goToNextVideo = () => {
-    if (isLastVideo || !hasVideos) return;
-    setIsLoading(true);
-    const nextVideo = ApiService.getNextVideo(currentVideoId);
-    setCurrentVideoId(nextVideo.address);
-
-    // Simulate loading for demo purposes
-    setTimeout(() => setIsLoading(false), 800);
-  };
-
-  const goToPreviousVideo = () => {
-    if (isFirstVideo || !hasVideos) return;
-    setIsLoading(true);
-    const prevVideo = ApiService.getPreviousVideo(currentVideoId);
-    setCurrentVideoId(prevVideo.address);
-
-    // Simulate loading for demo purposes
-    setTimeout(() => setIsLoading(false), 800);
-  };
-
-  const getVideoUrl = () => {
-    if (!currentVideo || !currentVideo.address)
-      return `${BASE_URL}${EXPLORE_PATH}`;
-    return `${BASE_URL}${EXPLORE_PATH}/${currentVideo.address}`;
-  };
-
-  const renderVideoContent = () => {
-    if (isLoading) {
-      return (
-        <View style={styles.videoContainer}>
-          <View style={styles.loadingContainer}>
-            <Image
-              source={require("../assets/logo-outline.svg")}
-              style={styles.loadingPlaceholder}
-            />
-            <Text>Loading...</Text>
-          </View>
-        </View>
+  const loadVideos = async (isRecycling = false) => {
+    try {
+      const screenRatio = width / height;
+      console.log(
+        `Fetching videos. Threshold: ${threshold}, Batch Size: ${batchSize}, Screen Ratio: ${screenRatio}`
       );
+      const fetched = await ApiService.fetchVideos(
+        threshold,
+        batchSize,
+        screenRatio
+      );
+      console.log(`Fetched ${fetched.length} videos.`);
+
+      if (fetched.length > 0) {
+        fetched.forEach((v) => {
+          const minted = v.stats?.minted ?? 0;
+          if (minted > maxMintedRef.current) {
+            maxMintedRef.current = minted;
+            console.log(`New max minted: ${maxMintedRef.current}`);
+          }
+        });
+
+        const newCanvasVideos = fetched.map((v) => {
+          const minted = v.stats?.minted ?? 0;
+          const normalizedMinted =
+            maxMintedRef.current > 0 ? minted / maxMintedRef.current : 0;
+          const speed = 0.8 + normalizedMinted * 0.2;
+          const xPos = Math.random() * (width - ITEM_WIDTH);
+          const yPos = canvasHeight.current + Math.random() * height * 1.5;
+
+          return {
+            ...v,
+            x: xPos,
+            y: yPos,
+            speed: speed,
+            scale: new Animated.Value(1),
+            timestamp: Date.now(),
+          } as CanvasVideo;
+        });
+
+        const maxY = newCanvasVideos.reduce(
+          (max, v) => Math.max(max, v.y + ITEM_HEIGHT),
+          canvasHeight.current
+        );
+        canvasHeight.current = maxY + height;
+
+        setVideos((prev) => [...prev, ...newCanvasVideos]);
+        setThreshold((prev) => prev + fetched.length);
+        console.log(
+          `Total videos: ${
+            videos.length + newCanvasVideos.length
+          }, New threshold: ${threshold + fetched.length}, Canvas height: ${
+            canvasHeight.current
+          }`
+        );
+      } else if (!isRecycling) {
+        console.log("No more videos from API. Starting recycling.");
+        recycleVideos();
+      } else {
+        console.log("Recycling finished or no videos to recycle.");
+      }
+    } catch (err) {
+      console.error("Error loading videos:", err);
+      if (!isRecycling) {
+        console.log("Error loading videos. Attempting recycling.");
+        recycleVideos();
+      }
+    }
+  };
+
+  const recycleVideos = () => {
+    if (videos.length === 0) {
+      console.log("No videos to recycle.");
+      return;
     }
 
-    if (!hasVideos || !currentVideo) {
-      return (
-        <View style={styles.emptyVideoContainer}>
-          <Image
-            source={require("../assets/logo-outline.svg")}
-            style={styles.emptyVideoIcon}
-          />
-          <Text style={styles.emptyVideoText}>No videos available yet</Text>
-          <Text style={styles.emptyVideoSubText}>
-            Create your first video by going to the creation tab
-          </Text>
-        </View>
-      );
+    console.log(`Recycling ${videos.length} videos.`);
+    const recycledVideos = videos.map((v) => {
+      const xPos = Math.random() * (width - ITEM_WIDTH);
+      const yPos = canvasHeight.current + Math.random() * height * 1.5;
+      v.scale.setValue(1);
+      return {
+        ...v,
+        x: xPos,
+        y: yPos,
+        scale: v.scale,
+        timestamp: Date.now(),
+      } as CanvasVideo;
+    });
+
+    const maxY = recycledVideos.reduce(
+      (max, v) => Math.max(max, v.y + ITEM_HEIGHT),
+      canvasHeight.current
+    );
+    canvasHeight.current = maxY + height;
+
+    setVideos((prev) => [...prev, ...recycledVideos]);
+    console.log(
+      `Recycled ${recycledVideos.length} videos. Total videos: ${
+        videos.length + recycledVideos.length
+      }, Canvas height: ${canvasHeight.current}`
+    );
+  };
+
+  const handleScroll = Animated.event(
+    [{ nativeEvent: { contentOffset: { y: scrollY } } }],
+    {
+      useNativeDriver: true,
+      listener: (event: NativeSyntheticEvent<NativeScrollEvent>) => {
+        const offsetY = event.nativeEvent.contentOffset.y;
+        const contentHeight = event.nativeEvent.contentSize.height;
+        const layoutHeight = event.nativeEvent.layoutMeasurement.height;
+
+        if (
+          contentHeight > layoutHeight &&
+          offsetY >= contentHeight - layoutHeight * 2
+        ) {
+          loadVideos();
+        }
+      },
     }
+  );
+
+  const handleVideoPress = (videoAddress: string) => {
+    const currentlyFocused = focusedVideo === videoAddress;
+
+    setFocusedVideo(currentlyFocused ? null : videoAddress);
+
+    videos.forEach((v) => {
+      let toValue = 1;
+      if (!currentlyFocused) {
+        toValue = v.address === videoAddress ? 1.5 : 0.6;
+      }
+
+      Animated.spring(v.scale, {
+        toValue,
+        friction: 7,
+        tension: 40,
+        useNativeDriver: true,
+      }).start();
+    });
+  };
+
+  const renderVideoStats = () => {
+    const video = videos.find((v) => v.address === focusedVideo);
+    if (!video || !video.stats) return null;
+
+    const priceStat = video.stats.price
+      ? `${video.stats.price.toFixed(4)} ETH`
+      : null;
+    const mintedStat =
+      video.stats.minted !== undefined ? `${video.stats.minted} minted` : null;
+    const valueStat = video.stats.value
+      ? `$${video.stats.value.toFixed(2)} value`
+      : null;
+
+    const stats = [priceStat, mintedStat, valueStat].filter(Boolean);
+
+    if (stats.length === 0) return null;
 
     return (
-      <VideoNote
-        videoSource={currentVideo.source}
-        texts={videoStats}
-        dom={{
-          matchContents: true,
-          scrollEnabled: false,
-        }}
-      />
+      <View style={styles.statsContainer}>
+        {stats.map((stat, index) => (
+          <Text key={index} style={styles.statsText}>
+            {stat}
+          </Text>
+        ))}
+      </View>
     );
   };
 
   return (
-    <ScrollView contentContainerStyle={styles.container}>
-      <View style={styles.content}>
-        {renderVideoContent()}
+    <SafeAreaView style={styles.container}>
+      <Animated.ScrollView
+        contentContainerStyle={{
+          height: canvasHeight.current,
+        }}
+        onScroll={handleScroll}
+        scrollEventThrottle={16}
+        showsVerticalScrollIndicator={false}
+      >
+        {videos.map((v) => {
+          const translateY = Animated.add(
+            v.y,
+            Animated.multiply(scrollY, Animated.subtract(1, v.speed))
+          );
 
-        <View style={styles.navigationButtons}>
-          <Button
-            iconPath={require("../assets/emojis/left-arrow.png")}
-            onPress={goToPreviousVideo}
-            disabled={isFirstVideo || !hasVideos || isLoading}
-            style={styles.navButton}
-            round
-          />
+          const isFocused = focusedVideo === v.address;
+          const uniqueKey = `${v.address}-${v.timestamp ?? v.id}`;
 
-          <Button
-            title="Discussion"
-            iconPosition="right"
-            iconPath={require("../assets/emojis/chain.png")}
-            onPress={() => Linking.openURL(getVideoUrl())}
-            style={styles.linkButton}
-          />
-
-          <Button
-            iconPath={require("../assets/emojis/right-arrow.png")}
-            onPress={goToNextVideo}
-            disabled={isLastVideo || !hasVideos || isLoading}
-            style={styles.navButton}
-            round
-          />
-        </View>
-
-        <GloriousButton
-          title={isWalletConnected ? "Bump" : "Connect Wallet"}
-          onPress={() =>
-            WebApp.showPopup({
-              title: "Connect Wallet",
-              message: "Please connect your wallet to continue",
-              buttons: [{ text: "Connect", onPress: handleConnectWallet }],
-            })
-          }
-        />
-      </View>
-    </ScrollView>
+          return (
+            <Animated.View
+              key={uniqueKey}
+              style={[
+                styles.videoContainer,
+                {
+                  left: v.x,
+                  top: 0,
+                  transform: [{ translateY }, { scale: v.scale }],
+                  zIndex: isFocused ? 10 : 1,
+                },
+              ]}
+            >
+              <TouchableOpacity
+                onPress={() => handleVideoPress(v.address)}
+                activeOpacity={0.8}
+              >
+                {isFocused ? (
+                  <VideoNote
+                    videoSource={v.source}
+                    texts={[]}
+                    x={0}
+                    y={0}
+                    scale={1}
+                    playing={true}
+                    onClick={() => handleVideoPress(v.address)}
+                  />
+                ) : (
+                  <Image
+                    source={{ uri: v.thumbnailUrl }}
+                    style={styles.thumbnail}
+                    resizeMode="cover"
+                  />
+                )}
+              </TouchableOpacity>
+            </Animated.View>
+          );
+        })}
+      </Animated.ScrollView>
+      {renderVideoStats()}
+    </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
-    flexGrow: 1,
-    alignItems: "center",
-    justifyContent: "flex-start",
-    maxWidth: 512,
-    width: "100%",
-    alignSelf: "center",
-    padding: 16,
-    gap: 16,
-  },
-  content: {
-    width: "100%",
-    alignItems: "center",
-    justifyContent: "flex-start",
-    gap: 16,
+    flex: 1,
   },
   videoContainer: {
-    width: "100%",
-    aspectRatio: 1,
-    borderRadius: 20,
+    position: "absolute",
+    width: ITEM_WIDTH,
+    height: ITEM_HEIGHT,
+    borderRadius: 8,
     overflow: "hidden",
+    backgroundColor: "#333",
   },
-  loadingContainer: {
-    flex: 1,
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  loadingPlaceholder: {
-    width: 60,
-    height: 60,
-  },
-  emptyVideoContainer: {
-    flex: 1,
-    justifyContent: "center",
-    alignItems: "center",
-    padding: 20,
-  },
-  emptyVideoIcon: {
-    width: 80,
-    height: 80,
-    marginBottom: 20,
-  },
-  emptyVideoText: {
-    fontSize: 20,
-    fontWeight: "600",
-    marginBottom: 8,
-    textAlign: "center",
-  },
-  emptyVideoSubText: {
-    fontSize: 16,
-    opacity: 0.7,
-    textAlign: "center",
-  },
-  linkButton: {
+  thumbnail: {
     width: "100%",
-    marginBottom: 8,
-    justifyContent: "space-between",
-    paddingHorizontal: 20,
+    height: "100%",
   },
-  navigationButtons: {
+  videoNote: {
+    width: "100%",
+    height: "100%",
+  },
+  statsContainer: {
+    position: "absolute",
+    bottom: Platform.select({ ios: 30, default: 20 }),
+    left: 20,
+    right: 20,
     flexDirection: "row",
-    justifyContent: "center",
+    justifyContent: "space-around",
     alignItems: "center",
-    width: "100%",
-    gap: 16,
-    marginVertical: 8,
+    backgroundColor: "rgba(0,0,0,0.7)",
+    paddingVertical: 8,
+    paddingHorizontal: 15,
+    borderRadius: 12,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.5,
+    shadowRadius: 4,
+    elevation: 5,
   },
-  navButton: {
-    paddingHorizontal: 0,
-    paddingVertical: 0,
-    width: 40,
-    height: 40,
-    borderRadius: 999,
-  },
-  connectButton: {
-    flex: 1,
-  },
-  shareButton: {
-    width: "100%",
-    marginTop: 8,
+  statsText: {
+    color: "white",
+    fontSize: 13,
+    fontWeight: "600",
+    textAlign: "center",
   },
 });

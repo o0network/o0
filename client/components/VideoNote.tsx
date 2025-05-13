@@ -1,5 +1,3 @@
-"use dom";
-
 import React, { useRef, useEffect } from "react";
 
 type VideoNoteProps = {
@@ -222,4 +220,3 @@ const VideoNote = ({
 };
 
 export default VideoNote;
-

@@ -3,15 +3,15 @@ import {
   View,
   StyleSheet,
   Text,
-  SafeAreaView,
   Linking,
   TouchableOpacity,
   Image,
 } from "react-native";
 import { CameraView, useCameraPermissions } from "expo-camera";
-import { Frame, Button } from "../components";
-import { Video, ResizeMode } from "expo-av";
+import { Frame, Button, SafeAreaView } from "../components";
+import Video from "expo-video";
 import * as FileSystem from "expo-file-system";
+import { useModal } from "../contexts/ModalContext";
 
 type CreateScreenProps = {};
 
@@ -23,10 +23,8 @@ export default function CreateScreen({}: CreateScreenProps) {
   const [recordingDuration, setRecordingDuration] = useState(0);
   const [isSending, setIsSending] = useState(false);
   const cameraRef = useRef<CameraView>(null);
-  const videoRef = useRef<Video>(null);
   const timerRef = useRef<NodeJS.Timeout | null>(null);
 
-  // Reset timer when not recording
   useEffect(() => {
     if (!isRecording) {
       if (timerRef.current) {
@@ -147,10 +145,9 @@ export default function CreateScreen({}: CreateScreenProps) {
       return (
         <View style={styles.camera}>
           <Video
-            ref={videoRef}
             source={{ uri: recordedVideo }}
             style={StyleSheet.absoluteFillObject}
-            resizeMode={ResizeMode.COVER}
+            resizeMode="cover"
             isLooping
             shouldPlay
           />
@@ -218,12 +215,6 @@ export default function CreateScreen({}: CreateScreenProps) {
   return (
     <SafeAreaView style={styles.container}>
       <View style={styles.cameraContainer}>{renderCamera()}</View>
-
-      <Button
-        style={styles.telegramPill}
-        onPress={() => Linking.openURL("https://t.me/o0netbot")}
-        title="open in Telegram bot"
-      />
 
       <View style={styles.bottomSection}>
         <Frame style={styles.instructionFrame}>
@@ -422,5 +413,10 @@ const styles = StyleSheet.create({
     color: "#FFFFFF",
     fontSize: 14,
     fontWeight: "600",
+  },
+  preferencesButton: {
+    marginVertical: 10,
+    width: "80%",
+    alignSelf: "center",
   },
 });

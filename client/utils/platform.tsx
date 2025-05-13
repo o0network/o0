@@ -1,9 +1,18 @@
 import { Platform } from "react-native";
-import React, { createContext, useContext, ReactNode } from "react";
+import React, {
+  createContext,
+  useContext,
+  ReactNode,
+  useEffect,
+  useState,
+} from "react";
+import { isTMA } from "@telegram-apps/sdk";
 
 declare global {
   interface Window {
-    Telegram?: any;
+    Telegram?: {
+      WebApp?: any;
+    };
   }
 }
 
@@ -16,8 +25,15 @@ export interface PlatformConfig {
   supportsDeepLinking: boolean;
 }
 
+// Define a function to safely check if Telegram WebApp is available
+const isTelegramAvailable = (): boolean => {
+  if (typeof window === "undefined") return false;
+  console.log("isTMA", isTMA());
+  return isTMA();
+};
+
 export const detectPlatform = (): AppPlatform => {
-  if (typeof window !== "undefined" && window.Telegram) {
+  if (isTelegramAvailable()) {
     return "telegram";
   }
 
@@ -51,8 +67,7 @@ export const getPlatformConfig = (): PlatformConfig => {
       return {
         name: getPlatformName(),
         isNative: false,
-        supportsBackButton:
-          typeof window !== "undefined" && window.Telegram ? true : false,
+        supportsBackButton: isTelegramAvailable(),
         supportsDeepLinking: false,
       };
     case "web":
@@ -81,6 +96,7 @@ export interface PlatformContextType {
   platformName: string;
   config: PlatformConfig;
   isPlatform: (platform: AppPlatform) => boolean;
+  isTelegramReady: boolean;
 }
 
 // Create the platform context
@@ -89,31 +105,46 @@ export const PlatformContext = createContext<PlatformContextType>({
   platformName: getPlatformName(),
   config: getPlatformConfig(),
   isPlatform,
+  isTelegramReady: false,
 });
 
-// Provider component for platform context
+// Provider component for platform context - using JSX for React 19 compatibility
 export const PlatformProvider = ({ children }: { children: ReactNode }) => {
-  const platformValue: PlatformContextType = {
+  const [isTelegramReady, setIsTelegramReady] = useState(false);
+
+  useEffect(() => {
+    // Wait for Telegram WebApp to become available
+    if (typeof window !== "undefined") {
+      const checkTelegram = () => {
+        if (window.Telegram) {
+          setIsTelegramReady(true);
+        } else if (isTelegramAvailable()) {
+          setTimeout(checkTelegram, 50);
+        }
+      };
+
+      checkTelegram();
+    }
+  }, []);
+
+  const contextValue = {
     platform: detectPlatform(),
     platformName: getPlatformName(),
     config: getPlatformConfig(),
     isPlatform,
+    isTelegramReady,
   };
 
-  return React.createElement(
-    PlatformContext.Provider,
-    { value: platformValue },
-    children
+  return (
+    <PlatformContext.Provider value={contextValue}>
+      {children}
+    </PlatformContext.Provider>
   );
 };
 
 export const usePlatform = () => {
-  return {
-    platform: detectPlatform(),
-    platformName: getPlatformName(),
-    config: getPlatformConfig(),
-    isPlatform,
-  };
+  const context = useContext(PlatformContext);
+  return context;
 };
 
 export const usePlatformContext = () => {
@@ -129,7 +160,7 @@ export const usePlatformContext = () => {
 export type PlatformType = "ios" | "android" | "web" | "telegram" | "unknown";
 
 const isTelegram = (): boolean => {
-  return typeof window !== "undefined" && window.Telegram;
+  return isTelegramAvailable();
 };
 
 export const getPlatformType = (): PlatformType => {

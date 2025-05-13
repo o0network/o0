@@ -1,11 +1,5 @@
 import { useState, useEffect } from "react";
-import {
-  View,
-  StyleSheet,
-  ScrollView,
-  Dimensions,
-  SafeAreaView,
-} from "react-native";
+import { View, StyleSheet, ScrollView, Dimensions } from "react-native";
 import {
   Switch,
   CellGrid,
@@ -15,15 +9,10 @@ import {
   Field,
   Text,
   Button,
+  SafeAreaView,
 } from "../components";
 import { AssetData, PriceData } from "../data/api";
 import { ApiService } from "../data/api";
-
-const mockListData = [
-  { id: "1", title: "Asset 1 - 0xabc...def" },
-  { id: "2", title: "Asset 2 - sth.eth" },
-  { id: "3", title: "Asset 3 - another.eth" },
-];
 
 const DEFAULT_ADDRESS = "o0.network";
 
@@ -234,61 +223,59 @@ export const AssetsScreen = ({ initialAddress }: AssetsScreenProps) => {
 
   return (
     <View style={styles.outerContainer}>
-      <ScrollView contentContainerStyle={styles.scrollContainer}>
-        <Outbound style={styles.frameContainer}>
-          <View style={styles.headerContainer}>
-            <View style={styles.addressBox}>
-              <Text style={styles.addressText}>{address}</Text>
-            </View>
-            <View style={styles.valueContainer}>
-              <Text style={styles.totalValueLabel}>Total Value</Text>
-              <Text style={styles.totalValue}>${totalValue}</Text>
-            </View>
+      <Outbound>
+        <View style={styles.headerContainer}>
+          <View style={styles.addressBox}>
+            <Text style={styles.addressText}>{address}</Text>
           </View>
-          <View style={styles.actionsContainer}>
-            <Button title="Buy" style={styles.actionButton} />
-            <Button title="Sell" style={styles.actionButton} />
-            <Button title="DAO" style={styles.actionButton} />
+          <View style={styles.valueContainer}>
+            <Text style={styles.totalValueLabel}>Total Value</Text>
+            <Text style={styles.totalValue}>${totalValue}</Text>
           </View>
-          <View style={styles.dynamicContentContainer}>
-            <GraphView />
-          </View>
-        </Outbound>
-        <Outbound>
-          <Field
-            placeholder="Search Assets"
-            placeholderTextColor="rgba(255, 255, 255, 0.23)"
-            style={styles.searchInput}
-            value={searchText}
-            onChangeText={setSearchText}
-          >
-            <Switch>
-              <Switch.Tab
-                tab={{
-                  key: "map",
-                  label: "Map",
-                }}
-                active={viewMode === "map"}
-                onPress={() => setViewMode("map")}
-              />
-              <Switch.Tab
-                tab={{
-                  key: "list",
-                  label: "List",
-                }}
-                active={viewMode === "list"}
-                onPress={() => setViewMode("list")}
-              />
-            </Switch>
-          </Field>
-          <AssetsContent />
-          <Button
-            title="Load Next Video"
-            onPress={() => {}}
-            style={styles.nextVideoButton}
-          />
-        </Outbound>
-      </ScrollView>
+        </View>
+        <View style={styles.actionsContainer}>
+          <Button title="Buy" style={styles.actionButton} />
+          <Button title="Sell" style={styles.actionButton} />
+          <Button title="DAO" style={styles.actionButton} />
+        </View>
+        <View style={styles.dynamicContentContainer}>
+          <GraphView />
+        </View>
+      </Outbound>
+      <Outbound>
+        <Field
+          placeholder="Search Assets"
+          placeholderTextColor="rgba(255, 255, 255, 0.23)"
+          style={styles.searchInput}
+          value={searchText}
+          onChangeText={setSearchText}
+        >
+          <Switch>
+            <Switch.Tab
+              tab={{
+                key: "map",
+                label: "Map",
+              }}
+              active={viewMode === "map"}
+              onPress={() => setViewMode("map")}
+            />
+            <Switch.Tab
+              tab={{
+                key: "list",
+                label: "List",
+              }}
+              active={viewMode === "list"}
+              onPress={() => setViewMode("list")}
+            />
+          </Switch>
+        </Field>
+        <AssetsContent />
+        <Button
+          title="Load Next Video"
+          onPress={() => {}}
+          style={styles.nextVideoButton}
+        />
+      </Outbound>
     </View>
   );
 };
@@ -307,11 +294,6 @@ const styles = StyleSheet.create({
     width: "100%",
     alignSelf: "center",
   },
-  scrollContainer: {
-    flexGrow: 1,
-    paddingBottom: 20,
-  },
-  frameContainer: {},
   headerContainer: {
     padding: 12,
     alignItems: "center",

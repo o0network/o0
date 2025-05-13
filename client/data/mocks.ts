@@ -1,8 +1,18 @@
 export type VideoData = {
+  id?: string;
   address: string;
   timestamp: number;
   source: any;
-  stats?: string[];
+  stats?: {
+    price: number;
+    minted: number;
+    value: number;
+  };
+  filename?: string;
+  videoUrl?: string;
+  thumbnailUrl?: string;
+  size?: number;
+  popularity?: number;
 };
 
 export type AssetType = "eth" | "weth" | "usdc" | "nft" | "token";
@@ -96,37 +106,37 @@ export const mockVideos: VideoData[] = [
     address: "o0.network",
     timestamp: 1714204800,
     source: require("../assets/videos/1.mp4"),
-    stats: ["0.0011 ETH", "12 minted", "0.21$ value"],
+    stats: { price: 0.0011, minted: 12, value: 0.21 },
   },
   {
     address: "QmYwAPJzv5WwXSNt67UjMG6ZAoyrDUBxLpVTicq2RtiohK",
     timestamp: 1714204800,
     source: require("../assets/videos/2.mp4"),
-    stats: ["0.0008 ETH", "18 minted", "0.12$ value"],
+    stats: { price: 0.0008, minted: 18, value: 0.12 },
   },
   {
     address: "QmXgqAR7K37jY34pWrFJJeEKvLXTulqxrqnY7piektshj7",
     timestamp: 1714204800,
     source: require("../assets/videos/3.mp4"),
-    stats: ["0.0022 ETH", "24 minted", "0.35$ value"],
+    stats: { price: 0.0022, minted: 24, value: 0.35 },
   },
   {
     address: "QmTtJX4xV6JozN9x36dN4ArGhMJ3VknQLZcD9nXBagJyGS",
     timestamp: 1714204800,
     source: require("../assets/videos/4.mp4"),
-    stats: ["0.0015 ETH", "16 minted", "0.25$ value"],
+    stats: { price: 0.0015, minted: 16, value: 0.25 },
   },
   {
     address: "QmRmyAXqbGpPPPV2QE3GrSfZi3JYkiKQVf2uQcpaWx2yv",
     timestamp: 1714204800,
     source: require("../assets/videos/5.mp4"),
-    stats: ["0.0009 ETH", "10 minted", "0.18$ value"],
+    stats: { price: 0.0009, minted: 10, value: 0.18 },
   },
   {
     address: "QmS4ustL54puYsYXGQ8dUBqo6pXZiCt4JD4K3N7SoDoB2D",
     timestamp: 1714204800,
     source: require("../assets/videos/6.mp4"),
-    stats: ["0.0014 ETH", "15 minted", "0.22$ value"],
+    stats: { price: 0.0014, minted: 15, value: 0.22 },
   },
 ];
 

@@ -9,6 +9,11 @@ import {
 
 export type { VideoData, AssetData, PriceData };
 
+const API_URL =
+  process.env.NODE_ENV === "development"
+    ? "http://localhost:5555/api"
+    : "https://o0.network/api";
+
 export const ApiService = {
   // Video-related API methods
   getAllVideos: (): VideoData[] => {
@@ -62,6 +67,18 @@ export const ApiService = {
     if (nextVideo) {
       await ApiService.preloadVideo(nextVideo);
     }
+  },
+
+  fetchVideos: async (
+    threshold = 0,
+    limit = 9,
+    screenRatio = 1
+  ): Promise<VideoData[]> => {
+    const response = await fetch(
+      `${API_URL}/videos/next?threshold=${threshold}&limit=${limit}&screenRatio=${screenRatio}`
+    );
+    if (!response.ok) throw new Error("Failed to fetch videos");
+    return (await response.json()) as VideoData[];
   },
 
   // Asset-related API methods

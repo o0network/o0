@@ -4,16 +4,16 @@ import {
   MaterialTopTabBarProps,
   MaterialTopTabNavigationOptions,
 } from "@react-navigation/material-top-tabs";
-import { useRef, useCallback, useState, useEffect } from "react";
+import { useRef, useCallback, useState } from "react";
 import {
   StyleSheet,
   View,
-  SafeAreaView,
   Dimensions,
   Text as RNText,
   TouchableOpacity,
   Animated,
   Image,
+  Modal,
 } from "react-native";
 import { StatusBar } from "expo-status-bar";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
@@ -23,15 +23,20 @@ import { Nunito_600SemiBold, Nunito_700Bold } from "@expo-google-fonts/nunito";
 import { DMMono_500Medium } from "@expo-google-fonts/dm-mono";
 import { DynaPuff_700Bold } from "@expo-google-fonts/dynapuff";
 import { SafeAreaProvider } from "react-native-safe-area-context";
-import { createNativeStackNavigator } from "@react-navigation/native-stack";
-import PreferencesScreen from "./screens/PreferencesScreen";
-
+import {
+  BottomSheetModalProvider,
+  BottomSheetModal,
+} from "@gorhom/bottom-sheet";
+import { ModalContext } from "./contexts/ModalContext";
+import PreferencesModal from "./modals/Preferences";
 import ExploreScreen from "./screens/ExploreScreen";
 import CreateScreen from "./screens/CreateScreen";
 import AssetsScreen from "./screens/AssetsScreen";
 import NetworkScreen from "./screens/NetworkScreen";
 import { PlatformProvider, usePlatform } from "./utils/platform";
 import { Background, WebIcons } from "./components";
+import SafeAreaView, { useInsets } from "./components/SafeAreaView";
+import { ScreenProvider, useScreen } from "./contexts/ScreenContext";
 import CompassIcon from "./assets/emojis/compass.png";
 import DvdIcon from "./assets/emojis/dvd.png";
 import CoinIcon from "./assets/emojis/coin.png";
@@ -44,14 +49,9 @@ type TabParamList = {
   Network: undefined;
 };
 
-type RootStackParamList = {
-  App: undefined;
-  Preferences: undefined;
-};
-
 const { width } = Dimensions.get("window");
 
-const DEFAULT_ADDRESS = "o0.network";
+const DEFAULT_ADDRESS = "/";
 
 type TabBarItemProps = {
   label: string;
@@ -94,7 +94,7 @@ const TabBarItem = ({
             height: 24,
           }}
         />
-        {(isFocused || isLargeScreen) && !isTelegram && (
+        {(isFocused || isLargeScreen) && (
           <RNText style={styles.label}>{label}</RNText>
         )}
       </Animated.View>
@@ -111,18 +111,26 @@ function CustomTabBar({
     state.routes.map(() => new Animated.Value(0))
   ).current;
   const { isPlatform } = usePlatform();
-  const [isLargeScreen, setIsLargeScreen] = useState(width > 512);
-
-  const isWeb = isPlatform("web");
+  const { isLargeScreen } = useScreen();
   const isTelegram = isPlatform("telegram");
+  const insets = useInsets();
 
   return (
     <View
       style={[
         styles.tabBarContainer,
-        isWeb && styles.webTabBarContainer,
-        isTelegram && styles.telegramTabBarContainer,
+        isTelegram &&
+          /iPhone|iPad/i.test(navigator.userAgent) && {
+            paddingVertical: 0,
+            paddingHorizontal: 0,
+          },
         isLargeScreen && styles.largeScreenTabBarContainer,
+        isPlatform("web") && { top: 20 },
+        isTelegram &&
+          /iPhone|iPad/i.test(navigator.userAgent) && {
+            top: insets.top - 38,
+          },
+        isTelegram && styles.telegramTabBarContainer,
       ]}
     >
       {state.routes.map((route, index) => {
@@ -180,6 +188,28 @@ export default function App() {
     }
   }, [fontsLoaded, fontError]);
 
+  const { isPlatform } = usePlatform();
+  const modalRef = useRef<BottomSheetModal>(null);
+  const { isMinWidth600 } = useScreen();
+  const [isClassicPreferencesVisible, setIsClassicPreferencesVisible] =
+    useState(false);
+
+  const openPreferences = useCallback(() => {
+    if (isMinWidth600) {
+      setIsClassicPreferencesVisible(true);
+    } else {
+      modalRef.current?.present();
+    }
+  }, [isMinWidth600, modalRef]);
+
+  const handleClosePreferences = useCallback(() => {
+    if (isMinWidth600) {
+      setIsClassicPreferencesVisible(false);
+    } else {
+      modalRef.current?.dismiss();
+    }
+  }, [isMinWidth600, modalRef]);
+
   if (!fontsLoaded && !fontError) {
     return null;
   }
@@ -195,8 +225,6 @@ export default function App() {
     tabBarStyle: styles.tabBar,
   };
 
-  const Stack = createNativeStackNavigator<RootStackParamList>();
-
   const MainTabs = () => (
     <Tab.Navigator
       tabBar={(props) => <CustomTabBar {...props} />}
@@ -207,6 +235,7 @@ export default function App() {
         name="Explore"
         component={ExploreScreen}
         initialParams={{ address: DEFAULT_ADDRESS }}
+        options={{ swipeEnabled: false }}
       />
       <Tab.Screen
         name="Assets"
@@ -218,53 +247,87 @@ export default function App() {
     </Tab.Navigator>
   );
 
-  const { isPlatform } = usePlatform();
-
   return (
-    <GestureHandlerRootView style={{ flex: 1 }}>
-      <Background />
-      <WebIcons />
-      <PlatformProvider>
-        <View style={styles.container}>
-          <StatusBar style="light" translucent backgroundColor="transparent" />
-          <SafeAreaProvider>
-            <SafeAreaView style={styles.safeArea}>
-              <NavigationContainer
-                ref={navigationRef}
-                theme={{
-                  ...DefaultTheme,
-                  colors: {
-                    ...DefaultTheme.colors,
-                    background: "transparent",
-                  },
-                }}
-                onReady={onLayoutRootView}
-                linking={{
-                  prefixes: [],
-                  config: {
-                    screens: {
-                      ...(isPlatform("web") ? { Home: "home" } : {}),
-                      Explore: "explore/:address?",
-                      Assets: "assets/:address?",
-                      Create: "create",
-                      Network: "network",
-                    },
-                  },
-                }}
-              >
-                <Stack.Navigator screenOptions={{ headerShown: false }}>
-                  <Stack.Screen name="Main" component={MainTabs} />
-                  <Stack.Screen
-                    name="Preferences"
-                    component={PreferencesScreen}
-                  />
-                </Stack.Navigator>
-              </NavigationContainer>
-            </SafeAreaView>
-          </SafeAreaProvider>
-        </View>
-      </PlatformProvider>
-    </GestureHandlerRootView>
+    <PlatformProvider>
+      <ScreenProvider>
+        <GestureHandlerRootView style={{ flex: 1 }}>
+          <BottomSheetModalProvider>
+            <ModalContext.Provider value={{ openPreferences }}>
+              <Background />
+              <WebIcons />
+              <View style={styles.container}>
+                <StatusBar
+                  style="light"
+                  translucent
+                  backgroundColor="transparent"
+                />
+                <SafeAreaProvider>
+                  <SafeAreaView style={styles.safeArea}>
+                    <NavigationContainer
+                      ref={navigationRef}
+                      theme={{
+                        ...DefaultTheme,
+                        colors: {
+                          ...DefaultTheme.colors,
+                          background: "transparent",
+                        },
+                      }}
+                      onReady={onLayoutRootView}
+                      linking={{
+                        prefixes: [],
+                        config: {
+                          screens: {
+                            ...(isPlatform("web") ? { Home: "home" } : {}),
+                            Explore: "explore/:address?",
+                            Assets: "assets/:address?",
+                            Create: "create",
+                            Network: "network",
+                          },
+                        },
+                      }}
+                    >
+                      <MainTabs />
+                    </NavigationContainer>
+                  </SafeAreaView>
+                </SafeAreaProvider>
+              </View>
+              {isMinWidth600 ? (
+                <Modal
+                  animationType="fade"
+                  transparent={true}
+                  visible={isClassicPreferencesVisible}
+                  onRequestClose={handleClosePreferences}
+                >
+                  <View style={styles.centeredView}>
+                    <View style={styles.modalView}>
+                      <PreferencesModal onClose={handleClosePreferences} />
+                    </View>
+                  </View>
+                </Modal>
+              ) : (
+                <BottomSheetModal
+                  ref={modalRef}
+                  index={0}
+                  snapPoints={["70%"]}
+                  enablePanDownToClose={true}
+                  backgroundStyle={{
+                    backgroundColor: "rgba(30, 30, 30, 0.95)",
+                  }}
+                  handleIndicatorStyle={{
+                    backgroundColor: "rgba(255, 255, 255, 0.5)",
+                    width: 50,
+                  }}
+                  android_keyboardInputMode="adjustResize"
+                  keyboardBehavior="extend"
+                >
+                  <PreferencesModal onClose={handleClosePreferences} />
+                </BottomSheetModal>
+              )}
+            </ModalContext.Provider>
+          </BottomSheetModalProvider>
+        </GestureHandlerRootView>
+      </ScreenProvider>
+    </PlatformProvider>
   );
 }
 
@@ -285,11 +348,6 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: "transparent",
   },
-  homeTabsContainer: {
-    width: "100%",
-    backgroundColor: "transparent",
-    marginTop: 10,
-  },
   tabBarContainer: {
     flexDirection: "row",
     alignItems: "center",
@@ -304,13 +362,12 @@ const styles = StyleSheet.create({
     shadowRadius: 4,
     elevation: 3,
     gap: 32,
-  },
-  webTabBarContainer: {
-    marginTop: 20,
+    position: "absolute",
+    zIndex: 10,
   },
   telegramTabBarContainer: {
-    backgroundColor: "rgba(20, 20, 20, 0.8)",
-    gap: 24,
+    backgroundColor: "transparent",
+    gap: 8,
   },
   largeScreenTabBarContainer: {
     gap: 16,
@@ -328,18 +385,11 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
-    height: 36,
+    borderRadius: 999,
+    paddingVertical: 6,
   },
   tabItemActive: {
     backgroundColor: "rgba(94, 94, 94, 0.2)",
-    borderRadius: 999,
-    paddingHorizontal: 8,
-    gap: 4,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 2,
   },
   tabItemInactive: {
     paddingHorizontal: 8,
@@ -362,8 +412,32 @@ const styles = StyleSheet.create({
     color: "#545454",
   },
   label: {
-    fontSize: 15,
+    fontSize: 14,
     fontWeight: "600",
     color: "rgba(255, 255, 255, 0.96)",
+    marginLeft: 4,
+  },
+  centeredView: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+    backgroundColor: "rgba(0,0,0,0.4)",
+  },
+  modalView: {
+    margin: 20,
+    backgroundColor: "rgba(30, 30, 30, 0.95)",
+    borderRadius: 20,
+    padding: 25,
+    alignItems: "center",
+    shadowColor: "#000",
+    shadowOffset: {
+      width: 0,
+      height: 2,
+    },
+    shadowOpacity: 0.25,
+    shadowRadius: 4,
+    elevation: 5,
+    width: "70%",
+    maxWidth: 600,
   },
 });
