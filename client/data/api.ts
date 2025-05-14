@@ -24,11 +24,20 @@ export type PriceData = {
   [key: string]: any;
 };
 
+// In React Native, __DEV__ is a global variable set to true in development.
+// process.env.NODE_ENV might not be reliably set by all RN bundlers/environments for this check.
+// window.location.hostname is not applicable in React Native.
 export const API_URL =
-  process.env.NODE_ENV !== "development" ||
-  window.location.hostname === "dev.o0.network"
-    ? "https://o0.network"
-    : "http://localhost:5555";
+  __DEV__ &&
+  !(
+    typeof window !== "undefined" &&
+    window.location &&
+    window.location.hostname === "dev.o0.network"
+  )
+    ? "http://localhost:5555"
+    : "https://o0.network";
+
+console.log("ApiService initialized. API_URL:", API_URL, "__DEV__:", __DEV__);
 
 export const ApiService = {
   fetchVideos: async (limit = 9): Promise<VideoData[]> => {
@@ -141,6 +150,19 @@ export const ApiService = {
     } catch (error) {
       console.error("Error fetching price data:", error);
       return { timeframe: "1M", points: [] };
+    }
+  },
+
+  getPitchPriceData: async (pitchAddress: string): Promise<PriceData> => {
+    try {
+      const response = await fetch(
+        `${API_URL}/api/pitch/${pitchAddress}/price`
+      );
+      if (!response.ok) throw new Error("Failed to fetch pitch price data");
+      return await response.json();
+    } catch (error) {
+      console.error("Error fetching pitch price data:", error);
+      return { timeframe: "1M", points: [] }; // Default empty response on error
     }
   },
 };

@@ -60,7 +60,7 @@ type TabParamList = {
 
 const { width } = Dimensions.get("window");
 
-const DEFAULT_ADDRESS = "/";
+const DEFAULT_ADDRESS = undefined;
 
 type TabBarItemProps = {
   label: string;
@@ -130,7 +130,6 @@ function CustomTabBar({
   const isTelegramIOS = isPlatform("tg_ios");
   const insets = useInsets();
 
-  // Container component with blur effect for iOS Telegram
   const TabBarContainer = ({
     children,
     style,
@@ -287,6 +286,12 @@ export default function App() {
     return null;
   }
 
+  const swipeEnabled =
+    isPlatform("android") ||
+    isPlatform("ios") ||
+    isPlatform("tg_ios") ||
+    isPlatform("tg_android");
+
   const Tab = createMaterialTopTabNavigator<TabParamList>();
   const screenOptions: MaterialTopTabNavigationOptions = {
     swipeEnabled: true,
@@ -336,9 +341,18 @@ export default function App() {
         name="Assets"
         component={AssetsScreen}
         initialParams={{ address: DEFAULT_ADDRESS }}
+        options={{ swipeEnabled: swipeEnabled }}
       />
-      <Tab.Screen name="Create" component={CreateScreen} />
-      <Tab.Screen name="Network" component={NetworkScreen} />
+      <Tab.Screen
+        name="Create"
+        component={CreateScreen}
+        options={{ swipeEnabled: swipeEnabled }}
+      />
+      <Tab.Screen
+        name="Network"
+        component={NetworkScreen}
+        options={{ swipeEnabled: swipeEnabled }}
+      />
     </Tab.Navigator>
   );
 
@@ -377,12 +391,12 @@ export default function App() {
                         }}
                         onReady={onLayoutRootView}
                         linking={{
-                          prefixes: [],
+                          prefixes: ["http://localhost:8081"],
                           config: {
+                            initialRouteName: "Explore",
                             screens: {
-                              ...(isPlatform("web") ? { Home: "home" } : {}),
-                              Explore: "explore/:address?",
-                              Assets: "assets/:address?",
+                              Explore: "explore",
+                              Assets: "assets",
                               Create: "create",
                               Network: "network",
                             },

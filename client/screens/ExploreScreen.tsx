@@ -6,16 +6,16 @@ import {
   Dimensions,
   TouchableOpacity,
   Animated,
-  NativeSyntheticEvent,
-  NativeScrollEvent,
-  FlexAlignType,
+  PanResponder,
+  GestureResponderEvent,
+  PanResponderGestureState,
 } from "react-native";
 import { useState, useEffect, useRef, useMemo, useCallback } from "react";
 import { Text, GloriousButton, Button, Inbound } from "../components";
 import VideoNote from "../components/VideoNote";
 import { ApiService, VideoData, API_URL } from "../data/api";
 import SafeAreaView from "../components/SafeAreaView";
-import { useNavigation } from "@react-navigation/native";
+import { useNavigation, useIsFocused } from "@react-navigation/native";
 
 const EXPLORE_PATH = "/explore";
 const { width: screenWidth, height: screenHeight } = Dimensions.get("window");
@@ -27,9 +27,9 @@ const MAX_PARALLAX_FACTOR = 1.5;
 const MIN_PARALLAX_FACTOR = 0.8;
 const GRID_AVOIDANCE_RADIUS = ITEM_DIAMETER * 0.8;
 const LOAD_BATCH_SIZE = 10;
-const SCROLL_LOAD_THRESHOLD_FACTOR = 2.5;
+const CANVAS_INITIAL_SIZE = 1000;
+const LOAD_THRESHOLD = 250;
 const ANIMATION_DURATION = 350;
-const CANVAS_INITIAL_HEIGHT_FACTOR = 5;
 
 const parseMinted = (mintedStr?: string): number => {
   if (!mintedStr) return 0;
@@ -58,12 +58,14 @@ type CanvasVideoItem = VideoData & {
 
 const {
   Value,
-  event: AnimatedEvent,
+  ValueXY,
   spring,
   timing,
   parallel,
   stagger,
   add,
+  multiply,
+  event: AnimatedEvent,
 } = Animated;
 
 export default function ExploreScreen({
@@ -71,41 +73,158 @@ export default function ExploreScreen({
 }: {
   initialAddress?: string | null;
 }) {
-  const scrollY = useRef(new Value(0)).current;
+  const navigation = useNavigation();
+  const isFocused = useIsFocused();
+
+  // Canvas state
+  const canvasPosition = useRef(new ValueXY({ x: 0, y: 0 })).current;
+  const [canvasDimensions, setCanvasDimensions] = useState({
+    width: CANVAS_INITIAL_SIZE,
+    height: CANVAS_INITIAL_SIZE,
+  });
+
+  // Videos state
   const [videos, setVideos] = useState<CanvasVideoItem[]>([]);
   const [focusedVideoKey, setFocusedVideoKey] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [allVideosLoaded, setAllVideosLoaded] = useState(false);
   const processedVideoAddresses = useRef(new Set<string>()).current;
-  const canvasHeight = useRef(screenHeight * CANVAS_INITIAL_HEIGHT_FACTOR);
   const occupiedPositions = useRef<Array<{ x: number; y: number }>>([]);
   const maxMintedRef = useRef(1);
   const loadCountRef = useRef(0);
   const [currentFocusedAddress, setCurrentFocusedAddress] = useState<
     string | null
   >(null);
-  const navigation = useNavigation();
 
   const focusedVideoData = useMemo(() => {
     return videos.find((v) => v.key === focusedVideoKey);
   }, [videos, focusedVideoKey]);
 
-  const generateUniqueKey = (address: string, batchId: number) =>
-    `${address}-${batchId}-${Math.random().toString(36).substring(2, 7)}`;
+  // Pan responder setup
+  const panResponder = useMemo(() => {
+    return PanResponder.create({
+      onMoveShouldSetPanResponder: (_, gestureState) => {
+        const { dx, dy } = gestureState;
+        return Math.abs(dx) > 5 || Math.abs(dy) > 5;
+      },
+      onPanResponderGrant: () => {
+        canvasPosition.extractOffset();
+      },
+      onPanResponderMove: Animated.event(
+        [null, { dx: canvasPosition.x, dy: canvasPosition.y }],
+        { useNativeDriver: false }
+      ),
+      onPanResponderRelease: (_, gestureState) => {
+        canvasPosition.flattenOffset();
+        checkCanvasBoundaries(gestureState);
+        checkLoadMore();
+      },
+    });
+  }, []);
 
+  // Check if we need to load more videos based on canvas position
+  const checkLoadMore = useCallback(() => {
+    // Use a safer approach to get current position values
+    let xValue = 0;
+    let yValue = 0;
+
+    // Access the x and y values directly
+    if (canvasPosition) {
+      const positionX = canvasPosition.x as any;
+      const positionY = canvasPosition.y as any;
+
+      if (positionX._value !== undefined) xValue = positionX._value;
+      if (positionY._value !== undefined) yValue = positionY._value;
+    }
+
+    const distanceFromRight = canvasDimensions.width - (xValue + screenWidth);
+    const distanceFromBottom =
+      canvasDimensions.height - (yValue + screenHeight);
+
+    // If the user is approaching the boundaries, load more videos
+    if (
+      distanceFromRight < LOAD_THRESHOLD ||
+      distanceFromBottom < LOAD_THRESHOLD
+    ) {
+      if (allVideosLoaded) {
+        loadMoreVideos(true); // Recycle existing videos
+      } else {
+        loadMoreVideos();
+      }
+    }
+  }, [canvasDimensions, allVideosLoaded]);
+
+  // Prevent canvas from going out of bounds
+  const checkCanvasBoundaries = useCallback(
+    (gestureState: PanResponderGestureState) => {
+      const { vx, vy } = gestureState;
+
+      // Use a safer approach to get current position values
+      let xValue = 0;
+      let yValue = 0;
+
+      // Access the x and y values directly
+      if (canvasPosition) {
+        const positionX = canvasPosition.x as any;
+        const positionY = canvasPosition.y as any;
+
+        if (positionX._value !== undefined) xValue = positionX._value;
+        if (positionY._value !== undefined) yValue = positionY._value;
+      }
+
+      // Apply momentum based on velocity
+      const momentumX = vx * 200;
+      const momentumY = vy * 200;
+
+      let newX = xValue + momentumX;
+      let newY = yValue + momentumY;
+
+      // Keep canvas within boundaries
+      newX = Math.max(-canvasDimensions.width + screenWidth, Math.min(0, newX));
+      newY = Math.max(
+        -canvasDimensions.height + screenHeight,
+        Math.min(0, newY)
+      );
+
+      // Apply final position with animation
+      Animated.spring(canvasPosition, {
+        toValue: { x: newX, y: newY },
+        useNativeDriver: true,
+        tension: 50,
+        friction: 7,
+      }).start();
+    },
+    [canvasDimensions]
+  );
+
+  // Create a unique key for each video
+  const generateUniqueKey = (address: string, batchId: number) =>
+    `${address}-${batchId}-${Date.now()}-${Math.random()
+      .toString(36)
+      .substring(2, 7)}`;
+
+  // Find a random position that doesn't overlap with existing items
   const getRandomPosition = (
-    currentBatchOccupied: Array<{ x: number; y: number }>,
-    baseYOffset: number
+    currentBatchOccupied: Array<{ x: number; y: number }>
   ): { x: number; y: number } => {
     let xPos: number,
       yPos: number,
       attempts = 0;
     const MAX_ATTEMPTS = 50;
+
     do {
-      xPos = Math.random() * (screenWidth - ITEM_DIAMETER);
-      yPos = baseYOffset + Math.random() * (screenHeight * 1.5);
+      // Generate position anywhere in the canvas
+      xPos =
+        Math.random() * (canvasDimensions.width - ITEM_DIAMETER * 2) +
+        ITEM_DIAMETER;
+      yPos =
+        Math.random() * (canvasDimensions.height - ITEM_DIAMETER * 2) +
+        ITEM_DIAMETER;
+
       attempts++;
       if (attempts > MAX_ATTEMPTS) break;
+
+      // Check if this position is too close to any existing item
       const tooClose = [
         ...occupiedPositions.current,
         ...currentBatchOccupied,
@@ -115,12 +234,15 @@ export default function ExploreScreen({
         );
         return dist < GRID_AVOIDANCE_RADIUS;
       });
+
       if (!tooClose) break;
     } while (true);
+
     currentBatchOccupied.push({ x: xPos, y: yPos });
     return { x: xPos, y: yPos };
   };
 
+  // Load more videos from API or recycle existing ones
   const loadMoreVideos = useCallback(
     async (isRecycling = false) => {
       if (isLoading || (allVideosLoaded && !isRecycling)) return;
@@ -146,7 +268,24 @@ export default function ExploreScreen({
       );
       console.log("New unique videos:", newUniqueVideosData.length);
 
+      // Expand canvas if needed
+      const currentSize = Math.max(
+        canvasDimensions.width,
+        canvasDimensions.height
+      );
+      if (
+        currentSize <
+        CANVAS_INITIAL_SIZE + loadCountRef.current * ITEM_DIAMETER * 3
+      ) {
+        const newSize = currentSize + CANVAS_INITIAL_SIZE / 2;
+        setCanvasDimensions({
+          width: newSize,
+          height: newSize,
+        });
+      }
+
       if (!isRecycling && newUniqueVideosData.length > 0) {
+        // Process new videos from API
         newUniqueVideosData.forEach((v) => {
           const currentMinted = parseMinted(v.stats?.minted);
           if (currentMinted > maxMintedRef.current) {
@@ -172,6 +311,7 @@ export default function ExploreScreen({
               value: parseNumericStat(videoData.stats?.value),
             };
 
+            // Calculate parallax factor based on popularity (minted)
             const normalizedMinted = Math.max(
               0.01,
               numericStats.minted / (maxMintedRef.current || 1)
@@ -180,19 +320,8 @@ export default function ExploreScreen({
               MAX_PARALLAX_FACTOR -
               normalizedMinted * (MAX_PARALLAX_FACTOR - MIN_PARALLAX_FACTOR);
 
-            const lastItem =
-              videos.length > 0 ? videos[videos.length - 1] : null;
-            const lastItemYPos = lastItem ? lastItem.y : 0;
-            const maxOccupiedY =
-              occupiedPositions.current.length > 0
-                ? Math.max(0, ...occupiedPositions.current.map((p) => p.y))
-                : 0;
-            const baseYOffset = Math.max(lastItemYPos, maxOccupiedY);
-
-            const { x: newX, y: newY } = getRandomPosition(
-              currentBatchOccupied,
-              baseYOffset + ITEM_DIAMETER
-            );
+            const { x: newX, y: newY } =
+              getRandomPosition(currentBatchOccupied);
 
             return {
               ...videoData,
@@ -216,6 +345,7 @@ export default function ExploreScreen({
           return updated;
         });
 
+        // Animate new videos appearing
         stagger(
           50,
           newCanvasVideos.map((v) =>
@@ -235,14 +365,6 @@ export default function ExploreScreen({
           )
         ).start();
 
-        const maxY = Math.max(
-          0,
-          ...newCanvasVideos.map((v) => v.y + ITEM_DIAMETER)
-        );
-        canvasHeight.current = Math.max(
-          canvasHeight.current,
-          maxY + screenHeight * 2
-        );
         if (
           fetchedData.length < LOAD_BATCH_SIZE ||
           (newUniqueVideosData.length === 0 && fetchedData.length > 0)
@@ -250,6 +372,7 @@ export default function ExploreScreen({
           setAllVideosLoaded(true);
         }
       } else if (isRecycling && videos.length > 0) {
+        // Recycle existing videos when no more from API
         const numToRecycle = Math.min(videos.length, LOAD_BATCH_SIZE);
         const videosToRecycle = videos.slice(0, numToRecycle);
         console.log("Recycling videos:", videosToRecycle.length);
@@ -257,11 +380,8 @@ export default function ExploreScreen({
         const currentBatchOccupied: Array<{ x: number; y: number }> = [];
         const recycledCanvasVideos: CanvasVideoItem[] = videosToRecycle.map(
           (videoData) => {
-            const baseYOffset = canvasHeight.current - screenHeight * 1.5;
-            const { x: newX, y: newY } = getRandomPosition(
-              currentBatchOccupied,
-              baseYOffset
-            );
+            const { x: newX, y: newY } =
+              getRandomPosition(currentBatchOccupied);
             return {
               ...videoData,
               x: newX,
@@ -276,6 +396,7 @@ export default function ExploreScreen({
         occupiedPositions.current.push(...currentBatchOccupied);
         setVideos((prev) => [...prev, ...recycledCanvasVideos]);
 
+        // Animate recycled videos appearing
         stagger(
           50,
           recycledCanvasVideos.map((v) =>
@@ -294,42 +415,83 @@ export default function ExploreScreen({
             ])
           )
         ).start();
-        const maxY = Math.max(
-          0,
-          ...recycledCanvasVideos.map((v) => v.y + ITEM_DIAMETER)
-        );
-        canvasHeight.current = Math.max(
-          canvasHeight.current,
-          maxY + screenHeight * 2
-        );
       } else if (!isRecycling && newUniqueVideosData.length === 0) {
         setAllVideosLoaded(true);
       }
       setIsLoading(false);
     },
-    [isLoading, allVideosLoaded, videos, processedVideoAddresses]
+    [
+      isLoading,
+      allVideosLoaded,
+      videos,
+      processedVideoAddresses,
+      canvasDimensions,
+    ]
   );
 
+  // Initial load and animate on navigation focus
   useEffect(() => {
     console.log("ExploreScreen mounted, calling loadMoreVideos()");
     loadMoreVideos();
   }, [loadMoreVideos]);
 
   useEffect(() => {
+    if (isFocused) {
+      // When screen is focused, animate all videos appearing
+      stagger(
+        30,
+        videos.map((v) =>
+          parallel([
+            spring(v.scale, {
+              toValue: focusedVideoKey === v.key ? 1.8 : 1,
+              useNativeDriver: true,
+              tension: 40,
+              friction: 7,
+            }),
+            timing(v.opacity, {
+              toValue: 1,
+              duration: ANIMATION_DURATION,
+              useNativeDriver: true,
+            }),
+          ])
+        )
+      ).start();
+    } else {
+      // When leaving screen, animate all videos disappearing
+      parallel(
+        videos.map((v) =>
+          parallel([
+            timing(v.scale, {
+              toValue: 0.1,
+              duration: ANIMATION_DURATION,
+              useNativeDriver: true,
+            }),
+            timing(v.opacity, {
+              toValue: 0,
+              duration: ANIMATION_DURATION,
+              useNativeDriver: true,
+            }),
+          ])
+        )
+      ).start();
+    }
+  }, [isFocused, videos, focusedVideoKey]);
+
+  // Handle initial address focus and web path updates
+  useEffect(() => {
     if (initialAddress && videos.length > 0 && !focusedVideoKey) {
       const videoToFocus = videos.find((v) => v.address === initialAddress);
       if (videoToFocus) {
-        handleThumbnailPress(videoToFocus);
+        handleVideoFocus(videoToFocus);
       }
     }
+
     if (Platform.OS === "web") {
       let newPath = EXPLORE_PATH;
       if (focusedVideoData && focusedVideoData.address) {
         newPath = `${EXPLORE_PATH}/${encodeURIComponent(
           focusedVideoData.address
         )}`;
-      } else if (initialAddress && !focusedVideoData) {
-        // Path remains /explore if initialAddress video not found or no focus
       }
 
       if (window.location.pathname !== newPath) {
@@ -339,73 +501,76 @@ export default function ExploreScreen({
     }
   }, [initialAddress, videos, focusedVideoKey, focusedVideoData]);
 
-  const handleScroll = (event: NativeSyntheticEvent<NativeScrollEvent>) => {
-    const offsetY = event.nativeEvent.contentOffset.y;
-    const contentHeight = event.nativeEvent.contentSize.height;
-    const layoutHeight = event.nativeEvent.layoutMeasurement.height;
+  // Video thumbnail press handler
+  const handleVideoFocus = useCallback(
+    (videoItem: CanvasVideoItem) => {
+      // Center the canvas on the selected video
+      const centerX = -videoItem.x + (screenWidth / 2 - ITEM_DIAMETER / 2);
+      const centerY = -videoItem.y + (screenHeight / 2 - ITEM_DIAMETER / 2);
 
-    AnimatedEvent([{ nativeEvent: { contentOffset: { y: scrollY } } }], {
-      useNativeDriver: false,
-    })(event);
+      Animated.spring(canvasPosition, {
+        toValue: { x: centerX, y: centerY },
+        useNativeDriver: true,
+        tension: 40,
+        friction: 7,
+      }).start();
 
-    if (
-      offsetY > contentHeight - layoutHeight * SCROLL_LOAD_THRESHOLD_FACTOR &&
-      !isLoading
-    ) {
-      if (allVideosLoaded) {
-        loadMoreVideos(true);
+      const isAlreadyFocused = focusedVideoKey === videoItem.key;
+      const newFocusedKey = isAlreadyFocused ? null : videoItem.key;
+
+      setFocusedVideoKey(newFocusedKey);
+
+      if (newFocusedKey) {
+        setCurrentFocusedAddress(videoItem.address);
       } else {
-        loadMoreVideos();
+        setCurrentFocusedAddress(null);
       }
-    }
-  };
 
-  const handleThumbnailPress = (videoItem: CanvasVideoItem) => {
-    const isAlreadyFocused = focusedVideoKey === videoItem.key;
-    const newFocusedKey = isAlreadyFocused ? null : videoItem.key;
-    setFocusedVideoKey(newFocusedKey);
+      // Animate all videos based on focus state
+      parallel(
+        videos.map((v) => {
+          let targetScale = 1;
+          if (newFocusedKey) {
+            targetScale = v.key === newFocusedKey ? 1.8 : MIN_SCALE_UNFOCUSED;
+          }
+          return spring(v.scale, {
+            toValue: targetScale,
+            tension: 40,
+            friction: 7,
+            useNativeDriver: true,
+          });
+        })
+      ).start();
+    },
+    [videos, focusedVideoKey]
+  );
 
-    parallel(
-      videos.map((v) => {
-        let targetScale = 1;
-        if (newFocusedKey) {
-          targetScale = v.key === newFocusedKey ? 1.8 : MIN_SCALE_UNFOCUSED;
-        } else {
-          targetScale = 1;
-        }
-        return spring(v.scale, {
-          toValue: targetScale,
-          tension: 40,
-          friction: 7,
-          useNativeDriver: true,
-        });
-      })
-    ).start();
-  };
-
-  const handleHideFocusedVideo = () => {
-    if (focusedVideoData) {
-      handleThumbnailPress(focusedVideoData);
-    }
-  };
-
-  const handleVideoFocus = useCallback((video: CanvasVideoItem) => {
-    setFocusedVideoKey(video.key);
-    const encodedAddress = encodeURIComponent(video.address);
-    setCurrentFocusedAddress(encodedAddress);
-  }, []);
-
+  // Close focused video
   const handleCloseFocusedVideo = () => {
     setFocusedVideoKey(null);
     setCurrentFocusedAddress(null);
+
+    // Restore all videos to normal scale
+    parallel(
+      videos.map((v) =>
+        spring(v.scale, {
+          toValue: 1,
+          tension: 40,
+          friction: 7,
+          useNativeDriver: true,
+        })
+      )
+    ).start();
   };
 
+  // Handle mint button press
   const handleMintPress = () => {
     if (focusedVideoData) {
       console.log("Mint pressed for video:", focusedVideoData.address);
     }
   };
 
+  // Render focused video overlay
   const renderFocusedVideo = () => {
     if (!focusedVideoData) return null;
 
@@ -421,17 +586,6 @@ export default function ExploreScreen({
     const mintedText =
       numericStats.minted > 0 ? `${numericStats.minted} minted` : "Minted N/A";
 
-    const videoContainerStyle: ViewStyle = {
-      width: FOCUSED_VIDEO_MAX_SIZE,
-      height: FOCUSED_VIDEO_MAX_SIZE,
-      borderRadius: FOCUSED_VIDEO_MAX_SIZE / 2,
-      overflow: "hidden",
-      alignItems: "center" as FlexAlignType,
-      justifyContent: "center",
-      backgroundColor: "transparent",
-      position: "relative",
-    };
-
     return (
       <View style={styles.focusedVideoOuterContainer}>
         <View style={{ marginBottom: 10 }}>
@@ -441,28 +595,24 @@ export default function ExploreScreen({
             style={styles.closeButton}
           />
         </View>
-        <Animated.View
-          style={[
-            videoContainerStyle,
-            {
-              // If scale of focused video itself needs to be animated:
-              // transform: [{ scale: focusedVideoData.scale }],
-            },
-          ]}
-        >
+
+        <View style={styles.focusedVideoContainer}>
           <TouchableOpacity
-            onPress={handleHideFocusedVideo}
+            onPress={handleCloseFocusedVideo}
             style={styles.hideButton}
           >
             <Text style={styles.hideButtonText}>✕</Text>
           </TouchableOpacity>
-          <VideoNote
-            videoSource={`${API_URL}${focusedVideoData.source}`}
-            playing={true}
-          />
-        </Animated.View>
 
-        <View style={styles.statsDisplayContainer}>
+          <View style={styles.videoPlayerContainer}>
+            <VideoNote
+              videoSource={`${API_URL}${focusedVideoData.source}`}
+              playing={true}
+            />
+          </View>
+        </View>
+
+        <View style={styles.statsContainer}>
           <Inbound style={styles.statItem}>
             <Text style={styles.statText}>{priceText}</Text>
           </Inbound>
@@ -487,27 +637,29 @@ export default function ExploreScreen({
 
   return (
     <SafeAreaView style={styles.container}>
-      <Animated.ScrollView
-        onScroll={handleScroll}
-        scrollEventThrottle={16}
-        contentContainerStyle={{ height: canvasHeight.current }}
-        showsVerticalScrollIndicator={false}
-        style={styles.scrollView}
+      <Animated.View
+        style={[
+          styles.canvasContainer,
+          {
+            width: canvasDimensions.width,
+            height: canvasDimensions.height,
+            transform: [
+              { translateX: canvasPosition.x },
+              { translateY: canvasPosition.y },
+            ],
+          },
+        ]}
+        {...panResponder.panHandlers}
       >
         {videos.map((item) => {
-          const translateY = add(
-            item.y,
-            scrollY.interpolate({
-              inputRange: [
-                Math.max(0, item.y - screenHeight * 2),
-                item.y + screenHeight * 2,
-              ],
-              outputRange: [
-                -screenHeight * (item.parallaxFactor - 1) * 2,
-                screenHeight * (item.parallaxFactor - 1) * 2,
-              ],
-              extrapolate: "clamp",
-            })
+          // Apply parallax effect based on canvas position
+          const translateX = multiply(
+            canvasPosition.x,
+            item.parallaxFactor - 1
+          );
+          const translateY = multiply(
+            canvasPosition.y,
+            item.parallaxFactor - 1
           );
 
           const isFocusedItem = focusedVideoKey === item.key;
@@ -520,23 +672,16 @@ export default function ExploreScreen({
                 styles.videoItemContainer,
                 {
                   left: item.x,
-                  top: 0,
-                  width: ITEM_DIAMETER,
-                  height: ITEM_DIAMETER,
-                  opacity: item.opacity.interpolate({
-                    inputRange: [0, 1],
-                    outputRange: [
-                      0,
-                      isAnyVideoFocused && !isFocusedItem ? 0.5 : 1,
-                    ],
-                  }),
-                  transform: [{ translateY }, { scale: item.scale }],
+                  top: item.y,
+                  opacity: item.opacity,
+                  transform: [
+                    { translateX },
+                    { translateY },
+                    { scale: item.scale },
+                  ],
                   zIndex: isFocusedItem
                     ? 100
-                    : isAnyVideoFocused
-                    ? 1
                     : Math.floor(item.parallaxFactor * 10),
-                  backgroundColor: "#333",
                 },
               ]}
             >
@@ -575,7 +720,7 @@ export default function ExploreScreen({
             </Animated.View>
           );
         })}
-      </Animated.ScrollView>
+      </Animated.View>
 
       {focusedVideoKey && renderFocusedVideo()}
 
@@ -584,6 +729,7 @@ export default function ExploreScreen({
           <Text style={styles.noVideosText}>Loading Videos...</Text>
         </View>
       )}
+
       {videos.length === 0 && !isLoading && allVideosLoaded && (
         <View style={styles.noVideosContainer}>
           <Text style={styles.noVideosText}>No videos found on server.</Text>
@@ -600,23 +746,24 @@ export default function ExploreScreen({
   );
 }
 
-import { ViewStyle } from "react-native";
-
 const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: "transparent",
   },
-  scrollView: {
-    flex: 1,
+  canvasContainer: {
+    position: "absolute",
   },
   closeButton: {
     height: 20,
   },
   videoItemContainer: {
     position: "absolute",
+    width: ITEM_DIAMETER,
+    height: ITEM_DIAMETER,
     borderRadius: ITEM_DIAMETER / 2,
     overflow: "hidden",
+    backgroundColor: "#333",
   },
   touchableThumbnail: {
     width: "100%",
@@ -632,6 +779,22 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     alignItems: "center",
     zIndex: 200,
+  },
+  focusedVideoContainer: {
+    width: FOCUSED_VIDEO_MAX_SIZE,
+    height: FOCUSED_VIDEO_MAX_SIZE,
+    borderRadius: FOCUSED_VIDEO_MAX_SIZE / 2,
+    overflow: "hidden",
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "transparent",
+    position: "relative",
+  },
+  videoPlayerContainer: {
+    width: "100%",
+    height: "100%",
+    borderRadius: FOCUSED_VIDEO_MAX_SIZE / 2,
+    overflow: "hidden",
   },
   hideButton: {
     position: "absolute",
@@ -649,7 +812,7 @@ const styles = StyleSheet.create({
     fontWeight: "bold",
     fontSize: 18,
   },
-  statsDisplayContainer: {
+  statsContainer: {
     flexDirection: "column",
     justifyContent: "center",
     alignItems: "center",
@@ -673,11 +836,8 @@ const styles = StyleSheet.create({
     textAlign: "center",
   },
   mintButtonContainer: {
-    position: "absolute",
-    bottom: 40,
+    marginTop: 20,
     width: 120,
-    left: "50%",
-    transform: [{ translateX: "-50%" }],
     alignItems: "center",
     zIndex: 100,
   },
@@ -696,16 +856,5 @@ const styles = StyleSheet.create({
     textShadowColor: "rgba(0, 0, 0, 0.75)",
     textShadowOffset: { width: -1, height: 1 },
     textShadowRadius: 10,
-  },
-  retryButton: {
-    backgroundColor: "#FF3B80",
-    paddingHorizontal: 20,
-    paddingVertical: 10,
-    borderRadius: 20,
-  },
-  retryButtonText: {
-    color: "white",
-    fontSize: 16,
-    fontWeight: "bold",
   },
 });

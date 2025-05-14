@@ -4,8 +4,6 @@ import fs from "fs/promises";
 import { fileURLToPath } from "url";
 import { dirname } from "path";
 import { execFile } from "child_process";
-import crypto from "crypto";
-import base58 from "bs58";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -43,12 +41,6 @@ await fastify.register(import("@fastify/static"), {
   prefix: "/api/video/",
   decorateReply: false,
 });
-
-function generateIpfsCid() {
-  const randomBytes = crypto.randomBytes(32);
-  const multihash = Buffer.concat([Buffer.from([0x12, 0x20]), randomBytes]);
-  return base58.encode(multihash);
-}
 
 function createVideoNoteFromFile(filename) {
   const address = path.basename(filename, ".mp4");
@@ -143,9 +135,11 @@ fastify.get(
       const files = (await fs.readdir(videosDir))
         .filter((file) => file.endsWith(".mp4"))
         .slice(0, amount);
+
       if (!files.length) {
-        return reply.code(404).send({ error: "No videos found" });
+        return [];
       }
+
       const videoNotes = files.map(createVideoNoteFromFile);
       return videoNotes;
     } catch (err) {
@@ -350,6 +344,78 @@ fastify.get(
     } catch (err) {
       fastify.log.error(`Failed to retrieve video: ${err.message}`);
       return reply.code(500).send({ error: "Failed to retrieve video" });
+    }
+  }
+);
+
+// New endpoint for pitch-specific price data
+fastify.get(
+  "/api/pitch/:addr/price",
+  {
+    schema: {
+      operationId: "get_pitch_price_data",
+      summary: "Get price data for a specific pitch",
+      description: "Returns mock price data for a given pitch address",
+      params: {
+        type: "object",
+        required: ["addr"],
+        properties: {
+          addr: { type: "string", description: "Pitch address" },
+        },
+      },
+      response: {
+        200: {
+          description: "Successful response",
+          type: "object",
+          properties: {
+            timeframe: { type: "string" },
+            points: {
+              type: "array",
+              items: {
+                type: "object",
+                properties: {
+                  timestamp: { type: "integer" },
+                  value: { type: "number" },
+                },
+              },
+            },
+          },
+        },
+      },
+    },
+  },
+  async (request, reply) => {
+    try {
+      const { addr } = request.params;
+      // Check if the corresponding video/pitch exists (optional, but good practice)
+      const videoPath = path.join(videosDir, `${addr}.mp4`);
+      try {
+        await fs.access(videoPath);
+      } catch (err) {
+        fastify.log.warn(`Video/Pitch not found for price data: ${addr}`);
+        // We can still return mock data, or a 404
+        // For now, let's return mock data even if the video doesn't exist
+      }
+
+      const points = [];
+      const now = Date.now();
+      const oneDay = 24 * 60 * 60 * 1000;
+      let currentValue = Math.random() * 100 + 50; // Start value between 50 and 150
+
+      for (let i = 0; i < 30; i++) {
+        // 30 data points for a month
+        const timestamp = Math.floor((now - (30 - i) * oneDay) / 1000);
+        currentValue += (Math.random() - 0.5) * 10; // Fluctuate value
+        if (currentValue < 10) currentValue = 10; // Ensure minimum value
+        points.push({ timestamp, value: parseFloat(currentValue.toFixed(2)) });
+      }
+
+      return { timeframe: "1M", points };
+    } catch (err) {
+      fastify.log.error(err);
+      return reply
+        .code(500)
+        .send({ error: "Failed to fetch pitch price data" });
     }
   }
 );
