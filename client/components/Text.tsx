@@ -1,18 +1,16 @@
-import { Text as RNText, Platform } from "react-native";
+import { Text as RNText, TextProps } from "react-native";
+import { PropsWithChildren } from "react";
 
-export default function Text(props: React.ComponentProps<typeof RNText>) {
-  const { style, ...rest } = props;
+const defaultStyle = {
+  fontFamily: "Nunito_600SemiBold",
+};
 
-  // Combine styles with non-selectable properties
-  const combinedStyles = [
-    {
-      fontFamily: "Nunito_600SemiBold",
-      color: "#FFFFFF",
-    },
-    // Add web-specific style for preventing selection
-    Platform.OS === "web" ? { userSelect: "none" as "none" } : {},
-    style,
-  ];
+type Props = PropsWithChildren<TextProps>;
 
-  return <RNText selectable={false} style={combinedStyles} {...rest} />;
+export default function Text({ style, children, ...rest }: Props) {
+  return (
+    <RNText style={[defaultStyle, style]} {...rest}>
+      {children}
+    </RNText>
+  );
 }

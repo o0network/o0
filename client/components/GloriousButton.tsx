@@ -8,7 +8,7 @@ import {
   ImageSourcePropType,
   View,
 } from "react-native";
-import { Text } from "../components";
+import Text from "./Text";
 
 export const GloriousButton = ({
   title,

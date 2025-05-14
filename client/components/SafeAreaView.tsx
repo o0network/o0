@@ -1,6 +1,6 @@
 import { ReactNode } from "react";
 import { View } from "react-native";
-import { isPlatform } from "../utils/platform";
+import { usePlatform } from "../contexts/ScreenContext";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { viewport } from "@telegram-apps/sdk";
 
@@ -10,7 +10,10 @@ type Props = {
 };
 
 export const useInsets = () => {
-  return isPlatform("telegram")
+  const { isPlatform } = usePlatform();
+  return isPlatform("telegram") ||
+    isPlatform("tg_ios") ||
+    isPlatform("tg_android")
     ? viewport.safeAreaInsets()
     : useSafeAreaInsets();
 };

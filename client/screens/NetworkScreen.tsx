@@ -1,291 +1,175 @@
-import { StyleSheet, View, ScrollView, Text } from "react-native";
-import { Button, Inbound, Outbound, SafeAreaView } from "../components";
+import { StyleSheet, ScrollView, View } from "react-native";
+import Text from "../components/Text";
+import { Outbound, Inbound, Button, SafeAreaView } from "../components";
 import { useModal } from "../contexts/ModalContext";
-import { isPlatform } from "../utils/platform";
+import { usePlatform } from "../contexts/ScreenContext";
 
-type ProposalCardProps = {
-  title: string;
-  description: string;
-  percentage: number;
-  status: "voting" | "approved" | "rejected";
-};
-
-const proposalData: {
+type Proposal = {
   key: string;
   title: string;
   description: string;
   percentage: number;
-  status: "voting" | "approved" | "rejected";
-}[] = [
+};
+
+const proposals: Proposal[] = [
   {
-    key: "fae3bb34-34a1-4d15-af46-5e0d7fc9cbb4",
-    title: "Which remote work project should we support?",
+    key: "1",
+    title: "Remote Work Initiative",
     description:
-      "A survey to assess the feasibility and potential benefits of a remote work initiative aimed at enhancing work-life balance and boosting productivity.",
+      "Assess feasibility and benefits of remote work to boost productivity.",
     percentage: 72,
-    status: "voting",
   },
   {
-    key: "72f7cd00-30f2-4a14-bb7f-ea3eb6c0a2f8",
-    title: "Which renewable energy project should we support?",
+    key: "2",
+    title: "Renewable Energy Adoption",
     description:
-      "A survey to evaluate the integration of renewable energy solutions to reduce operational costs and promote sustainability.",
+      "Evaluate renewable energy solutions for sustainability and cost savings.",
     percentage: 85,
-    status: "approved",
   },
   {
-    key: "2b895eed-4286-4f11-8967-3457d25cd0b9",
-    title: "Which employee benefits project should we support?",
+    key: "3",
+    title: "Employee Benefits Upgrade",
     description:
-      "Assessing proposals to upgrade health, wellness, and educational benefits for improved employee satisfaction and retention.",
+      "Upgrade health, wellness, and educational benefits for staff retention.",
     percentage: 35,
-    status: "rejected",
   },
   {
-    key: "b75b1977-8b8b-4a0a-bbca-52762c30a2fd",
-    title: "Which international expansion project should we support?",
+    key: "4",
+    title: "International Expansion",
     description:
-      "A market research survey exploring initiatives for extending our services to international markets while balancing benefits and challenges.",
+      "Research extending services to international markets responsibly.",
     percentage: 60,
-    status: "voting",
   },
   {
-    key: "c1234567-89ab-cdef-0123-456789abcdef",
-    title: "Which sustainability project should we support?",
+    key: "5",
+    title: "Sustainability Projects",
     description:
-      "Investigating potential projects focused on waste reduction, recycling, and sustainable product development.",
+      "Explore waste reduction, recycling, and eco-friendly product development.",
     percentage: 90,
-    status: "approved",
   },
 ];
 
-const ProposalCard: React.FC<ProposalCardProps> = ({
-  title,
-  description,
-  percentage,
-  status,
-}) => {
-  return (
-    <Inbound style={styles.proposalCard}>
-      <Text style={styles.proposalTitle}>{title}</Text>
-      <Text style={styles.proposalDescription}>{description}</Text>
-
-      <View style={styles.votingStats}>
-        <View style={styles.percentageRow}>
-          <View style={styles.yesPercentageContainer}>
-            <Text style={styles.percentageText}>{`${percentage}%`}</Text>
-          </View>
-          <Text style={styles.percentageText}>{`${100 - percentage}%`}</Text>
-        </View>
-
-        <View style={styles.progressBar}>
-          <View style={[styles.progressYes, { flex: percentage / 100 }]} />
-          <View
-            style={[styles.progressNo, { flex: (100 - percentage) / 100 }]}
-          />
-        </View>
-      </View>
-
-      {status === "voting" ? (
-        <View style={styles.votingButtons}>
-          <Button
-            title="Yes"
-            iconPath={require("../assets/emojis/check-mark.png")}
-            onPress={() => console.log("Voted Yes")}
-            style={styles.voteButton}
-          />
-          <Button
-            title="No"
-            iconPath={require("../assets/emojis/prohibited.png")}
-            onPress={() => console.log("Voted No")}
-            style={styles.voteButton}
-          />
-        </View>
-      ) : (
-        <View style={styles.statusBadge}>
-          <Text style={styles.statusText}>Approved</Text>
-        </View>
-      )}
-    </Inbound>
-  );
-};
-
-const NetworkScreen = () => {
+export default function NetworkScreen() {
   const { openPreferences } = useModal();
+  const { isPlatform } = usePlatform();
+  const showSettings = !isPlatform("telegram");
 
   return (
-    <SafeAreaView style={styles.container}>
-      <Outbound style={styles.governanceCard}>
-        <View style={styles.governanceHeader}>
-          <Text style={styles.governanceTitle}>DAO Governance</Text>
-          <Text style={styles.governanceDescription}>
-            Use your votes as a decision making power to shape the future we'll
-            build. Your balance reflects your voting power, we don't withdraw
-            any tokens from your balance. Feel free to vote.
-          </Text>
-        </View>
+    <SafeAreaView
+      style={[styles.screen, isPlatform("web") && { marginTop: 70 }]}
+    >
+      <Outbound style={styles.container}>
+        <Text style={styles.title}>DAO Governance</Text>
+        <Text style={styles.subtitle}>
+          Use your votes to shape our future. Your balance reflects your voting
+          power; no tokens are withdrawn.
+        </Text>
 
-        <Inbound style={styles.proposalsContainer}>
-          <ScrollView>
-            {proposalData.map((p) => (
-              <ProposalCard
-                key={p.key}
-                title={p.title}
-                description={p.description}
-                percentage={p.percentage}
-                status={p.status}
-              />
+        <Inbound style={styles.listWrapper}>
+          <ScrollView style={styles.scrollView}>
+            {proposals.map((p) => (
+              <Outbound key={p.key} style={styles.card}>
+                <Text style={styles.cardTitle}>{p.title}</Text>
+                <Text style={styles.cardDesc}>{p.description}</Text>
+                <View style={styles.statsRow}>
+                  <Text style={styles.percText}>{p.percentage}%</Text>
+                  <Text style={styles.percText}>{100 - p.percentage}%</Text>
+                </View>
+                <View style={styles.progressBar}>
+                  <View
+                    style={[styles.processApprove, { flex: p.percentage }]}
+                  />
+                  <View
+                    style={[styles.processReject, { flex: 100 - p.percentage }]}
+                  />
+                </View>
+                <View style={styles.buttonsRow}>
+                  <Button
+                    title="Approve"
+                    textStyle={{ color: "#FFFFFF" }}
+                    iconPath={require("../assets/emojis/check-mark.png")}
+                  />
+                  <Button
+                    title="Reject"
+                    textStyle={{ color: "#FFFFFF" }}
+                    iconPath={require("../assets/emojis/cross-mark.png")}
+                  />
+                </View>
+              </Outbound>
             ))}
           </ScrollView>
         </Inbound>
-      </Outbound>
 
-      {!isPlatform("telegram") && (
-        <Button title="Open Preferences" onPress={openPreferences} />
-      )}
+        {showSettings && (
+          <Button title="Open Preferences" onPress={openPreferences} />
+        )}
+      </Outbound>
     </SafeAreaView>
   );
-};
+}
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    gap: 16,
+  screen: {
     maxWidth: 512,
-    width: "100%",
-    alignSelf: "center",
+    marginHorizontal: "auto",
+    marginBottom: 12,
+  },
+  container: {
+    padding: 16,
+    gap: 16,
+    flex: 1,
+    margin: 12,
     justifyContent: "flex-start",
   },
-  settingsCard: {
-    borderRadius: 16,
-    padding: 12,
-    gap: 16,
-    width: "100%",
-  },
-  toggleRow: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-  },
-  toggleLabel: {
-    fontFamily: "Nunito_600SemiBold",
-    fontSize: 16,
-    color: "#FFFFFF",
-    fontWeight: "600",
-  },
-  disconnectButton: {
-    borderRadius: 999,
-    alignSelf: "stretch",
-  },
-  governanceCard: {
-    borderRadius: 16,
-    height: 580,
-    overflow: "hidden",
-  },
-  governanceHeader: {
-    padding: 12,
-    gap: 4,
-  },
-  governanceTitle: {
-    fontFamily: "Nunito_600SemiBold",
-    fontSize: 16,
-    color: "#FFFFFF",
-    fontWeight: "600",
-    lineHeight: 19.2,
-  },
-  governanceDescription: {
-    fontFamily: "Nunito_600SemiBold",
-    fontSize: 12,
-    color: "#FFFFFF",
-    fontWeight: "600",
-    lineHeight: 14.4,
-  },
-  proposalsContainer: {
-    borderRadius: 16,
-    padding: 12,
+  scrollView: { paddingHorizontal: 12, flex: 1 },
+  title: { fontSize: 20, fontWeight: "600", color: "#FFFFFF" },
+  subtitle: { fontSize: 14, color: "#FFFFFF", lineHeight: 18 },
+  listWrapper: { paddingVertical: 12, flex: 1, overflow: "hidden" },
+  card: {
     flex: 1,
-  },
-  proposalCard: {
-    borderRadius: 16,
-    padding: 12,
-    marginBottom: 8,
-    gap: 8,
-  },
-  proposalTitle: {
-    fontFamily: "Nunito_600SemiBold",
-    fontSize: 17,
-    color: "#FFFFFF",
-    fontWeight: "600",
-  },
-  proposalDescription: {
-    fontFamily: "Nunito_600SemiBold",
-    fontSize: 12,
-    color: "#FFFFFF",
-    fontWeight: "600",
-    lineHeight: 14.4,
-  },
-  votingStats: {
-    gap: 2,
     width: "100%",
+    marginBottom: 12,
+    paddingHorizontal: 12,
+    paddingVertical: 16,
+    borderRadius: 16,
   },
-  percentageRow: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
+  cardTitle: {
+    fontSize: 16,
+    width: "100%",
+    fontWeight: "600",
+    color: "#FFFFFF",
   },
-  yesPercentageContainer: {
-    flexDirection: "row",
-    alignItems: "center",
-    paddingLeft: 4,
-  },
-  percentageText: {
-    fontFamily: "Nunito_600SemiBold",
+  cardDesc: {
+    width: "100%",
     fontSize: 12,
     color: "#FFFFFF",
-    fontWeight: "600",
+    marginVertical: 4,
   },
+  statsRow: {
+    flexDirection: "row",
+    width: "100%",
+    justifyContent: "space-between",
+  },
+  buttonsRow: {
+    flexDirection: "row",
+    width: "100%",
+    flex: 1,
+    justifyContent: "space-between",
+    marginTop: 8,
+  },
+  percText: { fontSize: 14, color: "#FFFFFF" },
   progressBar: {
-    flexDirection: "row",
     height: 8,
-    borderRadius: 100,
-    overflow: "hidden",
-    backgroundColor: "rgba(208, 208, 208, 0.5)",
-  },
-  progressYes: {
-    backgroundColor: "rgba(0, 255, 81, 0.8)",
-    borderTopLeftRadius: 999,
-    borderBottomLeftRadius: 999,
-  },
-  progressNo: {
-    backgroundColor: "rgba(255, 0, 0, 0.8)",
-    borderTopRightRadius: 999,
-    borderBottomRightRadius: 999,
-  },
-  votingButtons: {
-    flexDirection: "row",
-    justifyContent: "space-between",
     width: "100%",
-    opacity: 0.8,
+    flexDirection: "row",
+    borderRadius: 4,
+    overflow: "hidden",
+    marginTop: 6,
   },
-  voteButton: {
-    flex: 1,
-    borderRadius: 20,
+  processApprove: {
+    backgroundColor: "rgb(0, 255, 0)",
   },
-  statusBadge: {
-    backgroundColor: "rgba(0, 0, 0, 0.1)",
-    padding: 10,
-    paddingHorizontal: 24,
-    borderRadius: 100,
-    alignSelf: "flex-start",
-  },
-  statusText: {
-    fontFamily: "Nunito_600SemiBold",
-    fontSize: 15,
-    color: "rgba(255, 255, 255, 0.96)",
-    fontWeight: "600",
+  processReject: {
+    backgroundColor: "rgb(255, 0, 0)",
   },
 });
-
-export default NetworkScreen;

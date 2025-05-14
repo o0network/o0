@@ -11,13 +11,12 @@ import {
 } from "@telegram-apps/sdk";
 import App from "./App";
 import { postEvent, on } from "@telegram-apps/bridge";
-
-import eruda from "eruda";
-
-eruda.init();
+// import eruda from "eruda";
+// eruda.init();
 
 try {
   init({ postEvent, on });
+
 
   if (swipeBehavior.mount.isAvailable()) {
     swipeBehavior.mount();

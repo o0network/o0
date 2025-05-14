@@ -9,8 +9,7 @@ import {
   Pressable,
   GestureResponderEvent,
 } from "react-native";
-import { usePlatform } from "../utils/platform";
-import { useScreen } from "../contexts/ScreenContext";
+import { usePlatform, useScreen } from "../contexts/ScreenContext";
 import TelegramIcon from "../assets/telegram.svg";
 
 type PopoverLinkProps = {
@@ -34,18 +33,17 @@ const PopoverLink: React.FC<PopoverLinkProps> = ({ url, text }) => {
 };
 
 export const WebIcons: React.FC = () => {
-  const { isPlatform } = usePlatform();
-  const { isMinWidth600 } = useScreen();
+  const { isLargeScreen } = useScreen();
   const [isPopoverVisible, setIsPopoverVisible] = useState(false);
   const [isMoreButtonHovered, setIsMoreButtonHovered] = useState(false);
-
-  if (!isPlatform("web") || !isMinWidth600) {
-    return null;
-  }
 
   const togglePopover = () => {
     setIsPopoverVisible(!isPopoverVisible);
   };
+
+  if (!isLargeScreen) {
+    return null;
+  }
 
   return (
     <View

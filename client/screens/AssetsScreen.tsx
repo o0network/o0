@@ -66,27 +66,50 @@ export const AssetsScreen = ({ initialAddress }: AssetsScreenProps) => {
     timeframe: "1Y",
     points: [],
   });
+  const [isLoading, setIsLoading] = useState<boolean>(true);
 
   useEffect(() => {
     // Get address from props or use default
     const currentAddress = initialAddress || DEFAULT_ADDRESS;
     setAddress(currentAddress);
 
-    // Load assets and other data for this address
-    const addressAssets = ApiService.getAssetsByAddress(currentAddress);
-    setAssets(addressAssets);
+    const fetchData = async () => {
+      setIsLoading(true);
+      try {
+        // Load assets and other data for this address
+        const addressAssets = await ApiService.getAssetsByAddress(
+          currentAddress
+        );
+        // Create grid data for the map view after assets are loaded
+        const grid = createAssetGridData(addressAssets);
 
-    // Create grid data for the map view
-    setGridData(createAssetGridData(addressAssets));
+        // Get total portfolio value
+        const portfolioValue = await ApiService.getTotalPortfolioValue(
+          currentAddress
+        );
 
-    // Get total portfolio value
-    setTotalValue(ApiService.getTotalPortfolioValue(currentAddress));
+        // Get portfolio performance
+        const portfolioPerformance = await ApiService.getPortfolioPerformance(
+          currentAddress
+        );
 
-    // Get portfolio performance
-    setPerformance(ApiService.getPortfolioPerformance(currentAddress));
+        // Get price data for chart
+        const priceData = await ApiService.getPriceData(currentAddress);
 
-    // Get price data for chart
-    setPriceData(ApiService.getPriceData(currentAddress));
+        // Set all state values after data is loaded
+        setAssets(addressAssets);
+        setGridData(grid);
+        setTotalValue(portfolioValue);
+        setPerformance(portfolioPerformance);
+        setPriceData(priceData);
+      } catch (error) {
+        console.error("Error loading assets data:", error);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    fetchData();
   }, [initialAddress]);
 
   const AssetsContent = () => {
@@ -211,7 +234,7 @@ export const AssetsScreen = ({ initialAddress }: AssetsScreenProps) => {
     );
   };
 
-  if (assets.length === 0 && address !== DEFAULT_ADDRESS) {
+  if (isLoading && address !== DEFAULT_ADDRESS) {
     return (
       <View style={styles.outerContainer}>
         <View style={styles.loadingContainer}>

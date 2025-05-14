@@ -1,31 +1,17 @@
-import { useState, useEffect, useRef, useCallback } from "react";
-import { View, StyleSheet, Platform } from "react-native";
+import { useEffect, useRef, useCallback } from "react";
+import { View, StyleSheet } from "react-native";
 import { GLView, ExpoWebGLRenderingContext } from "expo-gl";
 import * as THREE from "three";
 import { DeviceMotion } from "expo-sensors";
 import { Renderer } from "expo-three";
 import { on, postEvent } from "@telegram-apps/sdk";
-import { usePlatform } from "../utils/platform";
+import { usePlatform } from "../contexts/ScreenContext";
 
 try {
-  postEvent("web_app_start_accelerometer", { refresh_rate: 20 });
   postEvent("web_app_start_device_orientation", { refresh_rate: 20 });
-  postEvent("web_app_start_gyroscope", { refresh_rate: 20 });
 } catch (error) {
   console.error("Error starting motion events", error);
 }
-
-on("accelerometer_changed", (payload) => {
-  console.log("accelerometer_changed", payload);
-});
-
-on("device_orientation_changed", (payload) => {
-  console.log("device_orientation_changed", payload);
-});
-
-on("gyroscope_changed", (payload) => {
-  console.log("gyroscope_changed", payload);
-});
 
 const vertexShader = `
   varying vec3 vDir;
@@ -129,11 +115,12 @@ export default function Background() {
   const deviceOrientationRef = useRef({ alpha: 0, beta: 0, gamma: 0 });
   const orientationStatusRef = useRef<string>("unknown");
   const motionSubscriptionRef = useRef<{ remove: () => void } | null>(null);
-  const [isMobile] = useState(Platform.OS !== "web");
   const { isPlatform } = usePlatform();
-  const isTelegram = isPlatform("telegram");
-  const hasSensors = isTelegram || isMobile;
 
+  const isMobile = isPlatform("ios") || isPlatform("android");
+  const isTelegram = isPlatform("telegram");
+  const isTelegramMobile = isPlatform("tg_ios") || isPlatform("tg_android");
+  const hasSensors = isMobile || isTelegramMobile;
   const rendererRef = useRef<Renderer | null>(null);
   const sceneRef = useRef<THREE.Scene | null>(null);
   const cameraRef = useRef<THREE.PerspectiveCamera | null>(null);
@@ -201,23 +188,17 @@ export default function Background() {
     };
   }, [isMobile]);
 
-  useEffect(() => {
-    if (!isTelegram) return;
-    try {
-      postEvent("web_app_start_device_orientation", { refresh_rate: 1000 });
-    } catch (error) {
-      console.error("Error starting telegram sensors", error);
-    }
-    const handleOrientation = (payload: {
-      alpha?: number;
-      beta?: number;
-      gamma?: number;
-    }) => {
-      const { alpha = 0, beta = 0, gamma = 0 } = payload;
-      deviceOrientationRef.current = { alpha, beta, gamma };
-    };
-    on("device_orientation_changed", handleOrientation);
-  }, [isTelegram]);
+  try {
+    on(
+      "device_orientation_changed",
+      (payload: { alpha?: number; beta?: number; gamma?: number }) => {
+        const { alpha = 0, beta = 0, gamma = 0 } = payload;
+        deviceOrientationRef.current = { alpha, beta, gamma };
+      }
+    );
+  } catch (error) {
+    console.error("Error starting device orientation", error);
+  }
 
   useEffect(() => {
     if (isMobile) return;

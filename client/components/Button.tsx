@@ -91,6 +91,8 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     alignItems: "center",
     overflow: "hidden",
+    paddingHorizontal: 16,
+    paddingVertical: 12,
   },
   disabled: {
     opacity: 0.5,

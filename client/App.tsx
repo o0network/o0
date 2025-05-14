@@ -4,7 +4,13 @@ import {
   MaterialTopTabBarProps,
   MaterialTopTabNavigationOptions,
 } from "@react-navigation/material-top-tabs";
-import { useRef, useCallback, useState } from "react";
+import {
+  useRef,
+  useCallback,
+  useState,
+  useEffect,
+  type ReactNode,
+} from "react";
 import {
   StyleSheet,
   View,
@@ -13,7 +19,7 @@ import {
   TouchableOpacity,
   Animated,
   Image,
-  Modal,
+  Modal as RNModal,
 } from "react-native";
 import { StatusBar } from "expo-status-bar";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
@@ -21,19 +27,20 @@ import { useFonts } from "expo-font";
 import * as SplashScreen from "expo-splash-screen";
 import { Nunito_600SemiBold, Nunito_700Bold } from "@expo-google-fonts/nunito";
 import { DMMono_500Medium } from "@expo-google-fonts/dm-mono";
-import { DynaPuff_700Bold } from "@expo-google-fonts/dynapuff";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 import {
   BottomSheetModalProvider,
   BottomSheetModal,
 } from "@gorhom/bottom-sheet";
 import { ModalContext } from "./contexts/ModalContext";
+import { AuthProvider } from "./contexts/AuthContext";
 import PreferencesModal from "./modals/Preferences";
+import WalletConnectModal from "./modals/WalletConnect";
 import ExploreScreen from "./screens/ExploreScreen";
 import CreateScreen from "./screens/CreateScreen";
 import AssetsScreen from "./screens/AssetsScreen";
 import NetworkScreen from "./screens/NetworkScreen";
-import { PlatformProvider, usePlatform } from "./utils/platform";
+import { PlatformProvider, usePlatform } from "./contexts/ScreenContext";
 import { Background, WebIcons } from "./components";
 import SafeAreaView, { useInsets } from "./components/SafeAreaView";
 import { ScreenProvider, useScreen } from "./contexts/ScreenContext";
@@ -41,6 +48,8 @@ import CompassIcon from "./assets/emojis/compass.png";
 import DvdIcon from "./assets/emojis/dvd.png";
 import CoinIcon from "./assets/emojis/coin.png";
 import GlobeIcon from "./assets/emojis/globe.png";
+import { on, settingsButton } from "@telegram-apps/sdk";
+import { BlurView } from "expo-blur";
 
 type TabParamList = {
   Explore: { address?: string };
@@ -71,36 +80,41 @@ const TabBarItem = ({
   bounceValue,
   isLargeScreen,
   isTelegram,
-}: TabBarItemProps) => (
-  <Animated.View style={{ transform: [{ translateX: bounceValue }] }}>
-    <TouchableOpacity
-      accessibilityRole="button"
-      accessibilityState={isFocused ? { selected: true } : {}}
-      onPress={onPress}
-      style={styles.touchableTabBase}
-    >
-      <Animated.View
-        style={[
-          styles.tabItemBase,
-          isFocused ? styles.tabItemActive : styles.tabItemInactive,
-          isTelegram && isFocused && styles.telegramTabItemActive,
-          isTelegram && !isFocused && styles.telegramTabItemInactive,
-        ]}
+}: TabBarItemProps) => {
+  const { isPlatform } = usePlatform();
+  const isTelegramIOS = isPlatform("tg_ios");
+
+  return (
+    <Animated.View style={{ transform: [{ translateX: bounceValue }] }}>
+      <TouchableOpacity
+        accessibilityRole="button"
+        accessibilityState={isFocused ? { selected: true } : {}}
+        onPress={onPress}
+        style={styles.touchableTabBase}
       >
-        <Image
-          source={icon}
-          style={{
-            width: 24,
-            height: 24,
-          }}
-        />
-        {(isFocused || isLargeScreen) && (
-          <RNText style={styles.label}>{label}</RNText>
-        )}
-      </Animated.View>
-    </TouchableOpacity>
-  </Animated.View>
-);
+        <Animated.View
+          style={[
+            styles.tabItemBase,
+            isFocused ? styles.tabItemActive : styles.tabItemInactive,
+            isTelegram && isFocused && styles.telegramTabItemActive,
+            isTelegram && !isFocused && styles.telegramTabItemInactive,
+          ]}
+        >
+          <Image
+            source={icon}
+            style={{
+              width: 24,
+              height: 24,
+            }}
+          />
+          {(isFocused || isLargeScreen) && !isTelegramIOS && (
+            <RNText style={styles.label}>{label}</RNText>
+          )}
+        </Animated.View>
+      </TouchableOpacity>
+    </Animated.View>
+  );
+};
 
 function CustomTabBar({
   state,
@@ -113,23 +127,43 @@ function CustomTabBar({
   const { isPlatform } = usePlatform();
   const { isLargeScreen } = useScreen();
   const isTelegram = isPlatform("telegram");
+  const isTelegramIOS = isPlatform("tg_ios");
   const insets = useInsets();
 
+  // Container component with blur effect for iOS Telegram
+  const TabBarContainer = ({
+    children,
+    style,
+  }: {
+    children: ReactNode;
+    style?: any;
+  }) => {
+    if (isTelegramIOS) {
+      return (
+        <View style={[style, { overflow: "hidden", borderRadius: 100 }]}>
+          <BlurView
+            intensity={70}
+            tint="dark"
+            style={StyleSheet.absoluteFillObject}
+          />
+          {children}
+        </View>
+      );
+    }
+    return <View style={style}>{children}</View>;
+  };
+
   return (
-    <View
+    <TabBarContainer
       style={[
         styles.tabBarContainer,
-        isTelegram &&
-          /iPhone|iPad/i.test(navigator.userAgent) && {
-            paddingVertical: 0,
-            paddingHorizontal: 0,
-          },
+        isTelegramIOS && {
+          paddingHorizontal: 120,
+          height: 38,
+          top: insets.top - 38,
+        },
         isLargeScreen && styles.largeScreenTabBarContainer,
         isPlatform("web") && { top: 20 },
-        isTelegram &&
-          /iPhone|iPad/i.test(navigator.userAgent) && {
-            top: insets.top - 38,
-          },
         isTelegram && styles.telegramTabBarContainer,
       ]}
     >
@@ -169,7 +203,7 @@ function CustomTabBar({
           />
         );
       })}
-    </View>
+    </TabBarContainer>
   );
 }
 
@@ -179,7 +213,6 @@ export default function App() {
     Nunito_600SemiBold,
     Nunito_700Bold,
     DMMono_500Medium,
-    DynaPuff_700Bold,
   });
 
   const onLayoutRootView = useCallback(async () => {
@@ -190,25 +223,65 @@ export default function App() {
 
   const { isPlatform } = usePlatform();
   const modalRef = useRef<BottomSheetModal>(null);
-  const { isMinWidth600 } = useScreen();
-  const [isClassicPreferencesVisible, setIsClassicPreferencesVisible] =
-    useState(false);
+  const walletConnectModalRef = useRef<BottomSheetModal>(null);
+  const { isLargeScreen } = useScreen();
+  const [isPreferencesVisible, setIsPreferencesVisible] = useState(false);
+  const [isWalletConnectVisible, setIsWalletConnectVisible] = useState(false);
+  const [currentTabIndex, setCurrentTabIndex] = useState(0);
+
+  // Log screen dimensions on initial render
+  useEffect(() => {
+    const { width, height } = Dimensions.get("window");
+    console.log("Screen dimensions:", { width, height, isLargeScreen });
+  }, [isLargeScreen]);
 
   const openPreferences = useCallback(() => {
-    if (isMinWidth600) {
-      setIsClassicPreferencesVisible(true);
+    console.log("Opening preferences, isLargeScreen:", isLargeScreen);
+    if (isLargeScreen) {
+      setIsPreferencesVisible(true);
     } else {
       modalRef.current?.present();
     }
-  }, [isMinWidth600, modalRef]);
+  }, [isLargeScreen]);
+
+  const openWalletConnect = useCallback(() => {
+    console.log("Opening wallet connect, isLargeScreen:", isLargeScreen);
+    if (isLargeScreen) {
+      setIsWalletConnectVisible(true);
+    } else {
+      walletConnectModalRef.current?.present();
+    }
+  }, [isLargeScreen]);
+
+  if (isPlatform("telegram")) {
+    settingsButton.onClick(() => {
+      openPreferences();
+    });
+  }
 
   const handleClosePreferences = useCallback(() => {
-    if (isMinWidth600) {
-      setIsClassicPreferencesVisible(false);
+    if (isLargeScreen) {
+      setIsPreferencesVisible(false);
     } else {
       modalRef.current?.dismiss();
     }
-  }, [isMinWidth600, modalRef]);
+  }, [isLargeScreen]);
+
+  const handleCloseWalletConnect = useCallback(() => {
+    if (isLargeScreen) {
+      setIsWalletConnectVisible(false);
+    } else {
+      walletConnectModalRef.current?.dismiss();
+    }
+  }, [isLargeScreen]);
+
+  useEffect(() => {
+    console.log("isPreferencesVisible changed:", isPreferencesVisible);
+  }, [isPreferencesVisible]);
+
+  useEffect(() => {
+    console.log("isWalletConnectVisible changed:", isWalletConnectVisible);
+  }, [isWalletConnectVisible]);
 
   if (!fontsLoaded && !fontError) {
     return null;
@@ -230,6 +303,28 @@ export default function App() {
       tabBar={(props) => <CustomTabBar {...props} />}
       screenOptions={screenOptions}
       initialLayout={{ width }}
+      screenListeners={{
+        state: (e) => {
+          const index = e.data.state?.index;
+          if (index !== undefined && index !== currentTabIndex) {
+            setCurrentTabIndex(index);
+
+            // Close any open modals when switching tabs
+            if (isPreferencesVisible) {
+              setIsPreferencesVisible(false);
+            }
+            if (isWalletConnectVisible) {
+              setIsWalletConnectVisible(false);
+            }
+            if (modalRef.current) {
+              modalRef.current.dismiss();
+            }
+            if (walletConnectModalRef.current) {
+              walletConnectModalRef.current.dismiss();
+            }
+          }
+        },
+      }}
     >
       <Tab.Screen
         name="Explore"
@@ -252,77 +347,138 @@ export default function App() {
       <ScreenProvider>
         <GestureHandlerRootView style={{ flex: 1 }}>
           <BottomSheetModalProvider>
-            <ModalContext.Provider value={{ openPreferences }}>
-              <Background />
-              <WebIcons />
-              <View style={styles.container}>
-                <StatusBar
-                  style="light"
-                  translucent
-                  backgroundColor="transparent"
-                />
-                <SafeAreaProvider>
-                  <SafeAreaView style={styles.safeArea}>
-                    <NavigationContainer
-                      ref={navigationRef}
-                      theme={{
-                        ...DefaultTheme,
-                        colors: {
-                          ...DefaultTheme.colors,
-                          background: "transparent",
-                        },
-                      }}
-                      onReady={onLayoutRootView}
-                      linking={{
-                        prefixes: [],
-                        config: {
-                          screens: {
-                            ...(isPlatform("web") ? { Home: "home" } : {}),
-                            Explore: "explore/:address?",
-                            Assets: "assets/:address?",
-                            Create: "create",
-                            Network: "network",
+            <ModalContext.Provider
+              value={{
+                openPreferences,
+                openWalletConnect,
+                closePreferences: handleClosePreferences,
+                closeWalletConnect: handleCloseWalletConnect,
+              }}
+            >
+              <AuthProvider>
+                <Background />
+                <WebIcons />
+                <View style={styles.container}>
+                  <StatusBar
+                    style="light"
+                    translucent
+                    backgroundColor="transparent"
+                  />
+                  <SafeAreaProvider>
+                    <SafeAreaView style={styles.safeArea}>
+                      <NavigationContainer
+                        ref={navigationRef}
+                        theme={{
+                          ...DefaultTheme,
+                          colors: {
+                            ...DefaultTheme.colors,
+                            background: "transparent",
                           },
-                        },
-                      }}
-                    >
-                      <MainTabs />
-                    </NavigationContainer>
-                  </SafeAreaView>
-                </SafeAreaProvider>
-              </View>
-              {isMinWidth600 ? (
-                <Modal
-                  animationType="fade"
-                  transparent={true}
-                  visible={isClassicPreferencesVisible}
-                  onRequestClose={handleClosePreferences}
-                >
-                  <View style={styles.centeredView}>
-                    <View style={styles.modalView}>
-                      <PreferencesModal onClose={handleClosePreferences} />
+                        }}
+                        onReady={onLayoutRootView}
+                        linking={{
+                          prefixes: [],
+                          config: {
+                            screens: {
+                              ...(isPlatform("web") ? { Home: "home" } : {}),
+                              Explore: "explore/:address?",
+                              Assets: "assets/:address?",
+                              Create: "create",
+                              Network: "network",
+                            },
+                          },
+                        }}
+                      >
+                        <MainTabs />
+                      </NavigationContainer>
+                    </SafeAreaView>
+                  </SafeAreaProvider>
+                </View>
+
+                {/* Preferences Modal */}
+                {isLargeScreen ? (
+                  <RNModal
+                    transparent={true}
+                    visible={isPreferencesVisible}
+                    onRequestClose={handleClosePreferences}
+                    animationType="fade"
+                  >
+                    <View style={styles.modalBackdrop}>
+                      <TouchableOpacity
+                        style={StyleSheet.absoluteFill}
+                        activeOpacity={1}
+                        onPress={handleClosePreferences}
+                      />
+                      <View style={styles.modalContent}>
+                        <PreferencesModal onClose={handleClosePreferences} />
+                      </View>
                     </View>
-                  </View>
-                </Modal>
-              ) : (
-                <BottomSheetModal
-                  ref={modalRef}
-                  index={0}
-                  snapPoints={["70%"]}
-                  enablePanDownToClose={true}
-                  backgroundStyle={{
-                    backgroundColor: "rgba(30, 30, 30, 0.95)",
-                  }}
-                  handleIndicatorStyle={{
-                    backgroundColor: "rgba(255, 255, 255, 0.5)",
-                    width: 50,
-                  }}
-                  android_keyboardInputMode="adjustResize"
-                  keyboardBehavior="extend"
-                >
-                  <PreferencesModal onClose={handleClosePreferences} />
-                </BottomSheetModal>
-              )}
+                  </RNModal>
+                ) : (
+                  <BottomSheetModal
+                    ref={modalRef}
+                    index={0}
+                    snapPoints={["80%"]}
+                    enablePanDownToClose={true}
+                    backgroundStyle={{
+                      backgroundColor: "transparent",
+                    }}
+                    handleIndicatorStyle={{
+                      display: "none",
+                    }}
+                    android_keyboardInputMode="adjustResize"
+                    keyboardBehavior="extend"
+                  >
+                    <PreferencesModal
+                      onClose={handleClosePreferences}
+                      isBottomSheet={true}
+                    />
+                  </BottomSheetModal>
+                )}
+
+                {/* Wallet Connect Modal */}
+                {isLargeScreen ? (
+                  <RNModal
+                    transparent={true}
+                    visible={isWalletConnectVisible}
+                    onRequestClose={handleCloseWalletConnect}
+                    animationType="fade"
+                  >
+                    <View style={styles.modalBackdrop}>
+                      <TouchableOpacity
+                        style={StyleSheet.absoluteFill}
+                        activeOpacity={1}
+                        onPress={handleCloseWalletConnect}
+                      />
+                      <View style={styles.modalContent}>
+                        <WalletConnectModal
+                          onClose={handleCloseWalletConnect}
+                        />
+                      </View>
+                    </View>
+                  </RNModal>
+                ) : (
+                  <BottomSheetModal
+                    ref={walletConnectModalRef}
+                    index={0}
+                    snapPoints={["80%"]}
+                    enablePanDownToClose={true}
+                    backgroundStyle={{
+                      backgroundColor: "transparent",
+                    }}
+                    handleIndicatorStyle={{
+                      display: "none",
+                    }}
+                    android_keyboardInputMode="adjustResize"
+                    keyboardBehavior="extend"
+                  >
+                    <WalletConnectModal
+                      onClose={handleCloseWalletConnect}
+                      isBottomSheet={true}
+                    />
+                  </BottomSheetModal>
+                )}
+              </AuthProvider>
             </ModalContext.Provider>
           </BottomSheetModalProvider>
         </GestureHandlerRootView>
@@ -367,6 +523,7 @@ const styles = StyleSheet.create({
   },
   telegramTabBarContainer: {
     backgroundColor: "transparent",
+    height: 39,
     gap: 8,
   },
   largeScreenTabBarContainer: {
@@ -417,27 +574,17 @@ const styles = StyleSheet.create({
     color: "rgba(255, 255, 255, 0.96)",
     marginLeft: 4,
   },
-  centeredView: {
+  modalBackdrop: {
     flex: 1,
     justifyContent: "center",
     alignItems: "center",
-    backgroundColor: "rgba(0,0,0,0.4)",
+    backgroundColor: "rgba(0,0,0,0.7)",
   },
-  modalView: {
-    margin: 20,
-    backgroundColor: "rgba(30, 30, 30, 0.95)",
-    borderRadius: 20,
-    padding: 25,
-    alignItems: "center",
-    shadowColor: "#000",
-    shadowOffset: {
-      width: 0,
-      height: 2,
-    },
-    shadowOpacity: 0.25,
-    shadowRadius: 4,
-    elevation: 5,
-    width: "70%",
-    maxWidth: 600,
+  modalContent: {
+    width: "80%",
+    maxHeight: "80%",
+    backgroundColor: "transparent",
+    borderRadius: 16,
+    overflow: "hidden",
   },
 });

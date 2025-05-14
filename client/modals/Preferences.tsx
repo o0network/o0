@@ -1,87 +1,172 @@
-import { StyleSheet, View, Text, ScrollView } from "react-native";
-import { BottomSheetScrollView } from "@gorhom/bottom-sheet";
-import { Button } from "../components";
+import {
+  StyleSheet,
+  View,
+  Text,
+  TouchableOpacity,
+  Linking,
+  ScrollView,
+} from "react-native";
+import { Outbound, Inbound, GloriousButton } from "../components";
+import { useAuth } from "../contexts/AuthContext";
 
 type Props = {
   onClose?: () => void;
+  isBottomSheet?: boolean;
 };
 
-export default function PreferencesModal({ onClose }: Props) {
+export default function PreferencesModal({
+  onClose,
+  isBottomSheet = false,
+}: Props) {
+  const { isWalletConnected, disconnectWallet } = useAuth();
+
+  const handleDisconnectWallet = () => {
+    disconnectWallet();
+    if (onClose) onClose();
+  };
+
+  const ScrollViewComponent = isBottomSheet
+    ? require("@gorhom/bottom-sheet").BottomSheetScrollView
+    : ScrollView;
+
   return (
-    <View style={styles.container}>
-      <View style={styles.header}>
-        <Text style={styles.title}>Preferences</Text>
-      </View>
-      <BottomSheetScrollView style={styles.content}>
-        <Text style={styles.sectionTitle}>App Settings</Text>
+    <Outbound style={styles.container}>
+      {isBottomSheet && <View style={styles.grabber} />}
+      <ScrollViewComponent
+        style={styles.content}
+        contentContainerStyle={styles.contentContainer}
+      >
+        <View style={styles.cardsContainer}>
+          <Inbound style={styles.card}>
+            <View style={styles.cardContent}>
+              <Text style={styles.cardTitle}>Download App</Text>
+              <View style={styles.storeButtons}>
+                <TouchableOpacity
+                  style={styles.storeButton}
+                  onPress={() => Linking.openURL("https://apps.apple.com")}
+                >
+                  <Text style={styles.storeButtonText}>App Store</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={styles.storeButton}
+                  onPress={() => Linking.openURL("https://play.google.com")}
+                >
+                  <Text style={styles.storeButtonText}>Google Play</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+          </Inbound>
 
-        <View style={styles.option}>
-          <Text style={styles.optionText}>Dark Mode</Text>
+          <Inbound style={styles.card}>
+            <TouchableOpacity
+              style={styles.cardContent}
+              onPress={() =>
+                Linking.openURL("https://o0.network/graypaper.pdf")
+              }
+            >
+              <View style={styles.graypaper}>
+                <View>
+                  <Text style={styles.cardTitle}>Graypaper</Text>
+                  <Text style={styles.cardSubtitle}>
+                    https://o0.network/graypaper.pdf
+                  </Text>
+                </View>
+                <Text style={styles.externalLink}>↗</Text>
+              </View>
+            </TouchableOpacity>
+          </Inbound>
         </View>
 
-        <View style={styles.option}>
-          <Text style={styles.optionText}>Notifications</Text>
-        </View>
-
-        <View style={styles.option}>
-          <Text style={styles.optionText}>Language</Text>
-        </View>
-
-        <Text style={styles.sectionTitle}>Account</Text>
-
-        <View style={styles.option}>
-          <Text style={styles.optionText}>Profile</Text>
-        </View>
-
-        <View style={styles.option}>
-          <Text style={styles.optionText}>Security</Text>
-        </View>
-
-        {onClose && (
-          <Button title="Close" onPress={onClose} style={styles.closeButton} />
+        {isWalletConnected && (
+          <GloriousButton
+            title="Disconnect Wallet"
+            iconPath={require("../assets/emojis/prohibited.png")}
+            onPress={handleDisconnectWallet}
+            style={styles.disconnectButton}
+          />
         )}
-      </BottomSheetScrollView>
-    </View>
+      </ScrollViewComponent>
+    </Outbound>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: "rgba(20, 20, 20, 0.9)",
+    padding: 0,
+    gap: 12,
+    height: "100%",
+    width: "100%",
   },
-  header: {
-    padding: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: "rgba(255, 255, 255, 0.1)",
-  },
-  title: {
-    fontSize: 18,
-    fontWeight: "bold",
-    color: "#FFFFFF",
+  grabber: {
+    width: 40,
+    height: 5,
+    borderRadius: 2.5,
+    backgroundColor: "rgba(255, 255, 255, 0.3)",
+    alignSelf: "center",
+    marginTop: 10,
   },
   content: {
     flex: 1,
-    padding: 16,
   },
-  sectionTitle: {
-    fontSize: 16,
-    fontWeight: "bold",
-    color: "#FFFFFF",
-    marginTop: 16,
-    marginBottom: 8,
-  },
-  option: {
+  contentContainer: {
     padding: 12,
-    borderRadius: 8,
-    backgroundColor: "rgba(255, 255, 255, 0.1)",
-    marginBottom: 8,
+    width: "100%",
   },
-  optionText: {
-    fontSize: 16,
+  cardsContainer: {
+    gap: 6,
+    marginBottom: 12,
+    width: "100%",
+  },
+  card: {
+    padding: 8,
+    borderRadius: 16,
+    width: "100%",
+  },
+  cardContent: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    width: "100%",
+  },
+  cardTitle: {
+    fontSize: 17,
+    fontWeight: "600",
     color: "#FFFFFF",
   },
-  closeButton: {
-    marginTop: 24,
+  cardSubtitle: {
+    fontSize: 13,
+    color: "rgba(255, 255, 255, 0.23)",
+    fontWeight: "600",
+  },
+  externalLink: {
+    fontSize: 17,
+    color: "rgba(255, 255, 255, 0.23)",
+    fontWeight: "600",
+  },
+  graypaper: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    width: "100%",
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+  },
+  storeButtons: {
+    flexDirection: "row",
+    gap: 8,
+  },
+  storeButton: {
+    padding: 8,
+    backgroundColor: "rgba(255, 255, 255, 0.1)",
+    borderRadius: 8,
+  },
+  storeButtonText: {
+    color: "#FFFFFF",
+    fontSize: 14,
+  },
+  disconnectButton: {
+    marginTop: 12,
+    width: "100%",
   },
 });

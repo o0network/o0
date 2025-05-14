@@ -8,10 +8,11 @@ import {
   Image,
 } from "react-native";
 import { CameraView, useCameraPermissions } from "expo-camera";
-import { Frame, Button, SafeAreaView } from "../components";
+import { Frame, Button, SafeAreaView, GloriousButton } from "../components";
 import Video from "expo-video";
 import * as FileSystem from "expo-file-system";
 import { useModal } from "../contexts/ModalContext";
+import { useAuth } from "../contexts/AuthContext";
 
 type CreateScreenProps = {};
 
@@ -24,6 +25,8 @@ export default function CreateScreen({}: CreateScreenProps) {
   const [isSending, setIsSending] = useState(false);
   const cameraRef = useRef<CameraView>(null);
   const timerRef = useRef<NodeJS.Timeout | null>(null);
+  const { openWalletConnect } = useModal();
+  const { isWalletConnected } = useAuth();
 
   useEffect(() => {
     if (!isRecording) {
@@ -233,10 +236,10 @@ export default function CreateScreen({}: CreateScreenProps) {
           </Text>
         </Frame>
 
-        <Button
-          style={styles.sendButton}
-          onPress={sendVideo}
-          title={isSending ? "Sending..." : "Send"}
+        <GloriousButton
+          style={styles.walletButton}
+          onPress={openWalletConnect}
+          title="Connect Wallet"
         />
       </View>
     </SafeAreaView>
@@ -418,5 +421,8 @@ const styles = StyleSheet.create({
     marginVertical: 10,
     width: "80%",
     alignSelf: "center",
+  },
+  walletButton: {
+    marginTop: 12,
   },
 });
