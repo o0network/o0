@@ -18,7 +18,7 @@ export const Frame = ({
   intensity = 100,
   solidBorder = false,
   tint = "default",
-  borderRadius = 32,
+  borderRadius = 12,
 }: FrameProps) => {
   const frameStyles = [
     styles.container,

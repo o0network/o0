@@ -15,3 +15,4 @@ export { default as Text } from "./Text";
 export { default as WebIcons } from "./WebIcons";
 export { default as GloriousButton } from "./GloriousButton";
 export { default as SafeAreaView } from "./SafeAreaView";
+export { default as Link } from "./Link";

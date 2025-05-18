@@ -83,6 +83,7 @@ const styles = StyleSheet.create({
     zIndex: 1,
   },
   capRight: {
+    marginLeft: -5,
     width: CAP_RADIUS,
     height: "100%",
     zIndex: 1,

@@ -114,7 +114,7 @@ export const WebIcons: React.FC = () => {
         onPress={() => Linking.openURL("https://o0.network/a")}
       >
         <Image
-          source={require("../assets/app-store.png")}
+          source={require("../assets/app-store-qr.png")}
           style={styles.iconSizeLarge}
         />
       </TouchableOpacity>
@@ -124,7 +124,7 @@ export const WebIcons: React.FC = () => {
         onPress={() => Linking.openURL("https://o0.network/g")}
       >
         <Image
-          source={require("../assets/google-play.png")}
+          source={require("../assets/google-play-qr.png")}
           style={styles.iconSizeLarge}
         />
       </TouchableOpacity>

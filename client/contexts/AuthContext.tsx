@@ -26,11 +26,7 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
 
   const connectWallet = async () => {
     try {
-      // Simulating wallet connection
-      // In a real app, you would implement actual wallet connection logic here
-      // For example, using ethers.js, web3, or wallet-specific libraries
-
-      await new Promise((resolve) => setTimeout(resolve, 1000)); // Simulate connection delay
+      await new Promise((resolve) => setTimeout(resolve, 1000));
 
       const mockAddress = "0x" + Math.random().toString(16).slice(2, 42);
       setWalletAddress(mockAddress);
@@ -44,7 +40,6 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
   };
 
   const disconnectWallet = () => {
-    // Disconnect wallet logic
     setIsWalletConnected(false);
     setWalletAddress(null);
   };

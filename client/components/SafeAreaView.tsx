@@ -14,7 +14,9 @@ export const useInsets = () => {
   return isPlatform("telegram") ||
     isPlatform("tg_ios") ||
     isPlatform("tg_android")
-    ? viewport.safeAreaInsets()
+    ? { ...viewport.safeAreaInsets(), top: viewport.safeAreaInsets().top + 40 }
+    : isPlatform("web")
+    ? { top: 80, bottom: 40, left: 0, right: 0 }
     : useSafeAreaInsets();
 };
 

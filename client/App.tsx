@@ -8,8 +8,8 @@ import {
   useRef,
   useCallback,
   useState,
-  useEffect,
   type ReactNode,
+  useEffect,
 } from "react";
 import {
   StyleSheet,
@@ -19,8 +19,8 @@ import {
   TouchableOpacity,
   Animated,
   Image,
-  Modal as RNModal,
 } from "react-native";
+import Modal from "react-native-modal";
 import { StatusBar } from "expo-status-bar";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { useFonts } from "expo-font";
@@ -34,33 +34,66 @@ import {
 } from "@gorhom/bottom-sheet";
 import { ModalContext } from "./contexts/ModalContext";
 import { AuthProvider } from "./contexts/AuthContext";
-import PreferencesModal from "./modals/Preferences";
+import SettingsScreen from "./screens/SettingsScreen";
 import WalletConnectModal from "./modals/WalletConnect";
 import ExploreScreen from "./screens/ExploreScreen";
 import CreateScreen from "./screens/CreateScreen";
-import AssetsScreen from "./screens/AssetsScreen";
-import NetworkScreen from "./screens/NetworkScreen";
+import LedgerScreen from "./screens/LedgerScreen";
 import { PlatformProvider, usePlatform } from "./contexts/ScreenContext";
 import { Background, WebIcons } from "./components";
-import SafeAreaView, { useInsets } from "./components/SafeAreaView";
+import { useInsets } from "./components/SafeAreaView";
 import { ScreenProvider, useScreen } from "./contexts/ScreenContext";
 import CompassIcon from "./assets/emojis/compass.png";
 import DvdIcon from "./assets/emojis/dvd.png";
 import CoinIcon from "./assets/emojis/coin.png";
+import GearIcon from "./assets/emojis/gear.png";
+
+// All emoji images
+import TalkIcon from "./assets/emojis/talk.png";
+import ExternalLinkIcon from "./assets/emojis/external-link.png";
+import RejectIcon from "./assets/emojis/reject.png";
+import WorldIcon from "./assets/emojis/world.png";
+import TopLeftArrowIcon from "./assets/emojis/top-left-arrow.png";
+import UpwardsIcon from "./assets/emojis/upwards.png";
+import RightArrowIcon from "./assets/emojis/right-arrow.png";
+import MoneyWingsIcon from "./assets/emojis/money-wings.png";
+import ProhibitedIcon from "./assets/emojis/prohibited.png";
+import MoneyFaceIcon from "./assets/emojis/money-face.png";
+import LeftArrowIcon from "./assets/emojis/left-arrow.png";
 import GlobeIcon from "./assets/emojis/globe.png";
-import { on, settingsButton } from "@telegram-apps/sdk";
-import { BlurView } from "expo-blur";
+import DownwardsIcon from "./assets/emojis/downwards.png";
+import CloudIcon from "./assets/emojis/cloud.png";
+import ChainIcon from "./assets/emojis/chain.png";
+import CrossMarkIcon from "./assets/emojis/cross-mark.png";
+import CheckMarkIcon from "./assets/emojis/check-mark.png";
+import CameraIcon from "./assets/emojis/camera.png";
+
+// Glorious button assets
+import GloriousButtonLeft from "./assets/gloriousButton/left.png";
+import GloriousButtonCenter from "./assets/gloriousButton/center.png";
+import GloriousButtonRight from "./assets/gloriousButton/right.png";
 
 type TabParamList = {
   Explore: { address?: string };
   Create: undefined;
-  Assets: { address?: string };
-  Network: undefined;
+  Ledger: { address?: string };
+  Settings: undefined;
 };
 
 const { width } = Dimensions.get("window");
 
 const DEFAULT_ADDRESS = undefined;
+
+// Utility function to preload images
+const preloadImages = async (imageUrls: any[]) => {
+  try {
+    const preloadPromises = imageUrls.map((img) => Image.prefetch(Image.resolveAssetSource(img).uri));
+    await Promise.all(preloadPromises);
+    console.log('All images preloaded successfully');
+  } catch (error) {
+    console.error('Error preloading images:', error);
+  }
+};
 
 type TabBarItemProps = {
   label: string;
@@ -95,8 +128,10 @@ const TabBarItem = ({
         <Animated.View
           style={[
             styles.tabItemBase,
+            isTelegramIOS && { paddingHorizontal: 0 },
             isFocused ? styles.tabItemActive : styles.tabItemInactive,
             isTelegram && isFocused && styles.telegramTabItemActive,
+            isTelegramIOS && isFocused && { backgroundColor: "transparent" },
             isTelegram && !isFocused && styles.telegramTabItemInactive,
           ]}
         >
@@ -140,10 +175,16 @@ function CustomTabBar({
     if (isTelegramIOS) {
       return (
         <View style={[style, { overflow: "hidden", borderRadius: 100 }]}>
-          <BlurView
-            intensity={70}
-            tint="dark"
-            style={StyleSheet.absoluteFillObject}
+          <div
+            style={{
+              ...StyleSheet.absoluteFillObject,
+              position: "absolute",
+              background: "rgba(255,255,255,0.2)",
+              backdropFilter: `blur(50px)`,
+              WebkitBackdropFilter: `blur(50px)`,
+              borderRadius: 100,
+              zIndex: -1,
+            }}
           />
           {children}
         </View>
@@ -156,14 +197,18 @@ function CustomTabBar({
     <TabBarContainer
       style={[
         styles.tabBarContainer,
-        isTelegramIOS && {
-          paddingHorizontal: 120,
-          height: 38,
-          top: insets.top - 38,
-        },
-        isLargeScreen && styles.largeScreenTabBarContainer,
         isPlatform("web") && { top: 20 },
         isTelegram && styles.telegramTabBarContainer,
+        isTelegramIOS && {
+          height: 31,
+          gap: "auto",
+          background: "rgba(255, 255, 255, 0.1)",
+          shadowColor: "transparent",
+          justifyContent: "space-between",
+          width: 180,
+          top: insets.top - 32,
+        },
+        isLargeScreen && styles.largeScreenTabBarContainer,
       ]}
     >
       {state.routes.map((route, index) => {
@@ -174,8 +219,8 @@ function CustomTabBar({
         let icon = CompassIcon;
         if (route.name === "Explore") icon = CompassIcon;
         if (route.name === "Create") icon = DvdIcon;
-        if (route.name === "Assets") icon = CoinIcon;
-        if (route.name === "Network") icon = GlobeIcon;
+        if (route.name === "Ledger") icon = CoinIcon;
+        if (route.name === "Settings") icon = GearIcon;
 
         const bounceValue = bounceValues[index];
 
@@ -220,6 +265,24 @@ export default function App() {
     }
   }, [fontsLoaded, fontError]);
 
+  // Preload all images
+  useEffect(() => {
+    const emojiImages = [
+      CompassIcon, DvdIcon, CoinIcon, GearIcon,
+      TalkIcon, ExternalLinkIcon, RejectIcon, WorldIcon,
+      TopLeftArrowIcon, UpwardsIcon, RightArrowIcon, MoneyWingsIcon,
+      ProhibitedIcon, MoneyFaceIcon, LeftArrowIcon, GlobeIcon,
+      DownwardsIcon, CloudIcon, ChainIcon, CrossMarkIcon,
+      CheckMarkIcon, CameraIcon
+    ];
+
+    const gloriousButtonImages = [
+      GloriousButtonLeft, GloriousButtonCenter, GloriousButtonRight
+    ];
+
+    preloadImages([...emojiImages, ...gloriousButtonImages]);
+  }, []);
+
   const { isPlatform } = usePlatform();
   const modalRef = useRef<BottomSheetModal>(null);
   const walletConnectModalRef = useRef<BottomSheetModal>(null);
@@ -228,14 +291,7 @@ export default function App() {
   const [isWalletConnectVisible, setIsWalletConnectVisible] = useState(false);
   const [currentTabIndex, setCurrentTabIndex] = useState(0);
 
-  // Log screen dimensions on initial render
-  useEffect(() => {
-    const { width, height } = Dimensions.get("window");
-    console.log("Screen dimensions:", { width, height, isLargeScreen });
-  }, [isLargeScreen]);
-
   const openPreferences = useCallback(() => {
-    console.log("Opening preferences, isLargeScreen:", isLargeScreen);
     if (isLargeScreen) {
       setIsPreferencesVisible(true);
     } else {
@@ -244,19 +300,12 @@ export default function App() {
   }, [isLargeScreen]);
 
   const openWalletConnect = useCallback(() => {
-    console.log("Opening wallet connect, isLargeScreen:", isLargeScreen);
     if (isLargeScreen) {
       setIsWalletConnectVisible(true);
     } else {
       walletConnectModalRef.current?.present();
     }
   }, [isLargeScreen]);
-
-  if (isPlatform("telegram")) {
-    settingsButton.onClick(() => {
-      openPreferences();
-    });
-  }
 
   const handleClosePreferences = useCallback(() => {
     if (isLargeScreen) {
@@ -273,14 +322,6 @@ export default function App() {
       walletConnectModalRef.current?.dismiss();
     }
   }, [isLargeScreen]);
-
-  useEffect(() => {
-    console.log("isPreferencesVisible changed:", isPreferencesVisible);
-  }, [isPreferencesVisible]);
-
-  useEffect(() => {
-    console.log("isWalletConnectVisible changed:", isWalletConnectVisible);
-  }, [isWalletConnectVisible]);
 
   if (!fontsLoaded && !fontError) {
     return null;
@@ -314,7 +355,6 @@ export default function App() {
           if (index !== undefined && index !== currentTabIndex) {
             setCurrentTabIndex(index);
 
-            // Close any open modals when switching tabs
             if (isPreferencesVisible) {
               setIsPreferencesVisible(false);
             }
@@ -338,8 +378,8 @@ export default function App() {
         options={{ swipeEnabled: false }}
       />
       <Tab.Screen
-        name="Assets"
-        component={AssetsScreen}
+        name="Ledger"
+        component={LedgerScreen}
         initialParams={{ address: DEFAULT_ADDRESS }}
         options={{ swipeEnabled: swipeEnabled }}
       />
@@ -348,9 +388,10 @@ export default function App() {
         component={CreateScreen}
         options={{ swipeEnabled: swipeEnabled }}
       />
+
       <Tab.Screen
-        name="Network"
-        component={NetworkScreen}
+        name="Settings"
+        component={SettingsScreen}
         options={{ swipeEnabled: swipeEnabled }}
       />
     </Tab.Navigator>
@@ -379,55 +420,58 @@ export default function App() {
                     backgroundColor="transparent"
                   />
                   <SafeAreaProvider>
-                    <SafeAreaView style={styles.safeArea}>
-                      <NavigationContainer
-                        ref={navigationRef}
-                        theme={{
-                          ...DefaultTheme,
-                          colors: {
-                            ...DefaultTheme.colors,
-                            background: "transparent",
-                          },
-                        }}
-                        onReady={onLayoutRootView}
-                        linking={{
-                          prefixes: ["http://localhost:8081"],
-                          config: {
-                            initialRouteName: "Explore",
-                            screens: {
-                              Explore: "explore",
-                              Assets: "assets",
-                              Create: "create",
-                              Network: "network",
+                    <NavigationContainer
+                      ref={navigationRef}
+                      theme={{
+                        ...DefaultTheme,
+                        colors: {
+                          ...DefaultTheme.colors,
+                          background: "transparent",
+                        },
+                      }}
+                      onReady={onLayoutRootView}
+                      linking={{
+                        prefixes: [],
+                        config: {
+                          initialRouteName: "Explore",
+                          screens: {
+                            Explore: {
+                              path: "explore/:address?",
+                              parse: {
+                                address: (address: string) => address,
+                              },
                             },
+                            Ledger: {
+                              path: "ledger/:address?",
+                              parse: {
+                                address: (address: string) => address,
+                              },
+                            },
+                            Create: "create",
+                            Settings: "settings",
                           },
-                        }}
-                      >
-                        <MainTabs />
-                      </NavigationContainer>
-                    </SafeAreaView>
+                        },
+                      }}
+                    >
+                      <MainTabs />
+                    </NavigationContainer>
                   </SafeAreaProvider>
                 </View>
 
                 {/* Preferences Modal */}
                 {isLargeScreen ? (
-                  <RNModal
-                    transparent={true}
-                    visible={isPreferencesVisible}
-                    onRequestClose={handleClosePreferences}
-                    animationType="fade"
+                  <Modal
+                    isVisible={isPreferencesVisible}
+                    onBackdropPress={handleClosePreferences}
+                    backdropOpacity={0.7}
+                    animationIn="fadeIn"
+                    animationOut="fadeOut"
+                    style={styles.modal}
                   >
-                    <View style={styles.modalBackdrop}>
-                      <TouchableOpacity
-                        style={StyleSheet.absoluteFill}
-                        activeOpacity={1}
-                        onPress={handleClosePreferences}
-                      />
-                      <View style={styles.modalContent}>
-                        <PreferencesModal onClose={handleClosePreferences} />
-                      </View>
+                    <View style={styles.modalContent}>
+                      <SettingsScreen />
                     </View>
-                  </RNModal>
+                  </Modal>
                 ) : (
                   <BottomSheetModal
                     ref={modalRef}
@@ -443,34 +487,26 @@ export default function App() {
                     android_keyboardInputMode="adjustResize"
                     keyboardBehavior="extend"
                   >
-                    <PreferencesModal
-                      onClose={handleClosePreferences}
-                      isBottomSheet={true}
-                    />
+                    <SettingsScreen />
                   </BottomSheetModal>
                 )}
 
                 {/* Wallet Connect Modal */}
                 {isLargeScreen ? (
-                  <RNModal
-                    transparent={true}
-                    visible={isWalletConnectVisible}
-                    onRequestClose={handleCloseWalletConnect}
-                    animationType="fade"
+                  <Modal
+                    isVisible={isWalletConnectVisible}
+                    onBackdropPress={handleCloseWalletConnect}
+                    backdropOpacity={0.7}
+                    animationIn="fadeIn"
+                    animationOut="fadeOut"
+                    style={styles.modal}
                   >
-                    <View style={styles.modalBackdrop}>
-                      <TouchableOpacity
-                        style={StyleSheet.absoluteFill}
-                        activeOpacity={1}
-                        onPress={handleCloseWalletConnect}
+                    <View style={styles.modalContent}>
+                      <WalletConnectModal
+                        onClose={handleCloseWalletConnect}
                       />
-                      <View style={styles.modalContent}>
-                        <WalletConnectModal
-                          onClose={handleCloseWalletConnect}
-                        />
-                      </View>
                     </View>
-                  </RNModal>
+                  </Modal>
                 ) : (
                   <BottomSheetModal
                     ref={walletConnectModalRef}
@@ -536,8 +572,10 @@ const styles = StyleSheet.create({
     zIndex: 10,
   },
   telegramTabBarContainer: {
+    paddingHorizontal: 12,
     backgroundColor: "transparent",
-    height: 39,
+    marginVertical: 6,
+    height: 30,
     gap: 8,
   },
   largeScreenTabBarContainer: {
@@ -547,6 +585,7 @@ const styles = StyleSheet.create({
     elevation: 0,
     shadowOpacity: 0,
     backgroundColor: "transparent",
+    paddingHorizontal: 4,
   },
   tabBarContentContainer: {
     flex: 1,
@@ -558,16 +597,16 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     borderRadius: 999,
     paddingVertical: 6,
+    paddingHorizontal: 12,
   },
   tabItemActive: {
     backgroundColor: "rgba(94, 94, 94, 0.2)",
   },
   tabItemInactive: {
-    paddingHorizontal: 8,
     gap: 3,
   },
   telegramTabItemActive: {
-    backgroundColor: "rgba(255, 255, 255, 0.2)",
+    backgroundColor: "rgba(255, 255, 255, 0.1)",
   },
   telegramTabItemInactive: {
     backgroundColor: "transparent",
@@ -586,18 +625,16 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: "600",
     color: "rgba(255, 255, 255, 0.96)",
-    marginLeft: 4,
   },
-  modalBackdrop: {
-    flex: 1,
+  modal: {
+    margin: 0,
     justifyContent: "center",
     alignItems: "center",
-    backgroundColor: "rgba(0,0,0,0.7)",
   },
   modalContent: {
     width: "80%",
     maxHeight: "80%",
-    backgroundColor: "transparent",
+    backgroundColor: "rgba(30, 30, 30, 0.95)",
     borderRadius: 16,
     overflow: "hidden",
   },

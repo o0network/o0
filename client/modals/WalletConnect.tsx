@@ -4,9 +4,11 @@ import {
   Text,
   TouchableOpacity,
   ScrollView,
+  ActivityIndicator,
 } from "react-native";
 import { Outbound, Inbound, GloriousButton } from "../components";
 import { useAuth } from "../contexts/AuthContext";
+import { useState } from "react";
 
 type Props = {
   onClose?: () => void;
@@ -17,14 +19,27 @@ export default function WalletConnectModal({
   onClose,
   isBottomSheet = false,
 }: Props) {
-  const { connectWallet } = useAuth();
+  const { connectWallet, disconnectWallet, isWalletConnected, walletAddress } = useAuth();
+  const [isConnecting, setIsConnecting] = useState(false);
 
   const handleConnect = async () => {
     try {
+      setIsConnecting(true);
       await connectWallet();
       if (onClose) onClose();
     } catch (error) {
       console.error("Failed to connect wallet:", error);
+    } finally {
+      setIsConnecting(false);
+    }
+  };
+
+  const handleDisconnect = () => {
+    try {
+      disconnectWallet();
+      if (onClose) onClose();
+    } catch (error) {
+      console.error("Failed to disconnect wallet:", error);
     }
   };
 
@@ -39,27 +54,37 @@ export default function WalletConnectModal({
         style={styles.content}
         contentContainerStyle={styles.contentContainer}
       >
-        <Inbound style={styles.section}>
-          <Text style={styles.sectionTitle}>Available Wallets</Text>
+        <Text style={styles.title}>Wallet Connection</Text>
 
-          <TouchableOpacity style={styles.walletOption} onPress={handleConnect}>
-            <Text style={styles.walletText}>Telegram Wallet</Text>
-          </TouchableOpacity>
-
-          <TouchableOpacity style={styles.walletOption} onPress={handleConnect}>
-            <Text style={styles.walletText}>MetaMask</Text>
-          </TouchableOpacity>
-
-          <TouchableOpacity style={styles.walletOption} onPress={handleConnect}>
-            <Text style={styles.walletText}>WalletConnect</Text>
-          </TouchableOpacity>
-        </Inbound>
-
-        <GloriousButton
-          title="Connect Wallet"
-          onPress={handleConnect}
-          style={styles.connectButton}
-        />
+        {isWalletConnected ? (
+          <Inbound style={styles.section}>
+            <Text style={styles.sectionTitle}>Connected Wallet</Text>
+            <Text style={styles.walletAddress}>{walletAddress}</Text>
+            <GloriousButton
+              style={styles.connectButton}
+              onPress={handleDisconnect}
+              title="Disconnect Wallet"
+            />
+          </Inbound>
+        ) : (
+          <Inbound style={styles.section}>
+            <Text style={styles.sectionTitle}>Connect a Wallet</Text>
+            <TouchableOpacity style={styles.walletOption} onPress={handleConnect}>
+              <Text style={styles.walletText}>MetaMask</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={styles.walletOption} onPress={handleConnect}>
+              <Text style={styles.walletText}>WalletConnect</Text>
+            </TouchableOpacity>
+            <GloriousButton
+              style={styles.connectButton}
+              onPress={handleConnect}
+              title={isConnecting ? "Connecting..." : "Connect Wallet"}
+            />
+            {isConnecting && (
+              <ActivityIndicator style={styles.loader} color="#FFFFFF" />
+            )}
+          </Inbound>
+        )}
       </ScrollViewComponent>
     </Outbound>
   );
@@ -71,6 +96,8 @@ const styles = StyleSheet.create({
     padding: 0,
     width: "100%",
     height: "100%",
+    maxWidth: 500,
+    alignSelf: "center",
   },
   grabber: {
     width: 40,
@@ -94,6 +121,13 @@ const styles = StyleSheet.create({
     padding: 16,
     width: "100%",
   },
+  title: {
+    fontSize: 20,
+    fontWeight: "600",
+    color: "#FFFFFF",
+    marginBottom: 16,
+    textAlign: "center",
+  },
   section: {
     padding: 16,
     marginBottom: 16,
@@ -116,8 +150,18 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: "#FFFFFF",
   },
+  walletAddress: {
+    fontSize: 14,
+    color: "#FFFFFF",
+    opacity: 0.7,
+    marginBottom: 16,
+    fontFamily: "DMMono_500Medium",
+  },
   connectButton: {
     marginTop: 24,
     width: "100%",
+  },
+  loader: {
+    marginTop: 16,
   },
 });

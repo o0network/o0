@@ -118,7 +118,6 @@ export default function Background() {
   const { isPlatform } = usePlatform();
 
   const isMobile = isPlatform("ios") || isPlatform("android");
-  const isTelegram = isPlatform("telegram");
   const isTelegramMobile = isPlatform("tg_ios") || isPlatform("tg_android");
   const hasSensors = isMobile || isTelegramMobile;
   const rendererRef = useRef<Renderer | null>(null);
@@ -141,7 +140,6 @@ export default function Background() {
     const flatThreshold = Math.PI / 6;
 
     DeviceMotion.isAvailableAsync().then((isAvailable) => {
-      console.log("isAvailable", isAvailable);
       if (isAvailable && isMounted && !motionSubscriptionRef.current) {
         motionSubscriptionRef.current = DeviceMotion.addListener(
           (motionData) => {
@@ -214,19 +212,42 @@ export default function Background() {
 
   const onContextCreate = useCallback(
     (gl: ExpoWebGLRenderingContext) => {
-      rendererRef.current = new Renderer({ gl });
+      // Get actual dimensions
+      const { drawingBufferWidth: width, drawingBufferHeight: height } = gl;
+
+      // Create proper renderer
+      rendererRef.current = new Renderer({
+        gl,
+        width,
+        height,
+        // Use device pixel ratio for Telegram platforms as well
+        pixelRatio: window.devicePixelRatio || 1,
+      });
+
       sceneRef.current = new THREE.Scene();
       cameraRef.current = new THREE.PerspectiveCamera(
         75,
-        gl.drawingBufferWidth / gl.drawingBufferHeight,
+        width / height,
         0.1,
         1000
       );
       clockRef.current = new THREE.Clock();
 
-      const { drawingBufferWidth: width, drawingBufferHeight: height } = gl;
-      rendererRef.current.setSize(width, height);
+      // Set size correctly for the specific platform
+      if (isMobile || isTelegramMobile) {
+        // For mobile or Telegram, use full viewport dimensions
+        const viewportWidth = window.innerWidth || width;
+        const viewportHeight = window.innerHeight || height;
+        rendererRef.current.setSize(viewportWidth, viewportHeight, true);
+        cameraRef.current.aspect = viewportWidth / viewportHeight;
+      } else {
+        // For web, use window dimensions
+        rendererRef.current.setSize(window.innerWidth, window.innerHeight, true);
+        cameraRef.current.aspect = window.innerWidth / window.innerHeight;
+      }
+
       rendererRef.current.setClearColor(0x000000, 0);
+      cameraRef.current.updateProjectionMatrix();
       cameraRef.current!.position.z = 1;
 
       const mouseSensitivity = 0.04;
@@ -289,7 +310,7 @@ export default function Background() {
             -Math.PI / 2
           );
           targetQuat.multiply(alignQuat);
-          currentQuat.slerp(targetQuat, isTelegram ? 1.0 : 0.1);
+          currentQuat.slerp(targetQuat, 0.1);
           const rotationMatrix = new THREE.Matrix3().setFromMatrix4(
             new THREE.Matrix4().makeRotationFromQuaternion(currentQuat)
           );
@@ -320,20 +341,38 @@ export default function Background() {
   }, []);
 
   useEffect(() => {
-    if (isMobile) return;
+    // Handle resize for all platforms, not just non-mobile
     const handleResize = () => {
-      if (rendererRef.current) {
+      if (rendererRef.current && cameraRef.current) {
         const { innerWidth, innerHeight } = window;
-        rendererRef.current.setSize(innerWidth, innerHeight);
+        const viewportWidth = innerWidth;
+        const viewportHeight = innerHeight;
+
+        // Set physical and logical size
+        rendererRef.current.setSize(viewportWidth, viewportHeight, true);
+
+        if (rendererRef.current.domElement) {
+          rendererRef.current.domElement.style.width = '100%';
+          rendererRef.current.domElement.style.height = '100%';
+        }
+
+        // Update camera aspect ratio
+        cameraRef.current.aspect = viewportWidth / viewportHeight;
+        cameraRef.current.updateProjectionMatrix();
       }
     };
+    // Call it once to ensure initial sizing is correct
+    handleResize();
     window.addEventListener("resize", handleResize);
     return () => window.removeEventListener("resize", handleResize);
-  }, [isMobile]);
+  }, []); // Remove isMobile dependency to handle all platforms
 
   return (
-    <View style={styles.container}>
-      <GLView style={styles.glView} onContextCreate={onContextCreate} />
+    <View style={{...StyleSheet.absoluteFillObject, zIndex: -1}}>
+      <GLView
+        style={styles.glView}
+        onContextCreate={onContextCreate}
+      />
     </View>
   );
 }
@@ -346,8 +385,13 @@ const styles = StyleSheet.create({
     right: 0,
     bottom: 0,
     zIndex: -1,
+    width: "100%",
+    height: "100%",
+    overflow: "hidden",
   },
   glView: {
     flex: 1,
+    width: "100%",
+    height: "100%",
   },
 });

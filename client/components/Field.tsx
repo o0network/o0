@@ -10,6 +10,7 @@ import {
   TextStyle,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
+import { Inbound } from "../components";
 
 type FieldProps = TextInputProps & {
   placeholder?: string;
@@ -38,7 +39,7 @@ export const Field: React.FC<FieldProps> = ({
   const finalInputStyle = [styles.input, inputStyle];
 
   return (
-    <View style={containerStyle}>
+    <Inbound style={containerStyle}>
       <TextInput
         style={finalInputStyle}
         placeholder={placeholder}
@@ -62,18 +63,22 @@ export const Field: React.FC<FieldProps> = ({
         </TouchableOpacity>
       )}
       <View style={styles.childrenContainer}>{children}</View>
-    </View>
+    </Inbound>
   );
 };
 
 const styles = StyleSheet.create({
   focusedContainer: {
     borderColor: "rgba(255, 255, 255, 0.5)",
+    width: "100%",
   },
   input: {
     flex: 1,
+    paddingLeft: 12,
+    width: "100%",
     borderRadius: 999,
     fontSize: 16,
+    textAlign: "left",
     fontWeight: "600",
     fontFamily: "Nunito_600SemiBold",
     color: "#FFFFFF",

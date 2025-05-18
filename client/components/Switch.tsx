@@ -1,11 +1,11 @@
 import {
-  View,
   StyleSheet,
   Pressable,
   Text,
   Image,
   ImageSourcePropType,
 } from "react-native";
+import { Outbound } from "./Frame";
 
 export type TabItemType = {
   key: string;
@@ -19,7 +19,7 @@ type SwitchProps = {
 };
 
 const Switch = ({ style, children }: SwitchProps) => {
-  return <View style={[styles.container, style]}>{children}</View>;
+  return <Outbound style={[styles.container, style]}>{children}</Outbound>;
 };
 
 type TabProps = {
@@ -29,9 +29,10 @@ type TabProps = {
   isPlatformWeb?: boolean;
   style?: any;
   onPress: () => void;
+  img?: ImageSourcePropType;
 };
 
-const Tab = ({ tab, active, style, onPress }: TabProps) => {
+const Tab = ({ tab, active, style, onPress, showLabels = true, img }: TabProps) => {
   return (
     <Pressable
       key={tab.key}
@@ -45,7 +46,7 @@ const Tab = ({ tab, active, style, onPress }: TabProps) => {
           resizeMode="contain"
         />
       ) : (
-        <Text style={styles.label}>{tab.label}</Text>
+        <Text style={styles.label}>{showLabels ? tab.label : ""}</Text>
       )}
     </Pressable>
   );
@@ -99,9 +100,8 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     backgroundColor: "rgba(208, 208, 208, 0.5)",
     borderRadius: 999,
-    paddingVertical: 4,
     paddingHorizontal: 4,
-    gap: 32,
+    gap: 6,
     shadowColor: "#000",
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,

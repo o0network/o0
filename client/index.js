@@ -7,22 +7,19 @@ import {
   swipeBehavior,
   viewport,
   closingBehavior,
-  settingsButton,
 } from "@telegram-apps/sdk";
 import App from "./App";
 import { postEvent, on } from "@telegram-apps/bridge";
-// import eruda from "eruda";
-// eruda.init();
+import eruda from "eruda";
+eruda.init();
 
 try {
   init({ postEvent, on });
-
 
   if (swipeBehavior.mount.isAvailable()) {
     swipeBehavior.mount();
     if (swipeBehavior.disableVertical.isAvailable()) {
       swipeBehavior.disableVertical();
-      console.log(swipeBehavior.isVerticalEnabled());
     }
   }
 
@@ -30,9 +27,6 @@ try {
 
   closingBehavior.mount();
   closingBehavior.enableConfirmation();
-
-  settingsButton.mount();
-  settingsButton.show();
 
   viewport
     .mount()

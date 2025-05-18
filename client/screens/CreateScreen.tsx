@@ -3,16 +3,18 @@ import {
   View,
   StyleSheet,
   Text,
-  Linking,
   TouchableOpacity,
   Image,
+  Alert,
 } from "react-native";
 import { CameraView, useCameraPermissions } from "expo-camera";
-import { Frame, Button, SafeAreaView, GloriousButton } from "../components";
-import Video from "expo-video";
+import { Frame, SafeAreaView, GloriousButton } from "../components";
+import { VideoView, useVideoPlayer } from "expo-video";
 import * as FileSystem from "expo-file-system";
 import { useModal } from "../contexts/ModalContext";
 import { useAuth } from "../contexts/AuthContext";
+import ApiService from "../data/api";
+import { retrieveLaunchParams } from "@telegram-apps/sdk";
 
 type CreateScreenProps = {};
 
@@ -37,13 +39,11 @@ export default function CreateScreen({}: CreateScreenProps) {
       return;
     }
 
-    // Start timer when recording begins
     setRecordingDuration(0);
     timerRef.current = setInterval(() => {
       setRecordingDuration((prev) => prev + 1);
     }, 1000);
 
-    // Auto-stop recording after 60 seconds
     const stopTimeout = setTimeout(() => {
       if (isRecording) {
         toggleRecording();
@@ -73,8 +73,6 @@ export default function CreateScreen({}: CreateScreenProps) {
       try {
         cameraRef.current.stopRecording();
         setIsRecording(false);
-        // In a real app, you would get the URI from where the video was saved
-        // For this implementation, we'll simulate having a URI
         const dummyUri = FileSystem.documentDirectory + "recorded_video.mp4";
         setRecordedVideo(dummyUri);
       } catch (e) {
@@ -83,16 +81,12 @@ export default function CreateScreen({}: CreateScreenProps) {
       }
     } else {
       try {
-        // Reset the recorded video when starting a new recording
         setRecordedVideo(null);
         setIsRecording(true);
 
-        // Start recording and handle the promise
         cameraRef.current
           .recordAsync()
           .then((data) => {
-            // If we reach here, it means recordAsync completed normally
-            // which shouldn't happen unless stopRecording was called
             if (data && data.uri) {
               setRecordedVideo(data.uri);
             }
@@ -122,14 +116,41 @@ export default function CreateScreen({}: CreateScreenProps) {
 
     try {
       setIsSending(true);
+      if (!isWalletConnected) {
+        Alert.alert(
+          "Connect Wallet",
+          "You need to connect your wallet before submitting videos",
+          [{ text: "OK", onPress: openWalletConnect }]
+        );
+        return;
+      }
 
-      // TODO: upload video to server
+      const launchParams = retrieveLaunchParams();
+      const user = launchParams?.tgWebAppData?.user;
 
-      await new Promise((resolve) => setTimeout(resolve, 2000));
+      if (!user) {
+        return;
+      }
 
-      resetRecording();
+      const result = await ApiService.submitVideo(
+        recordedVideo,
+        user?.id.toString() || user.username || "0",
+        "Video Note"
+      );
+
+      if (result.success) {
+        Alert.alert(
+          "Video Submitted",
+          "Your video has been submitted for validation. You'll be notified when it's approved.",
+          [{ text: "OK" }]
+        );
+        resetRecording();
+      } else {
+        Alert.alert("Error", result.message || "Failed to submit video");
+      }
     } catch (error) {
       console.error("Error sending video:", error);
+      Alert.alert("Error", "Failed to send video. Please try again.");
     } finally {
       setIsSending(false);
     }
@@ -147,12 +168,10 @@ export default function CreateScreen({}: CreateScreenProps) {
     if (recordedVideo) {
       return (
         <View style={styles.camera}>
-          <Video
-            source={{ uri: recordedVideo }}
+          <VideoView
+            player={useVideoPlayer(recordedVideo)}
             style={StyleSheet.absoluteFillObject}
-            resizeMode="cover"
-            isLooping
-            shouldPlay
+            contentFit="cover"
           />
           <TouchableOpacity style={styles.resetButton} onPress={resetRecording}>
             <Text style={styles.resetButtonText}>↺</Text>
@@ -204,7 +223,7 @@ export default function CreateScreen({}: CreateScreenProps) {
 
     return (
       <View style={[styles.camera, styles.cameraPlaceholder]}>
-        <Image source={require("../assets/emojis/camera.png")} />
+        <Image style={{width: 48, height: 48}} source={require("../assets/emojis/camera.png")} />
         <TouchableOpacity
           style={styles.permissionButton}
           onPress={requestCameraAccess}
@@ -221,26 +240,28 @@ export default function CreateScreen({}: CreateScreenProps) {
 
       <View style={styles.bottomSection}>
         <Frame style={styles.instructionFrame}>
-          <Text style={styles.instructionTitle}>What to shot?</Text>
+          <Text style={styles.instructionTitle}>Advice</Text>
           <Text style={styles.instructionText}>
-            Try to describe the key features
+            • Try to describe the key features
           </Text>
           <Text style={styles.instructionText}>
-            Highlight unique problem and solution
+            • Highlight unique problem and solution
           </Text>
           <Text style={styles.instructionText}>
-            Show traction or market potential
+            • Show traction or market potential
           </Text>
           <Text style={styles.instructionText}>
-            Be concise, passionate, and clear
+            • Be concise, passionate, and clear
           </Text>
         </Frame>
 
-        <GloriousButton
-          style={styles.walletButton}
-          onPress={openWalletConnect}
-          title="Connect Wallet"
-        />
+        {!isWalletConnected && (
+          <GloriousButton
+            style={styles.walletButton}
+            onPress={openWalletConnect}
+            title="Connect Wallet"
+          />
+        )}
       </View>
     </SafeAreaView>
   );
@@ -255,7 +276,7 @@ const styles = StyleSheet.create({
     width: "100%",
     alignSelf: "center",
     paddingHorizontal: 16,
-    paddingVertical: 12,
+    marginTop: 12,
     gap: 16,
   },
   telegramPill: {
@@ -280,7 +301,6 @@ const styles = StyleSheet.create({
     backgroundColor: "#333",
     justifyContent: "center",
     alignItems: "center",
-    marginBottom: 20,
     position: "relative",
   },
   camera: {
@@ -310,7 +330,8 @@ const styles = StyleSheet.create({
     textAlign: "left",
     borderRadius: 16,
     alignItems: "flex-start",
-    padding: 12,
+    paddingHorizontal: 24,
+    paddingVertical: 18,
     gap: 4,
   },
   instructionTitle: {
@@ -355,11 +376,12 @@ const styles = StyleSheet.create({
   },
   flipButton: {
     position: "absolute",
-    right: 20,
-    bottom: 20,
+    right: "50%",
+    bottom: 0,
+    transform: [{ translateX: "50%" }, { translateY: "50%" }],
     width: 40,
     height: 40,
-    borderRadius: 20,
+    borderRadius: 999,
     backgroundColor: "rgba(255, 255, 255, 0.3)",
     justifyContent: "center",
     alignItems: "center",
@@ -423,6 +445,10 @@ const styles = StyleSheet.create({
     alignSelf: "center",
   },
   walletButton: {
-    marginTop: 12,
+    margin: 12,
+    width: 240,
+  },
+  walletConnectedButton: {
+    opacity: 0.7,
   },
 });

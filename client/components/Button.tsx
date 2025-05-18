@@ -92,7 +92,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     overflow: "hidden",
     paddingHorizontal: 16,
-    paddingVertical: 12,
+    paddingVertical: 8,
   },
   disabled: {
     opacity: 0.5,
