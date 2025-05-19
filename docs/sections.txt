@@ -1,0 +1,121 @@
+  \hypertarget{chap:\thechapter}{}% Create unique anchor
+  \begin{center}
+    \textbf{\MakeUppercase{\thechapter\space #1}}
+  \end{center}
+  % Reduce space between number and title in TOC by using less space or negative space
+  \addcontentsline{toc}{chapter}{\texorpdfstring{\thechapter\hspace{0.3em}#1}{Chapter \thechapter}}% Reduced space
+  \@afterchaptertrue % Set flag after chapter
+}
+
+% Special command for unnumbered chapters (like INTRODUCTION, CONCLUSION)
+\newcommand{\myunnumberedchapter}[1]{%
+  \newpage
+  \hypertarget{chap:#1}{}% Create unique anchor
+  \begin{center}
+    \textbf{\MakeUppercase{#1}}
+  \end{center}
+  \addcontentsline{toc}{chapter}{\texorpdfstring{#1}{#1}}% Add optional PDF string
+}
+
+\newcommand{\mysection}[1]{%
+  \ifnum\value{section}>0
+  \vspace{1em}
+  \fi
+  \refstepcounter{section}
+  \hypertarget{sec:\thechapter.\thesection}{}% Create unique anchor
+  \textbf{\thesection\space #1}
+  % Reduce space between number and title in TOC
+  \addcontentsline{toc}{section}{\texorpdfstring{\thesection\hspace{2em}#1}{Section \thesection}}% Reduced space
+}
+
+\newcommand{\mysubsection}[1]{%
+  \refstepcounter{subsection}
+  \hypertarget{subsec:\thechapter.\thesection.\thesubsection}{}
+  \textbf{\thesubsection\space #1}
+  % Reduce space between number and title in TOC
+  \addcontentsline{toc}{subsection}{\texorpdfstring{\thesubsection\hspace{2em}#1}{Subsection \thesubsection}}
+}
+
+\renewcommand{\thechapter}{\arabic{chapter}}
+
+% Define appendix format with Cyrillic letters
+\newcommand{\startappendix}{%
+  \setcounter{chapter}{0}%
+  \renewcommand{\thechapter}{\CYRA\cyrillictext}%
+  \renewcommand{\thesection}{\thechapter.\arabic{section}}%
+  \renewcommand{\thesubsection}{\thechapter.\arabic{section}.\arabic{subsection}}%
+  \renewcommand{\thetable}{\thechapter.\arabic{table}}%
+  \renewcommand{\thefigure}{\thechapter.\arabic{figure}}%
+}
+
+\makeatother
+
+\AtBeginDocument{\onehalfspacing}
+
+% Настройка листингов кода (перед \begin{document})
+\lstset{
+    language=Python,                       % язык по умолчанию
+    frame=single,                          % рамка вокруг кода
+    basicstyle=\footnotesize\ttfamily,     % шрифт кода
+    keywordstyle=\color{blue},             % стиль ключевых слов
+    commentstyle=\itshape\color{green!50!black}, % стиль комментариев
+    stringstyle=\color{mauve},             % стиль строк
+    breaklines=true,                       % автоматический перенос строк
+    breakatwhitespace=true,                % перенос только на пробельных символах
+    tabsize=4,                             % размер табуляции
+    numberstyle=\tiny\color{gray},         % стиль нумерации строк
+    numbersep=5pt,                         % расстояние между нумерацией и кодом
+    aboveskip=10pt,                        % отступ сверху
+    belowskip=10pt,                        % отступ снизу
+    captionpos=t,                          % позиция заголовка (t - сверху, b - снизу)
+    float=tp,                              % опции для плавающих блоков
+    numbers=left,                          % нумерация строк слева
+    literate={~} {$\sim$}{1},              % замена символов
+    extendedchars=true                     % расширенная кодировка
+}
+
+% Переопределение названий для листингов
+\renewcommand{\lstlistingname}{Листинг}
+
+% Настройка подписей к листингам через caption
+\captionsetup[lstlisting]{
+    singlelinecheck=false,
+    justification=raggedright,
+    format=plain,
+    labelformat=simple,
+    labelsep=endash
+}
+
+% Добавляем команду для вставки надписи "Продолжение листинга"
+\newcommand{\continuedlisting}[1]{%
+  \begin{center}
+% Настройка отображения листингов с поддержкой разрывов страниц
+\makeatletter
+\newenvironment{tcolorbox}[1][]{%
+  \begin{mdframed}[%
+    skipabove=10pt,
+    skipbelow=10pt,
+    leftmargin=0pt,
+    rightmargin=0pt,
+    innerleftmargin=5pt,
+    innerrightmargin=5pt,
+    innertopmargin=\baselineskip,
+    innerbottommargin=\baselineskip,
+    frametitle=\mdframedtitle,
+    frametitlebelowskip=\baselineskip,
+    splittopskip=\baselineskip,
+    splitbottomskip=0pt,
+    singleextra={},
+    firstextra={},
+    middleextra={},
+    lastextra={},
+    secondextra={},
+    settings={\global\let\mdframedtitle\@empty}%
+  ]%
+}{%
+  \end{mdframed}%
+}
+
+\newcommand{\mdframedtitle}{}
+\newcommand{\themdframedtitle}{\mdframedtitle}
+
