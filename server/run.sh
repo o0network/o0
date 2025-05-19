@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 
-docker stop o0server || true
-docker rm o0server || true
+docker stop o0server
+docker rm o0server
 
 docker build -t o0server .
 

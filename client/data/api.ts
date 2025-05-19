@@ -48,14 +48,8 @@ export type VideoStatusResult = {
 // In React Native, __DEV__ is a global variable set to true in development.
 // process.env.NODE_ENV might not be reliably set by all RN bundlers/environments for this check.
 // window.location.hostname is not applicable in React Native.
-export const API_URL =
-  __DEV__ &&
-  !(
-    typeof window !== "undefined" &&
-    window.location &&
-    window.location.hostname === "dev.o0.network"
-  )
-    ? "http://localhost:5555"
+export const API_URL = (__DEV__ || window.location.hostname === "dev.o0.network")
+    ? "https://dev.o0.network"
     : "https://o0.network";
 
 export const ApiService = {

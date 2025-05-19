@@ -1,21 +1,26 @@
 import os
 import logging
 import asyncio
+import json
 
 from dotenv import load_dotenv
-from aiogram import Bot, Dispatcher, Router
+from aiogram import Bot, Dispatcher, Router, F
 from aiogram.fsm.storage.memory import MemoryStorage
-from aiogram.filters import CommandStart
+from aiogram.filters import CommandStart, Command
 from aiogram.types import (
     Message,
     KeyboardButton,
     ReplyKeyboardMarkup,
     FSInputFile,
     WebAppInfo,
+    CallbackQuery,
 )
 
 load_dotenv()
 TOKEN = os.getenv("TOKEN")
+ADMIN_CHAT_ID = os.getenv("ADMIN_CHAT_ID")
+SERVER_URL = os.getenv("SERVER_URL", "http://localhost:5555")
+ADMIN_KEY = os.getenv("ADMIN_KEY", "admin_secret_key")
 
 logging.basicConfig(level=logging.INFO)
 
@@ -26,9 +31,7 @@ main_keyboard = ReplyKeyboardMarkup(
         [
             KeyboardButton(
                 text="🔥 Launch App 🔥",
-                web_app=WebAppInfo(
-                    url="https://t.me/o0netbot/app?startapp=true&mode=fullscreen"
-                ),
+                web_app=WebAppInfo(url="https://o0.network/explore"),
             ),
         ]
     ],
@@ -63,6 +66,66 @@ async def start(message: Message):
             disable_notification=True,
             parse_mode="HTML",
         )
+
+
+@router.callback_query(F.data.startswith(("approve_", "reject_")))
+async def handle_validation_callback(callback_query: CallbackQuery):
+    bot = callback_query.bot
+
+    if not ADMIN_CHAT_ID or str(callback_query.from_user.id) != ADMIN_CHAT_ID:
+        await callback_query.answer(
+            "You are not authorized to perform this action.", show_alert=True
+        )
+        return
+
+    action, video_address = callback_query.data.split("_", 1)
+    status = "approved" if action == "approve" else "rejected"
+
+    try:
+        import aiohttp
+
+        async with aiohttp.ClientSession() as session:
+            api_url = f"{SERVER_URL}/api/videos/validate/{video_address}"
+            async with session.post(
+                api_url, json={"status": status, "adminKey": ADMIN_KEY}
+            ) as response:
+                if response.status == 200:
+                    result = await response.json()
+                    await callback_query.answer(
+                        f"Video {status} successfully!", show_alert=True
+                    )
+
+                    # Update the message to show it's been processed
+                    await bot.edit_message_text(
+                        chat_id=callback_query.message.chat.id,
+                        message_id=callback_query.message.message_id,
+                        text=f"{callback_query.message.text}\n\n✅ STATUS: {status.upper()}",
+                        reply_markup=None,
+                    )
+                else:
+                    error_data = await response.json()
+                    logging.error(f"API error: {error_data}")
+                    await callback_query.answer(
+                        f"Error: {error_data.get('error', 'Unknown error')}",
+                        show_alert=True,
+                    )
+    except Exception as e:
+        logging.error(f"Error processing validation: {e}")
+        await callback_query.answer(
+            "An error occurred while processing your request.", show_alert=True
+        )
+
+
+@router.message(Command("help"))
+async def help_command(message: Message):
+    """Send help information about the bot"""
+    help_text = (
+        "🤖 <b>O0 Network Bot Commands</b>\n\n"
+        "/start - Start the bot and get the main menu\n"
+        "/help - Show this help message\n\n"
+        "Use the Launch App button to create and manage video notes."
+    )
+    await message.answer(help_text, parse_mode="HTML")
 
 
 async def main():
