@@ -1,6 +1,12 @@
 name: client.yaml
 
 on:
+  workflow_call:
+    inputs:
+      node-version:
+        required: false
+        type: string
+        default: '18'
   workflow_dispatch:
   push:
     branches:
@@ -11,7 +17,6 @@ on:
 
 jobs:
   setup:
-    name: Setup Environment
     runs-on: ubuntu-latest
     defaults:
       run:

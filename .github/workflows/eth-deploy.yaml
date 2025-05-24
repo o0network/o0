@@ -1,0 +1,43 @@
+name: eth-deploy.yaml
+
+on:
+  workflow_call:
+  workflow_dispatch:
+  push:
+    paths:
+      - "contracts/**"
+      - "scripts/deploy/**"
+
+env:
+  FOUNDRY_PROFILE: production
+
+jobs:
+  deploy:
+    if: false
+    name: ⛓️ Deploy Contracts
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Install Foundry
+        uses: foundry-rs/foundry-toolchain@v1
+
+      - name: Deploy to Network
+        env:
+          PRIVATE_KEY: ${{ secrets.DEPLOYER_PRIVATE_KEY }}
+          RPC_URL: ${{ secrets.RPC_URL }}
+        run: |
+          forge script scripts/deploy/Deploy.s.sol \
+            --rpc-url $RPC_URL \
+            --private-key $PRIVATE_KEY \
+            --broadcast \
+            --verify
+
+      - name: Save Deployment Artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: deployment-artifacts
+          path: broadcast/

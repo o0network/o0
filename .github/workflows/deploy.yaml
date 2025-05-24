@@ -1,0 +1,349 @@
+name: deploy.yaml
+
+on:
+  workflow_dispatch:
+    inputs:
+      deployment_scope:
+        description: 'What to deploy'
+        required: false
+        type: choice
+        options:
+          - 'full-stack'
+          - 'infrastructure-only'
+          - 'backend-only'
+          - 'frontend-only'
+          - 'custom'
+        default: 'full-stack'
+      include_mobile:
+        description: 'Include mobile app deployment'
+        required: false
+        type: boolean
+        default: false
+      run_tests:
+        description: 'Run test suites'
+        required: false
+        type: boolean
+        default: true
+      node_version:
+        description: 'Node.js version for frontend builds'
+        required: false
+        type: string
+        default: '18'
+      environment:
+        description: 'Deployment environment'
+        required: false
+        type: choice
+        options:
+          - production
+          - staging
+          - development
+        default: production
+      custom_infrastructure:
+        description: 'Custom: Deploy infrastructure (nginx, docs)'
+        required: false
+        type: boolean
+        default: true
+      custom_backend:
+        description: 'Custom: Deploy backend (server, bot)'
+        required: false
+        type: boolean
+        default: true
+      custom_frontend:
+        description: 'Custom: Deploy frontend (client, www)'
+        required: false
+        type: boolean
+        default: true
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+env:
+  DEPLOY_ENV: ${{ inputs.environment || 'production' }}
+
+jobs:
+  checks:
+    runs-on: ubuntu-latest
+    outputs:
+      should_deploy_infrastructure: ${{ steps.check.outputs.infrastructure }}
+      should_deploy_backend: ${{ steps.check.outputs.backend }}
+      should_deploy_frontend: ${{ steps.check.outputs.frontend }}
+      should_deploy_mobile: ${{ steps.check.outputs.mobile }}
+      should_run_tests: ${{ steps.check.outputs.tests }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Validate deployment inputs
+        id: check
+        run: |
+          case "${{ inputs.deployment_scope }}" in
+            "full-stack")
+              infrastructure=true
+              backend=true
+              frontend=true
+              ;;
+            "infrastructure-only")
+              infrastructure=true
+              backend=false
+              frontend=false
+              ;;
+            "backend-only")
+              infrastructure=false
+              backend=true
+              frontend=false
+              ;;
+            "frontend-only")
+              infrastructure=false
+              backend=false
+              frontend=true
+              ;;
+            "custom")
+              infrastructure=${{ inputs.custom_infrastructure }}
+              backend=${{ inputs.custom_backend }}
+              frontend=${{ inputs.custom_frontend }}
+              ;;
+            *)
+              infrastructure=true
+              backend=true
+              frontend=true
+              ;;
+          esac
+
+          echo "infrastructure=$infrastructure" >> $GITHUB_OUTPUT
+          echo "backend=$backend" >> $GITHUB_OUTPUT
+          echo "frontend=$frontend" >> $GITHUB_OUTPUT
+          echo "mobile=${{ inputs.include_mobile }}" >> $GITHUB_OUTPUT
+          echo "tests=${{ inputs.run_tests }}" >> $GITHUB_OUTPUT
+
+          echo "📋 Deployment Plan:"
+          echo "  Scope: ${{ inputs.deployment_scope }}"
+          echo "  Environment: ${{ env.DEPLOY_ENV }}"
+          echo "  Infrastructure: $infrastructure"
+          echo "  Backend: $backend"
+          echo "  Frontend: $frontend"
+          echo "  Mobile: ${{ inputs.include_mobile }}"
+          echo "  Tests: ${{ inputs.run_tests }}"
+
+      - name: Check repository structure
+        run: |
+          echo "📁 Repository structure validation..."
+          for dir in server client www bot docs; do
+            if [ -d "$dir" ]; then
+              echo "✅ $dir directory exists"
+            else
+              echo "⚠️  $dir directory not found"
+            fi
+          done
+
+  nginx:
+    needs: checks
+    if: needs.checks.outputs.should_deploy_infrastructure == 'true'
+    uses: ./.github/workflows/nginx.yaml
+    secrets: inherit
+
+  docs:
+    needs: checks
+    if: needs.checks.outputs.should_deploy_infrastructure == 'true'
+    uses: ./.github/workflows/docs.yaml
+    secrets: inherit
+
+  www:
+    needs: [checks]
+    if: needs.checks.outputs.should_deploy_frontend == 'true'
+    uses: ./.github/workflows/www.yaml
+    with:
+      node-version: ${{ inputs.node_version }}
+    secrets: inherit
+
+  server:
+    needs: nginx
+    if: needs.checks.outputs.should_deploy_backend == 'true'
+    uses: ./.github/workflows/server.yaml
+    secrets: inherit
+
+  bot:
+    needs: checks
+    if: |
+      always() &&
+      needs.checks.outputs.should_deploy_backend == 'true' &&
+      (needs.server.result == 'success' || needs.server.result == 'skipped')
+    uses: ./.github/workflows/bot.yaml
+    secrets: inherit
+
+  rlmodel:
+    needs: [checks]
+    if: |
+      always() &&
+      needs.checks.outputs.should_deploy_backend == 'true' &&
+      (needs.bot.result == 'success' || needs.bot.result == 'skipped')
+    uses: ./.github/workflows/rl-model.yaml
+    secrets: inherit
+
+  ethdeploy:
+    needs: [checks]
+    if: |
+      always() &&
+      needs.checks.outputs.should_deploy_backend == 'true' &&
+      (needs.ethtest.result == 'success' || needs.ethtest.result == 'skipped')
+    uses: ./.github/workflows/eth-deploy.yaml
+    secrets: inherit
+
+  ethtest:
+    needs: [checks]
+    if: needs.checks.outputs.should_run_tests == 'true'
+    uses: ./.github/workflows/eth-test.yml
+    secrets: inherit
+
+  client:
+    needs: [nginx]
+    if: |
+      always() &&
+      needs.checks.outputs.should_deploy_frontend == 'true' &&
+      (needs.bot.result == 'success' || needs.bot.result == 'skipped')
+    uses: ./.github/workflows/client.yaml
+    with:
+      node-version: ${{ inputs.node_version }}
+    secrets: inherit
+
+  mobile:
+    needs: [nginx]
+    if: |
+      always() &&
+      needs.checks.outputs.should_deploy_mobile == 'true' &&
+      (needs.bot.result == 'success' || needs.bot.result == 'skipped')
+    uses: ./.github/workflows/expo.yaml
+    secrets:
+      EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
+      APPLE_ID: ${{ secrets.APPLE_ID }}
+      APPLE_APP_ID: ${{ secrets.APPLE_APP_ID }}
+      APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+      GOOGLE_PLAY_SERVICE_ACCOUNT: ${{ secrets.GOOGLE_PLAY_SERVICE_ACCOUNT }}
+
+  verify:
+    runs-on: ubuntu-latest
+    needs: [
+      checks,
+      ethtest,
+      ethdeploy,
+      rlmodel,
+      nginx,
+      docs,
+      server,
+      bot,
+      client,
+      www,
+      mobile
+    ]
+    if: always()
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Collect deployment results
+        id: results
+        run: |
+          echo "📊 Deployment Results Summary:"
+          echo "================================"
+
+          # Infrastructure
+          if [ "${{ needs.nginx.result }}" != "" ]; then
+            echo "🌐 Nginx Config: ${{ needs.nginx.result }}"
+          fi
+
+          if [ "${{ needs.docs.result }}" != "" ]; then
+            echo "📚 Documentation: ${{ needs.docs.result }}"
+          fi
+
+          # Backend
+          if [ "${{ needs.server.result }}" != "" ]; then
+            echo "🖥️  Server: ${{ needs.server.result }}"
+          fi
+
+          if [ "${{ needs.bot.result }}" != "" ]; then
+            echo "🤖 Bot: ${{ needs.bot.result }}"
+          fi
+
+          if [ "${{ needs.rlmodel.result }}" != "" ]; then
+            echo "🧠 RL Model: ${{ needs.rlmodel.result }}"
+          fi
+
+          if [ "${{ needs.ethdeploy.result }}" != "" ]; then
+            echo "⛓️ Ethereum Contracts: ${{ needs.ethdeploy.result }}"
+          fi
+
+          # Frontend
+          if [ "${{ needs.client.result }}" != "" ]; then
+            echo "🎨 Client: ${{ needs.client.result }}"
+          fi
+
+          if [ "${{ needs.www.result }}" != "" ]; then
+            echo "🌍 Website: ${{ needs.www.result }}"
+          fi
+
+          # Mobile
+          if [ "${{ needs.mobile.result }}" != "" ]; then
+            echo "📱 Mobile App: ${{ needs.mobile.result }}"
+          fi
+
+          # Tests
+          if [ "${{ needs.ethtest.result }}" != "" ]; then
+            echo "🧪 Tests: ${{ needs.ethtest.result }}"
+          fi
+
+          echo "================================"
+
+          # Check if any critical deployments failed
+          critical_failed=false
+
+          if [ "${{ needs.server.result }}" = "failure" ]; then
+            critical_failed=true
+          fi
+
+          if [ "${{ needs.nginx.result }}" = "failure" ]; then
+            critical_failed=true
+          fi
+
+          if [ "$critical_failed" = "true" ]; then
+            echo "❌ Critical components failed to deploy!"
+            echo "deployment_status=failed" >> $GITHUB_OUTPUT
+          else
+            echo "✅ Deployment completed successfully!"
+            echo "deployment_status=success" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Create deployment summary
+        run: |
+          cat >> $GITHUB_STEP_SUMMARY << 'EOF'
+          # 🚀 Deployment Summary
+
+          **Environment:** ${{ env.DEPLOY_ENV }}
+          **Triggered by:** ${{ github.actor }}
+          **Commit:** ${{ github.sha }}
+
+          ## 📋 Component Status
+
+          | Component | Status | Workflow |
+          |-----------|--------|----------|
+          | 🌐 Nginx Config | ${{ needs.nginx.result || 'skipped' }} | nginx.yaml |
+          | 📚 Documentation | ${{ needs.docs.result || 'skipped' }} | docs.yaml |
+          | 🖥️ Server | ${{ needs.server.result || 'skipped' }} | server.yaml |
+          | 🤖 Bot | ${{ needs.bot.result || 'skipped' }} | bot.yaml |
+          | 🧠 RL Model | ${{ needs.rlmodel.result || 'skipped' }} | rl-model.yaml |
+          | ⛓️ Ethereum Contracts | ${{ needs.ethdeploy.result || 'skipped' }} | eth-deploy.yaml |
+          | 🎨 Client | ${{ needs.client.result || 'skipped' }} | client.yaml |
+          | 🌍 Website | ${{ needs.www.result || 'skipped' }} | www.yaml |
+          | 📱 Mobile App | ${{ needs.mobile.result || 'skipped' }} | expo.yaml |
+          | 🧪 Tests | ${{ needs.ethtest.result || 'skipped' }} | eth-test.yml |
+
+          **Overall Status:** ${{ steps.results.outputs.deployment_status == 'success' && '✅ Success' || '❌ Failed' }}
+          EOF
+
+      - name: Notify on failure
+        if: steps.results.outputs.deployment_status == 'failed'
+        run: |
+          echo "::error::Critical deployment components failed. Please check the individual workflow logs."
+          exit 1

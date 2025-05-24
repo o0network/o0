@@ -1,6 +1,7 @@
 name: eth-test
 
 on:
+  workflow_call:
   push:
   pull_request:
   workflow_dispatch:
@@ -10,11 +11,11 @@ env:
 
 jobs:
   check:
-    if: false # Temporary disabled
+    if: false
     strategy:
       fail-fast: true
 
-    name: Foundry project
+    name: 🧪 Test contracts
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4

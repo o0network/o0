@@ -1,0 +1,45 @@
+name: rl-model.yaml
+
+on:
+  workflow_call:
+  workflow_dispatch:
+  push:
+    paths:
+      - "core/model/**"
+
+jobs:
+  train:
+    if: false
+    name: Train RL Model
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.11'
+
+      - name: Install Dependencies
+        run: |
+          pip install torch torchvision gymnasium stable-baselines3
+          pip install -r ml/requirements.txt
+
+      - name: Train Model
+        working-directory: ml
+        run: |
+          python train.py --config config/production.yaml
+
+      - name: Save Model Artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: rl-model
+          path: models/
+
+      - name: Deploy Model to Server
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.SSH_PRIVATE_KEY }}" > ~/.ssh/id_rsa
+          chmod 600 ~/.ssh/id_rsa
+          rsync -avz models/ ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }}:/var/www/o0/models/
