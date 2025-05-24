@@ -1,6 +1,13 @@
 name: www.yaml
 
 on:
+  workflow_call:
+    inputs:
+      node-version:
+        description: 'Node.js version to use'
+        required: false
+        type: string
+        default: '18'
   workflow_dispatch:
   push:
     branches:

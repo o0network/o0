@@ -38,16 +38,17 @@ jobs:
         run: echo "${{ secrets.EXPO_TOKEN }}" | npx eas auth:login --non-interactive
 
       - name: Configure service accounts
-        if: ${{ secrets.GOOGLE_PLAY_SERVICE_ACCOUNT != '' }}
         run: |
           mkdir -p app/secrets
-          echo '${{ secrets.GOOGLE_PLAY_SERVICE_ACCOUNT }}' > app/secrets/google-service-account.json
+          if [ -n "${{ secrets.GOOGLE_PLAY_SERVICE_ACCOUNT }}" ]; then
+            echo '${{ secrets.GOOGLE_PLAY_SERVICE_ACCOUNT }}' > app/secrets/google-service-account.json
+          fi
 
       - name: Update EAS config for submission
-        if: ${{ secrets.APPLE_ID != '' && secrets.APPLE_APP_ID != '' && secrets.APPLE_TEAM_ID != '' }}
         working-directory: app
         run: |
-          cat > eas-submit-overrides.json << EOF
+          if [ -n "${{ secrets.APPLE_ID }}" ] && [ -n "${{ secrets.APPLE_APP_ID }}" ] && [ -n "${{ secrets.APPLE_TEAM_ID }}" ]; then
+            cat > eas-submit-overrides.json << EOF
           {
             "submit": {
               "production": {
@@ -64,12 +65,17 @@ jobs:
             }
           }
           EOF
+          fi
 
       - name: Build for Android & iOS
         working-directory: app
         run: npm run build:mobile
 
       - name: Submit to App Stores
-        if: ${{ secrets.APPLE_ID != '' && secrets.APPLE_APP_ID != '' && secrets.APPLE_TEAM_ID != '' && secrets.GOOGLE_PLAY_SERVICE_ACCOUNT != '' }}
         working-directory: app
-        run: npx eas submit --platform all --profile production --non-interactive
+        run: |
+          if [ -n "${{ secrets.APPLE_ID }}" ] && [ -n "${{ secrets.APPLE_APP_ID }}" ] && [ -n "${{ secrets.APPLE_TEAM_ID }}" ] && [ -n "${{ secrets.GOOGLE_PLAY_SERVICE_ACCOUNT }}" ]; then
+            npx eas submit --platform all --profile production --non-interactive
+          else
+            echo "Skipping app store submission - missing required secrets"
+          fi

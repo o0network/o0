@@ -1,6 +1,7 @@
 name: docs.yaml
 
 on:
+  workflow_call:
   workflow_dispatch:
   push:
     paths:
