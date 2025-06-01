@@ -12,13 +12,15 @@ export type VideoData = {
 };
 
 export type AssetData = {
-  id: string;
-  type: string;
-  value: string;
-  priceChange: number;
-  discussion?: string;
-  price?: string;
-  minted?: string;
+  address: string;
+  stat: {
+    value: number;
+    valuation: number;
+    price: number;
+    minted: number;
+  };
+  discussion: string;
+  price: number[];
   [key: string]: any;
 };
 
@@ -45,11 +47,9 @@ export type VideoStatusResult = {
   message: string;
 };
 
-// In React Native, __DEV__ is a global variable set to true in development.
-// process.env.NODE_ENV might not be reliably set by all RN bundlers/environments for this check.
-// window.location.hostname is not applicable in React Native.
-export const API_URL = (__DEV__ || window.location.hostname === "dev.o0.network")
-    ? "https://dev.o0.network"
+export const API_URL =  window.location.hostname === "dev.o0.network"
+    ? "https://dev.o0.network" :
+    __DEV__ ? "http://localhost:5555"
     : "https://o0.network";
 
 export const ApiService = {
@@ -104,17 +104,16 @@ export const ApiService = {
 
   getAssetsByAddress: async (address: string): Promise<AssetData[]> => {
     try {
-      // Skip calling the API for obviously invalid addresses
-      if (!address || address === "select an item first" || address.includes("%20")) {
-        console.warn("Invalid address format, skipping API call");
-        return [];
-      }
+      const response = await fetch(`${API_URL}/api/ledger`, {
+        headers: {
+          'Authorization': `User ${address}`,
+          'Content-Type': 'application/json',
+        },
+      });
 
-      const response = await fetch(`${API_URL}/api/assets/${address}`);
-
-      // Handle 400 Bad Request (invalid address)
-      if (response.status === 400) {
-        console.warn(`Invalid address format: ${address}`);
+      // Handle 401 Unauthorized
+      if (response.status === 401) {
+        console.warn(`Unauthorized request for address: ${address}`);
         return [];
       }
 
@@ -229,36 +228,40 @@ export const ApiService = {
     userId: string,
     title?: string
   ): Promise<VideoSubmissionResult> => {
+    console.log(`ApiService.submitVideo called with: videoUri=${videoUri}, userId=${userId}, title=${title}`);
     try {
       const formData = new FormData();
 
-      // Add the video file
       const uriParts = videoUri.split(".");
       const fileType = uriParts[uriParts.length - 1];
+      const fileName = `video.${fileType}`;
+      console.log(`ApiService.submitVideo: Preparing video file - name: ${fileName}, type: video/${fileType}`);
 
       formData.append("video", {
         uri: videoUri,
-        name: `video.${fileType}`,
+        name: fileName,
         type: `video/${fileType}`,
       } as any);
 
-      // Add metadata
       formData.append("userId", userId);
       if (title) {
         formData.append("title", title);
       }
+      console.log("ApiService.submitVideo: FormData prepared:", formData);
 
       const response = await fetch(`${API_URL}/api/videos/submit`, {
         method: "POST",
         body: formData,
-        headers: {
-          "Content-Type": "multipart/form-data",
-        },
+        // headers: { // fetch typically sets this correctly for FormData
+        //   "Content-Type": "multipart/form-data",
+        // },
       });
-
+      console.log("ApiService.submitVideo: Response status:", response.status);
       const result = await response.json();
+      console.log("ApiService.submitVideo: Response JSON:", result);
 
       if (!response.ok) {
+        console.error("ApiService.submitVideo: Submission failed with response:", result);
         return {
           success: false,
           message: result.error || "Failed to submit video",
@@ -266,13 +269,96 @@ export const ApiService = {
         };
       }
 
+      console.log("ApiService.submitVideo: Submission successful:", result);
       return {
         success: true,
-        message: result.message || "Video submitted successfully",
+        message: result.message || "Video uploaded successfully",
         address: result.address,
       };
     } catch (error) {
-      console.error("Error submitting video:", error);
+      console.error("ApiService.submitVideo: Network error or other exception:", error);
+      return {
+        success: false,
+        message: "Network error while submitting video",
+        error: error instanceof Error ? error.message : String(error),
+      };
+    }
+  },
+
+  submitVideoBlob: async (
+    videoBlob: Blob,
+    userId: string,
+    title?: string
+  ): Promise<VideoSubmissionResult> => {
+    console.log(`ApiService.submitVideoBlob called with: blob size=${videoBlob.size}, type=${videoBlob.type}, userId=${userId}, title=${title}`);
+    try {
+      const formData = new FormData();
+
+      // Determine filename extension based on the MIME type
+      let fileExtension = '.webm';
+      if (videoBlob.type.includes('mp4')) {
+        fileExtension = '.mp4';
+      }
+
+      const fileName = `video${fileExtension}`;
+      console.log(`ApiService.submitVideoBlob: Preparing video blob - name: ${fileName}, type: ${videoBlob.type}`);
+
+      // Add the video blob with explicit filename and type
+      formData.append("video", videoBlob, fileName);
+      formData.append("userId", userId);
+      if (title) {
+        formData.append("title", title);
+      }
+
+      // Log all FormData entries for debugging
+      for (const pair of (formData as any).entries()) {
+        console.log(`FormData contains: ${pair[0]}, ${typeof pair[1] === 'object' ? 'Blob/File' : pair[1]}`);
+      }
+
+      console.log(`ApiService.submitVideoBlob: Sending to ${API_URL}/api/videos/submit`);
+      const response = await fetch(`${API_URL}/api/videos/submit`, {
+        method: "POST",
+        body: formData,
+      });
+
+      console.log("ApiService.submitVideoBlob: Response status:", response.status);
+
+      if (!response.ok) {
+        let errorDetail = '';
+        try {
+          const errorData = await response.json();
+          errorDetail = JSON.stringify(errorData);
+        } catch (e) {
+          errorDetail = await response.text();
+        }
+
+        console.error(`ApiService.submitVideoBlob: Server error (${response.status}): ${errorDetail}`);
+
+        if (response.status === 413) {
+          return {
+            success: false,
+            message: "Video file too large. Please record a shorter video.",
+            error: "Request Entity Too Large"
+          };
+        }
+
+        return {
+          success: false,
+          message: `Upload failed with status ${response.status}: ${errorDetail || response.statusText}`,
+          error: errorDetail,
+        };
+      }
+
+      const result = await response.json();
+      console.log("ApiService.submitVideoBlob: Response JSON:", result);
+
+      return {
+        success: true,
+        message: result.message || "Video uploaded successfully",
+        address: result.address,
+      };
+    } catch (error) {
+      console.error("ApiService.submitVideoBlob: Network error or other exception:", error);
       return {
         success: false,
         message: "Network error while submitting video",
@@ -294,6 +380,56 @@ export const ApiService = {
     } catch (error) {
       console.error("Error checking video status:", error);
       throw error;
+    }
+  },
+
+  getVideoInfo: async (address: string): Promise<VideoData | null> => {
+    try {
+      if (!address || address === "select an item first" || address.includes("%20")) {
+        console.warn("Invalid address format for video info");
+        return null;
+      }
+
+      const response = await fetch(`${API_URL}/api/video/${address}/info`);
+
+      if (response.status === 404) {
+        console.warn(`Video not found: ${address}`);
+        return null;
+      }
+
+      if (!response.ok) {
+        throw new Error("Failed to fetch video info");
+      }
+
+      return await response.json();
+    } catch (error) {
+      console.error("Error fetching video info:", error);
+      return null;
+    }
+  },
+
+  getAssetInfo: async (address: string): Promise<AssetData | null> => {
+    try {
+      if (!address || address === "select an item first" || address.includes("%20")) {
+        console.warn("Invalid address format for asset info");
+        return null;
+      }
+
+      const response = await fetch(`${API_URL}/api/asset/${address}/info`);
+
+      if (response.status === 404) {
+        console.warn(`Asset not found: ${address}`);
+        return null;
+      }
+
+      if (!response.ok) {
+        throw new Error("Failed to fetch asset info");
+      }
+
+      return await response.json();
+    } catch (error) {
+      console.error("Error fetching asset info:", error);
+      return null;
     }
   },
 };

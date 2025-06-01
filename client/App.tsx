@@ -21,6 +21,7 @@ import {
   Image,
 } from "react-native";
 import Modal from "react-native-modal";
+import { BlurView } from "expo-blur";
 import { StatusBar } from "expo-status-bar";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { useFonts } from "expo-font";
@@ -73,7 +74,7 @@ import GloriousButtonLeft from "./assets/gloriousButton/left.png";
 import GloriousButtonCenter from "./assets/gloriousButton/center.png";
 import GloriousButtonRight from "./assets/gloriousButton/right.png";
 
-type TabParamList = {
+export type TabParamList = {
   Explore: { address?: string };
   Create: undefined;
   Ledger: { address?: string };
@@ -84,15 +85,60 @@ const { width } = Dimensions.get("window");
 
 const DEFAULT_ADDRESS = undefined;
 
-// Utility function to preload images
-const preloadImages = async (imageUrls: any[]) => {
-  try {
-    const preloadPromises = imageUrls.map((img) => Image.prefetch(Image.resolveAssetSource(img).uri));
-    await Promise.all(preloadPromises);
-    console.log('All images preloaded successfully');
-  } catch (error) {
-    console.error('Error preloading images:', error);
-  }
+// Custom Modal Wrapper with Blur Effect
+type BlurModalWrapperProps = {
+  isVisible: boolean;
+  onBackdropPress: () => void;
+  children: ReactNode;
+};
+
+const BlurModalWrapper = ({ isVisible, onBackdropPress, children }: BlurModalWrapperProps) => {
+  const { isPlatform } = usePlatform();
+  const isWeb = isPlatform("web");
+
+  return (
+    <Modal
+      isVisible={isVisible}
+      onBackdropPress={onBackdropPress}
+      backdropOpacity={0}
+      animationIn="fadeIn"
+      animationOut="fadeOut"
+      style={styles.modal}
+    >
+      {isWeb ? (
+        // Web: Use div with backdrop-filter
+        <div
+          style={{
+            position: 'absolute',
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            backdropFilter: 'blur(20px)',
+            WebkitBackdropFilter: 'blur(20px)',
+            backgroundColor: 'rgba(0, 0, 0, 0.3)',
+            zIndex: 0,
+          }}
+        />
+      ) : (
+        // Mobile: Use BlurView
+        <BlurView
+          intensity={80}
+          style={{
+            position: 'absolute',
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+          }}
+        />
+      )}
+
+      <View style={styles.modalContainer}>
+        {children}
+      </View>
+    </Modal>
+  );
 };
 
 type TabBarItemProps = {
@@ -180,8 +226,8 @@ function CustomTabBar({
               ...StyleSheet.absoluteFillObject,
               position: "absolute",
               background: "rgba(255,255,255,0.2)",
-              backdropFilter: `blur(50px)`,
-              WebkitBackdropFilter: `blur(50px)`,
+              backdropFilter: `blur(100px)`,
+              WebkitBackdropFilter: `blur(100px)`,
               borderRadius: 100,
               zIndex: -1,
             }}
@@ -251,38 +297,7 @@ function CustomTabBar({
   );
 }
 
-export default function App() {
-  const navigationRef = useRef(null);
-  const [fontsLoaded, fontError] = useFonts({
-    Nunito_600SemiBold,
-    Nunito_700Bold,
-    DMMono_500Medium,
-  });
-
-  const onLayoutRootView = useCallback(async () => {
-    if (fontsLoaded || fontError) {
-      await SplashScreen.hideAsync();
-    }
-  }, [fontsLoaded, fontError]);
-
-  // Preload all images
-  useEffect(() => {
-    const emojiImages = [
-      CompassIcon, DvdIcon, CoinIcon, GearIcon,
-      TalkIcon, ExternalLinkIcon, RejectIcon, WorldIcon,
-      TopLeftArrowIcon, UpwardsIcon, RightArrowIcon, MoneyWingsIcon,
-      ProhibitedIcon, MoneyFaceIcon, LeftArrowIcon, GlobeIcon,
-      DownwardsIcon, CloudIcon, ChainIcon, CrossMarkIcon,
-      CheckMarkIcon, CameraIcon
-    ];
-
-    const gloriousButtonImages = [
-      GloriousButtonLeft, GloriousButtonCenter, GloriousButtonRight
-    ];
-
-    preloadImages([...emojiImages, ...gloriousButtonImages]);
-  }, []);
-
+const AppContent = () => {
   const { isPlatform } = usePlatform();
   const modalRef = useRef<BottomSheetModal>(null);
   const walletConnectModalRef = useRef<BottomSheetModal>(null);
@@ -322,10 +337,6 @@ export default function App() {
       walletConnectModalRef.current?.dismiss();
     }
   }, [isLargeScreen]);
-
-  if (!fontsLoaded && !fontError) {
-    return null;
-  }
 
   const swipeEnabled =
     isPlatform("android") ||
@@ -398,140 +409,168 @@ export default function App() {
   );
 
   return (
-    <PlatformProvider>
-      <ScreenProvider>
-        <GestureHandlerRootView style={{ flex: 1 }}>
-          <BottomSheetModalProvider>
-            <ModalContext.Provider
-              value={{
-                openPreferences,
-                openWalletConnect,
-                closePreferences: handleClosePreferences,
-                closeWalletConnect: handleCloseWalletConnect,
-              }}
-            >
-              <AuthProvider>
-                <Background />
-                <WebIcons />
-                <View style={styles.container}>
-                  <StatusBar
-                    style="light"
-                    translucent
-                    backgroundColor="transparent"
-                  />
-                  <SafeAreaProvider>
-                    <NavigationContainer
-                      ref={navigationRef}
-                      theme={{
-                        ...DefaultTheme,
-                        colors: {
-                          ...DefaultTheme.colors,
-                          background: "transparent",
-                        },
-                      }}
-                      onReady={onLayoutRootView}
-                      linking={{
-                        prefixes: [],
-                        config: {
-                          initialRouteName: "Explore",
-                          screens: {
-                            Explore: {
-                              path: "explore/:address?",
-                              parse: {
-                                address: (address: string) => address,
-                              },
-                            },
-                            Ledger: {
-                              path: "ledger/:address?",
-                              parse: {
-                                address: (address: string) => address,
-                              },
-                            },
-                            Create: "create",
-                            Settings: "settings",
+    <GestureHandlerRootView style={{ flex: 1 }}>
+      <BottomSheetModalProvider>
+        <ModalContext.Provider
+          value={{
+            openPreferences,
+            openWalletConnect,
+            closePreferences: handleClosePreferences,
+            closeWalletConnect: handleCloseWalletConnect,
+          }}
+        >
+          <AuthProvider>
+            <Background />
+            <WebIcons />
+            <View style={styles.container}>
+              <StatusBar
+                style="light"
+                translucent
+                backgroundColor="transparent"
+              />
+              <SafeAreaProvider>
+                <NavigationContainer
+                  theme={{
+                    ...DefaultTheme,
+                    colors: {
+                      ...DefaultTheme.colors,
+                      background: "transparent",
+                    },
+                  }}
+                  linking={{
+                    prefixes: [],
+                    config: {
+                      initialRouteName: "Explore",
+                      screens: {
+                        Explore: {
+                          path: "explore/:address?",
+                          parse: {
+                            address: (address: string) => address,
                           },
                         },
-                      }}
-                    >
-                      <MainTabs />
-                    </NavigationContainer>
-                  </SafeAreaProvider>
-                </View>
+                        Ledger: {
+                          path: "ledger/:address?",
+                          parse: {
+                            address: (address: string) => address,
+                          },
+                        },
+                        Create: "create",
+                        Settings: "settings",
+                      },
+                    },
+                  }}
+                >
+                  <MainTabs />
+                </NavigationContainer>
+              </SafeAreaProvider>
+            </View>
 
-                {/* Preferences Modal */}
-                {isLargeScreen ? (
-                  <Modal
-                    isVisible={isPreferencesVisible}
-                    onBackdropPress={handleClosePreferences}
-                    backdropOpacity={0.7}
-                    animationIn="fadeIn"
-                    animationOut="fadeOut"
-                    style={styles.modal}
-                  >
-                    <View style={styles.modalContent}>
-                      <SettingsScreen />
-                    </View>
-                  </Modal>
-                ) : (
-                  <BottomSheetModal
-                    ref={modalRef}
-                    index={0}
-                    snapPoints={["80%"]}
-                    enablePanDownToClose={true}
-                    backgroundStyle={{
-                      backgroundColor: "transparent",
-                    }}
-                    handleIndicatorStyle={{
-                      display: "none",
-                    }}
-                    android_keyboardInputMode="adjustResize"
-                    keyboardBehavior="extend"
-                  >
-                    <SettingsScreen />
-                  </BottomSheetModal>
-                )}
+            {/* Preferences Modal */}
+            {isLargeScreen ? (
+              <BlurModalWrapper
+                isVisible={isPreferencesVisible}
+                onBackdropPress={handleClosePreferences}
+              >
+                <SettingsScreen />
+              </BlurModalWrapper>
+            ) : (
+              <BottomSheetModal
+                ref={modalRef}
+                index={0}
+                snapPoints={["80%"]}
+                enablePanDownToClose={true}
+                backgroundStyle={{
+                  backgroundColor: "transparent",
+                }}
+                handleIndicatorStyle={{
+                  display: "none",
+                }}
+                android_keyboardInputMode="adjustResize"
+                keyboardBehavior="extend"
+              >
+                <SettingsScreen />
+              </BottomSheetModal>
+            )}
 
-                {/* Wallet Connect Modal */}
-                {isLargeScreen ? (
-                  <Modal
-                    isVisible={isWalletConnectVisible}
-                    onBackdropPress={handleCloseWalletConnect}
-                    backdropOpacity={0.7}
-                    animationIn="fadeIn"
-                    animationOut="fadeOut"
-                    style={styles.modal}
-                  >
-                    <View style={styles.modalContent}>
-                      <WalletConnectModal
-                        onClose={handleCloseWalletConnect}
-                      />
-                    </View>
-                  </Modal>
-                ) : (
-                  <BottomSheetModal
-                    ref={walletConnectModalRef}
-                    index={0}
-                    snapPoints={["80%"]}
-                    enablePanDownToClose={true}
-                    backgroundStyle={{
-                      backgroundColor: "transparent",
-                    }}
-                    handleIndicatorStyle={{
-                      display: "none",
-                    }}
-                    android_keyboardInputMode="adjustResize"
-                    keyboardBehavior="extend"
-                  >
-                    <WalletConnectModal
-                      onClose={handleCloseWalletConnect}
-                      isBottomSheet={true}
-                    />
-                  </BottomSheetModal>
-                )}
-              </AuthProvider>
-            </ModalContext.Provider>
-          </BottomSheetModalProvider>
-        </GestureHandlerRootView>
+            {/* Wallet Connect Modal */}
+            {/* DEBUG: Rendering wallet connect modal */}
+            {isLargeScreen ? (
+              <BlurModalWrapper
+                isVisible={isWalletConnectVisible}
+                onBackdropPress={handleCloseWalletConnect}
+              >
+                <WalletConnectModal
+                  onClose={handleCloseWalletConnect}
+                />
+              </BlurModalWrapper>
+            ) : (
+              <BottomSheetModal
+                ref={walletConnectModalRef}
+                index={0}
+                snapPoints={["80%"]}
+                enablePanDownToClose={true}
+                backgroundStyle={{
+                  backgroundColor: "transparent",
+                }}
+                handleIndicatorStyle={{
+                  display: "none",
+                }}
+                android_keyboardInputMode="adjustResize"
+                keyboardBehavior="extend"
+              >
+                <WalletConnectModal
+                  onClose={handleCloseWalletConnect}
+                  isBottomSheet={true}
+                />
+              </BottomSheetModal>
+            )}
+          </AuthProvider>
+        </ModalContext.Provider>
+      </BottomSheetModalProvider>
+    </GestureHandlerRootView>
+  );
+};
+
+export default function App() {
+  const navigationRef = useRef(null);
+  const [fontsLoaded, fontError] = useFonts({
+    Nunito_600SemiBold,
+    Nunito_700Bold,
+    DMMono_500Medium,
+  });
+
+  const onLayoutRootView = useCallback(async () => {
+    if (fontsLoaded || fontError) {
+      await SplashScreen.hideAsync();
+    }
+  }, [fontsLoaded, fontError]);
+
+  // Preload all images
+  useEffect(() => {
+    const emojiImages = [
+      CompassIcon, DvdIcon, CoinIcon, GearIcon,
+      TalkIcon, ExternalLinkIcon, RejectIcon, WorldIcon,
+      TopLeftArrowIcon, UpwardsIcon, RightArrowIcon, MoneyWingsIcon,
+      ProhibitedIcon, MoneyFaceIcon, LeftArrowIcon, GlobeIcon,
+      DownwardsIcon, CloudIcon, ChainIcon, CrossMarkIcon,
+      CheckMarkIcon, CameraIcon
+    ];
+
+    const gloriousButtonImages = [
+      GloriousButtonLeft, GloriousButtonCenter, GloriousButtonRight
+    ];
+
+    preloadImages([...emojiImages, ...gloriousButtonImages]);
+  }, []);
+
+  if (!fontsLoaded && !fontError) {
+    return null;
+  }
+
+  return (
+    <PlatformProvider>
+      <ScreenProvider>
+        <AppContent />
       </ScreenProvider>
     </PlatformProvider>
   );
@@ -630,12 +669,25 @@ const styles = StyleSheet.create({
     margin: 0,
     justifyContent: "center",
     alignItems: "center",
+    flex: 1,
   },
-  modalContent: {
+  modalContainer: {
+    maxWidth: "95%",
+    maxHeight: "90%",
+    minWidth: 400,
     width: "80%",
-    maxHeight: "80%",
-    backgroundColor: "rgba(30, 30, 30, 0.95)",
-    borderRadius: 16,
-    overflow: "hidden",
+    justifyContent: "center",
+    alignItems: "center",
   },
 });
+
+// Utility function to preload images
+const preloadImages = async (imageUrls: any[]) => {
+  try {
+    const preloadPromises = imageUrls.map((img) => Image.prefetch(Image.resolveAssetSource(img).uri));
+    await Promise.all(preloadPromises);
+    console.log('All images preloaded successfully');
+  } catch (error) {
+    console.error('Error preloading images:', error);
+  }
+};

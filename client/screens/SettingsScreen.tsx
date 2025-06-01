@@ -1,8 +1,9 @@
 import { StyleSheet, View, Image } from "react-native";
-import { Button, Frame, Link, Text } from "../components";
+import { Button, Frame, GloriousButton, Link, Text } from "../components";
 import { useAuth } from "../contexts/AuthContext";
 import SafeAreaView from "../components/SafeAreaView";
 import { usePlatform } from "../contexts/ScreenContext";
+import { useModal } from "../contexts/ModalContext";
 
 export default function SettingsScreen() {
   const { isWalletConnected, disconnectWallet } = useAuth();
@@ -10,80 +11,86 @@ export default function SettingsScreen() {
   const handleDisconnectWallet = () => {
     disconnectWallet();
   };
+
+  const { openWalletConnect } = useModal();
+
   const { isPlatform } = usePlatform();
 
   return (
-    <SafeAreaView
-      style={[styles.container, isPlatform("web") && { maxHeight: 0 }]}
-    >
-      <View style={{flex: 1, width: "100%", paddingHorizontal: 12, marginTop: 12}}>
-      <Frame style={styles.storeButtons} borderRadius={0}>
-        <Link href="https://o0.network/g" style={styles.storeButton} external>
-          <Image
-            resizeMode="contain"
-            style={{
-              width: 48,
-              height: 48,
-            }}
-            source={require("../assets/google-play.png")}
-          />
-        </Link>
-        <Text style={styles.cardTitle}>Download App</Text>
-        <Link href="https://o0.network/a" style={styles.storeButton} external>
-          <Image
-            resizeMode="contain"
-            style={{
-              width: 48,
-              height: 48,
-              transform: [{translateX: -8}],
-            }}
-            source={require("../assets/app-store.png")}
-          />
-        </Link>
-      </Frame>
-
-      {[
-        {
-          title: "Graypaper",
-          url: "https://o0.network/graypaper.pdf",
-        },
-        {
-          title: "Telegram Channel",
-          url: "https://t.me/o0network",
-        },
-        {
-          title: "Twitter X",
-          url: "https://x.com/o0network",
-        },
-        {
-          title: "Github",
-          url: "https://github.com/o0network/o0",
-        },
-      ].map((item, index) => (
-        <Frame key={index} style={styles.card} borderRadius={0}>
-          <Link style={styles.cardContent} href={item.url}>
-            <View>
-              <Text style={styles.cardTitle}>{item.title}</Text>
-              <Text style={styles.cardSubtitle}>{item.url}</Text>
-            </View>
-            <Image
-              style={{width: 24, height: 24}}
-              source={require("../assets/emojis/external-link.png")}
-            />
-          </Link>
+    <SafeAreaView style={styles.container}>
+        <View style={{flex: 1, width: "100%", paddingHorizontal: 12, marginTop: 12}}>
+          <Frame style={styles.storeButtons} borderRadius={0}>
+            <Link href="https://o0.network/g" style={styles.storeButton} external>
+              <Image
+                resizeMode="contain"
+                style={{
+                  width: 48,
+                  height: 48,
+                }}
+                source={require("../assets/google-play.png")}
+              />
+            </Link>
+            <Text style={styles.cardTitle}>Download App</Text>
+            <Link href="https://o0.network/a" style={styles.storeButton} external>
+              <Image
+                resizeMode="contain"
+                style={{
+                  width: 48,
+                  height: 48,
+                  transform: [{translateX: -8}],
+                }}
+                source={require("../assets/app-store.png")}
+              />
+            </Link>
         </Frame>
-      ))}
-      </View>
 
-      <View style={styles.disconnectButton}>
-        {isWalletConnected && (
-          <Button
-            iconPath={require("../assets/emojis/cross-mark.png")}
-            title="Disconnect Wallet"
-            onPress={handleDisconnectWallet}
-          />
-         )}
-      </View>
+          {[
+            {
+              title: "Graypaper",
+              url: "https://o0.network/graypaper.pdf",
+            },
+            {
+              title: "Telegram Channel",
+              url: "https://t.me/o0network",
+            },
+            {
+              title: "Twitter X",
+              url: "https://x.com/o0network",
+            },
+            {
+              title: "Github",
+              url: "https://github.com/o0network/o0",
+            },
+          ].map((item, index) => (
+            <Frame key={index} style={styles.card} borderRadius={0}>
+              <Link style={styles.cardContent} href={item.url}>
+                <View>
+                  <Text style={styles.cardTitle}>{item.title}</Text>
+                  <Text style={styles.cardSubtitle}>{item.url}</Text>
+                </View>
+                <Image
+                  style={{width: 24, height: 24}}
+                  source={require("../assets/emojis/external-link.png")}
+                />
+              </Link>
+            </Frame>
+          ))}
+        </View>
+
+        <View style={styles.bottomButtons}>
+          {isWalletConnected ? (
+            <Button
+              iconPath={require("../assets/emojis/cross-mark.png")}
+              title="Disconnect Wallet"
+              onPress={handleDisconnectWallet}
+            />
+          ) : (
+            <GloriousButton
+              title="Connect Wallet"
+              onPress={openWalletConnect}
+            />
+          )}
+        </View>
     </SafeAreaView>
   );
 }
@@ -98,6 +105,14 @@ const styles = StyleSheet.create({
     width: "100%",
     maxWidth: 512,
     marginHorizontal: "auto",
+  },
+  bottomButtons: {
+    marginBottom: 30,
+    position: "absolute",
+    marginHorizontal: 60,
+    bottom: 0,
+    left: 0,
+    right: 0,
   },
   cardsContainer: {
     gap: 6,

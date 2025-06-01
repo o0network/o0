@@ -3,28 +3,43 @@ import {
   View,
   StyleSheet,
   ScrollView,
-  Dimensions,
   TouchableOpacity,
   StyleProp,
   ViewStyle,
   Linking,
+  Text as RNText,
+  Platform,
+  Alert,
 } from "react-native";
-import { useRoute, RouteProp } from "@react-navigation/native";
+import { useRoute, RouteProp, useNavigation } from "@react-navigation/native";
+import type { MaterialTopTabNavigationProp } from "@react-navigation/material-top-tabs";
+import type { TabParamList } from "../App";
 
 import {
   Switch,
-  CellGrid,
   Frame,
   Outbound,
   Field,
   Text,
   Button,
   SafeAreaView,
+  Inbound,
+  CandlestickMiniGraph,
+  WagmiMainGraph,
+  Link
 } from "../components";
-import { AssetData, PriceData, VideoData } from "../data/api";
+import { AssetData, PriceData } from "../data/api";
 import { ApiService } from "../data/api";
 import { openLink } from "@telegram-apps/sdk";
 import { usePlatform } from "../contexts/ScreenContext";
+
+const getHeatColor = (value: number, min: number, max: number) => {
+  if (max === min) return 'rgb(0,200,0)';
+  const norm = (value - min) / (max - min);
+  const r = Math.round(255 * (1 - norm));
+  const g = Math.round(200 * norm + 55 * (1 - norm));
+  return `rgb(${r},${g},60)`;
+};
 
 const createAssetGridData = (
   assets: AssetData[],
@@ -37,17 +52,13 @@ const createAssetGridData = (
     };
   }
 
-  // Sort assets by value for better visualization
   let sortedAssets = [...assets];
-
-  // Convert string values to numbers for sorting by value
   sortedAssets.sort((a, b) => {
-    const valueA = parseFloat(String(a.value).replace(/[^0-9.-]+/g, ""));
-    const valueB = parseFloat(String(b.value).replace(/[^0-9.-]+/g, ""));
-    return valueB - valueA; // Descending order
+    const valueA = parseFloat(String(a.value || 0).replace(/[^0-9.-]+/g, "")) || 0;
+    const valueB = parseFloat(String(b.value || 0).replace(/[^0-9.-]+/g, "")) || 0;
+    return valueB - valueA;
   });
 
-  // Group assets into categories based on type
   const assetGroups: { [key: string]: AssetData[] } = {};
   sortedAssets.forEach(asset => {
     const type = asset.type || 'other';
@@ -57,70 +68,35 @@ const createAssetGridData = (
     assetGroups[type].push(asset);
   });
 
-  // Create a grid where cell size correlates to asset value
+  // Calculate min/max for heat map
+  const values = sortedAssets.map(a => {
+    const parsedValue = parseFloat(String(a.value || 0).replace(/[^0-9.-]+/g, ""));
+    return isNaN(parsedValue) ? 0 : parsedValue;
+  });
+  const minValue = Math.min(...values);
+  const maxValue = Math.max(...values);
+
   const gridData: string[][] = [];
   const labelsData: { value: string; symbol: string; address: string; }[][] = [];
 
-  const groupColors: { [key: string]: string } = {
-    token: '#4CAF50',    // Green for tokens
-    nft: '#2196F3',      // Blue for NFTs
-    pitch: '#FFC107',    // Yellow for pitches
-    other: '#9C27B0'     // Purple for other types
-  };
-
-  // Calculate total value for size distribution
-  const totalValue = sortedAssets.reduce((sum, asset) => {
-    const value = parseFloat(String(asset.value).replace(/[^0-9.-]+/g, ""));
-    return sum + (isNaN(value) ? 0 : value);
-  }, 0);
-
-  // Create a grid that roughly represents the distribution of values
-  // We'll use a simple algorithm to assign cells based on relative value
   const rows = Math.ceil(Math.sqrt(sortedAssets.length));
   const cols = Math.ceil(sortedAssets.length / rows);
 
-  // Initialize grid with empty strings and empty labels
   for (let i = 0; i < rows; i++) {
     gridData[i] = new Array(cols).fill('#333333');
     labelsData[i] = new Array(cols).fill({ value: "", symbol: "", address: "" });
   }
 
-  // Fill the grid with asset colors and labels
   let row = 0, col = 0;
   sortedAssets.forEach(asset => {
-    const value = parseFloat(String(asset.value).replace(/[^0-9.-]+/g, ""));
-    const relativeValue = isNaN(value) ? 0 : (value / totalValue);
-
-    // Determine color based on price change or predefined color
-    let color;
-    if (priceChanges) {
-      // Price change color gradient (red to green)
-      const changeIntensity = Math.min(Math.abs(asset.priceChange) / 10, 1);
-      if (asset.priceChange >= 0) {
-        // Green gradient for positive change
-        const g = Math.floor(100 + changeIntensity * 155);
-        color = `rgb(0, ${g}, 0)`;
-      } else {
-        // Red gradient for negative change
-        const r = Math.floor(100 + changeIntensity * 155);
-        color = `rgb(${r}, 0, 0)`;
-      }
-    } else {
-      // Use type-based color
-      color = groupColors[asset.type] || groupColors.other;
-    }
-
-    // Assign color to the corresponding cell
+    const value = parseFloat(String(asset.value || 0).replace(/[^0-9.-]+/g, "")) || 0;
+    const color = getHeatColor(value, minValue, maxValue);
     gridData[row][col] = color;
-
-    // Assign label data to the corresponding cell
     labelsData[row][col] = {
-      value: asset.value.toString(),
+      value: (asset.value != null ? asset.value.toString() : "0"),
       symbol: asset.symbol || "",
       address: asset.address || "",
     };
-
-    // Move to the next position
     col++;
     if (col >= cols) {
       col = 0;
@@ -129,21 +105,6 @@ const createAssetGridData = (
   });
 
   return { grid: gridData, labels: labelsData };
-};
-
-const createAssetDisplayData = (
-  assets: AssetData[],
-  videos: VideoData[]
-): (AssetData | (VideoData & { type: string; id: string; stats?: any }))[] => {
-  return [
-    ...assets,
-    ...videos.map((v) => ({
-      ...v,
-      id: v.address,
-      type: "pitch",
-      name: v.address,
-    })),
-  ];
 };
 
 type ViewMode = "map" | "list";
@@ -162,9 +123,148 @@ type Stats = {
   value: string;
 };
 
-export const AssetsScreen = ({ initialAddress }: AssetsScreenProps) => {
+// CellGrid component moved inline
+type CellGridProps = {
+  data: string[][];
+  style?: StyleProp<ViewStyle>;
+  onSelect?: (rowIndex: number, colIndex: number) => void;
+  selectedCoords?: { row: number; col: number } | null;
+  assetLabels?: {
+    value: string;
+    symbol: string;
+    address: string;
+  }[][];
+};
+
+const CellGrid = ({
+  data,
+  style,
+  onSelect,
+  selectedCoords,
+  assetLabels,
+}: CellGridProps) => {
+  return (
+    <View style={[cellGridStyles.container, style]}>
+      {data.map((row, rowIndex) => (
+        <View key={rowIndex} style={cellGridStyles.rowContainer}>
+          {row.map((color, colIndex) => {
+            const isSelected =
+              selectedCoords?.row === rowIndex &&
+              selectedCoords?.col === colIndex;
+            const cellId = `${rowIndex}-${colIndex}`;
+            const label = assetLabels?.[rowIndex]?.[colIndex];
+
+            return (
+              <TouchableOpacity
+                key={cellId}
+                style={[
+                  cellGridStyles.cellOuter,
+                  label && label.value ? {
+                    flex: Math.max(1, Math.min(3, parseFloat(label.value) / 200)),
+                  } : {}
+                ]}
+                onPress={onSelect ? () => onSelect(rowIndex, colIndex) : undefined}
+                activeOpacity={0.8}
+              >
+                <View style={[cellGridStyles.cellInner, { backgroundColor: color }]}>
+                  {label && label.symbol && (
+                    <View style={cellGridStyles.labelContainer}>
+                      <RNText style={cellGridStyles.symbolText} numberOfLines={1}>
+                        {label.symbol}
+                      </RNText>
+                      {label.value && parseFloat(label.value) > 0 && (
+                        <RNText style={cellGridStyles.valueText} numberOfLines={1}>
+                          ${parseFloat(label.value).toFixed(0)}
+                        </RNText>
+                      )}
+                    </View>
+                  )}
+                </View>
+                {isSelected && <View style={cellGridStyles.selectedCellBorder} />}
+              </TouchableOpacity>
+            );
+          })}
+        </View>
+      ))}
+    </View>
+  );
+};
+
+const cellGridStyles = StyleSheet.create({
+  container: {
+    flex: 1,
+    flexDirection: "column",
+    borderRadius: 12,
+    backgroundColor: "transparent",
+    width: "100%",
+    gap: 4,
+  },
+  rowContainer: {
+    flexDirection: "row",
+    flex: 1,
+    gap: 4,
+  },
+  cellOuter: {
+    flex: 1,
+    minHeight: 40,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  cellInner: {
+    width: "100%",
+    height: "100%",
+    borderRadius: 8,
+    padding: 6,
+    justifyContent: "center",
+    alignItems: "center",
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 2,
+  },
+  selectedCellBorder: {
+    position: "absolute",
+    width: "100%",
+    height: "100%",
+    borderRadius: 8,
+    borderWidth: 2,
+    borderColor: "#FFFFFF",
+  },
+  labelContainer: {
+    flexDirection: "column",
+    alignItems: "center",
+    justifyContent: "center",
+    flex: 1,
+  },
+  symbolText: {
+    color: "#FFFFFF",
+    fontSize: 11,
+    fontWeight: "700",
+    textAlign: "center",
+    textShadowColor: "rgba(0, 0, 0, 0.5)",
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 2,
+  },
+  valueText: {
+    color: "#FFFFFF",
+    fontSize: 9,
+    fontWeight: "600",
+    textAlign: "center",
+    marginTop: 2,
+    textShadowColor: "rgba(0, 0, 0, 0.5)",
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 2,
+  },
+});
+
+export const LedgerScreen = ({ initialAddress }: AssetsScreenProps) => {
   const route = useRoute<RouteProp<Record<string, RouteParams>, string>>();
   const routeAddress = route.params?.address;
+
+  // Use routeAddress (from URL) as priority, fall back to initialAddress prop
+  const addressFromUrl = routeAddress || initialAddress;
+
   const [viewMode, setViewMode] = useState<ViewMode>("list");
   const [selectedMapCell, setSelectedMapCell] = useState<{
     row: number;
@@ -172,216 +272,262 @@ export const AssetsScreen = ({ initialAddress }: AssetsScreenProps) => {
   } | null>(null);
   const [searchText, setSearchText] = useState("");
   const [assets, setAssets] = useState<AssetData[]>([]);
-  const [pitches, setPitches] = useState<VideoData[]>([]);
-  const [displayData, setDisplayData] = useState<(AssetData | VideoData)[]>([]);
+  const [displayData, setDisplayData] = useState<AssetData[]>([]);
   const [gridData, setGridData] = useState<string[][]>([]);
   const [gridLabels, setGridLabels] = useState<{ value: string; symbol: string; address: string; }[][]>([]);
-  const [address, setAddress] = useState<string | undefined>(routeAddress || initialAddress);
-  const [totalValue, setTotalValue] = useState<string>("0");
-  const [performance, setPerformance] = useState<number>(0);
+  const [address, setAddress] = useState<string | undefined>(addressFromUrl);
   const [currentPriceData, setCurrentPriceData] = useState<PriceData>({
     timeframe: "1Y",
     points: [],
   });
   const [isLoading, setIsLoading] = useState<boolean>(true);
-  const [selectedPitchAddress, setSelectedPitchAddress] = useState<string | null>(null);
-  const [allInvestments, setAllInvestments] = useState<AssetData[]>([]);
   const [stats, setStats] = useState<Stats>({
     price: "0",
     minted: "0",
     value: "0"
   });
-  const [selectedItem, setSelectedItem] = useState<AssetData | VideoData | null>(null);
+  const [selectedItem, setSelectedItem] = useState<AssetData | null>(null);
 
   const platformContext = usePlatform();
+  const navigation = useNavigation<MaterialTopTabNavigationProp<TabParamList>>();
 
   useEffect(() => {
-    // Use provided address or a default address
-    const currentAddress = routeAddress || initialAddress || "0xDefaultUserAddress";
+    const currentAddress = addressFromUrl || '';
     setAddress(currentAddress);
-
-    const fetchData = async () => {
-      setIsLoading(true);
+    setIsLoading(true);
+    (async () => {
       try {
-        const [
-          fetchedAssets,
-          fetchedPitches,
-          portfolioValue,
-          portfolioPerformance,
-          portfolioPriceData,
-        ] = await Promise.all([
-          ApiService.getAssetsByAddress(currentAddress),
-          ApiService.fetchVideos(10),
-          ApiService.getTotalPortfolioValue(currentAddress),
-          ApiService.getPortfolioPerformance(currentAddress),
-          ApiService.getPriceData(currentAddress),
-        ]);
-
+        const userKey = currentAddress || 'default-user';
+        const fetchedAssets = await ApiService.getAssetsByAddress(userKey);
         setAssets(fetchedAssets);
-        setPitches(fetchedPitches);
-        setAllInvestments(fetchedAssets);
+        setDisplayData(fetchedAssets);
 
-        const combinedData = createAssetDisplayData(
-          fetchedAssets,
-          fetchedPitches
-        );
-        setDisplayData(combinedData);
-
-        const { grid, labels } = createAssetGridData(fetchedAssets, true);
+        // Create grid data for heat map
+        const { grid, labels } = createAssetGridData(fetchedAssets);
         setGridData(grid);
         setGridLabels(labels);
 
-        setTotalValue(portfolioValue);
-        setPerformance(portfolioPerformance);
-        setCurrentPriceData(portfolioPriceData);
-        setSelectedPitchAddress(null);
-
-        if (fetchedAssets.length > 0 && !selectedItem) {
-          const portfolioTotalValue = await ApiService.getTotalPortfolioValue(currentAddress);
-          setStats({
-            price: currentPriceData.points.length > 0 ? currentPriceData.points[currentPriceData.points.length -1].value.toFixed(2) : "N/A",
-            minted: "N/A",
-            value: portfolioTotalValue
-          });
+        // If we have an address from URL, try to select that specific asset
+        if (addressFromUrl) {
+          const assetToSelect = fetchedAssets.find(asset => asset.address === addressFromUrl);
+          if (assetToSelect) {
+            setSelectedItem(assetToSelect);
+          } else {
+            // If asset not found in user's ledger, try to load it individually
+            try {
+              const assetInfo = await ApiService.getAssetInfo(addressFromUrl);
+              if (assetInfo) {
+                const updatedAssets = [...fetchedAssets, assetInfo];
+                setAssets(updatedAssets);
+                setDisplayData(updatedAssets);
+                setSelectedItem(assetInfo);
+              }
+            } catch (error) {
+              console.error("Error loading specific asset:", error);
+            }
+          }
+        } else {
+          // Automatically select the first item if no specific address requested
+          if (fetchedAssets.length > 0) {
+            const firstItem = fetchedAssets[0];
+            setSelectedItem(firstItem);
+          }
         }
       } catch (error) {
-        console.error("Error loading initial assets data:", error);
+        console.error("Error fetching assets:", error);
+      } finally {
+        setIsLoading(false);
+      }
+    })();
+  }, [addressFromUrl]);
+
+  // Update grid data when search filters change displayData
+  useEffect(() => {
+    if (assets.length > 0) {
+      const { grid, labels } = createAssetGridData(displayData);
+      setGridData(grid);
+      setGridLabels(labels);
+    }
+  }, [displayData]);
+
+  // Handle search filtering and update grid data
+  useEffect(() => {
+    const filteredData = assets.filter((item) => {
+      const searchTextLower = searchText.toLowerCase();
+      const asset = item as AssetData;
+      return asset.address?.toLowerCase().includes(searchTextLower) ||
+             asset.symbol?.toLowerCase().includes(searchTextLower);
+    });
+
+    setDisplayData(filteredData);
+  }, [searchText, assets]);
+
+  // Effect for fetching price data (currentPriceData state)
+  useEffect(() => {
+    const fetchPriceDataLogic = async () => {
+      if (!selectedItem?.address) {
+        setCurrentPriceData({ timeframe: "N/A", points: [] });
+        return;
+      }
+
+      setIsLoading(true);
+      try {
+        const priceData = await ApiService.getPriceData(selectedItem.address);
+        setCurrentPriceData(priceData);
+      } catch (error) {
+        console.error("Error fetching price data:", error);
+        setCurrentPriceData({ timeframe: "Error", points: [] });
       } finally {
         setIsLoading(false);
       }
     };
 
-    fetchData();
-  }, [initialAddress, routeAddress]);
+    fetchPriceDataLogic();
+  }, [selectedItem?.address]); // Only fetch when selected item changes
 
+  // Effect for updating stats (stats state)
   useEffect(() => {
-    if (!selectedPitchAddress || selectedPitchAddress === "select an item first") {
-      return;
-    }
+    const updateStatsLogic = async () => {
+      try {
+        if (selectedItem) {
+          const asset = selectedItem as AssetData;
+          setStats({
+            price: asset.stat?.price?.toFixed(2) || "N/A",
+            minted: asset.stat?.minted?.toString() || "N/A",
+            value: asset.stat?.value?.toFixed(2) || "N/A",
+          });
+        } else {
+          setStats({ price: "N/A", minted: "N/A", value: "N/A" });
 
-    if (selectedPitchAddress) {
-      const fetchPitchPrice = async () => {
-        setIsLoading(true);
-        try {
-          const pitchPriceData = await ApiService.getPitchPriceData(
-            selectedPitchAddress
-          );
-          setCurrentPriceData(pitchPriceData);
-          if (selectedItem && selectedItem.address === selectedPitchAddress && selectedItem.type === 'pitch') {
-            const videoItem = selectedItem as VideoData;
-            setStats({
-              price: videoItem.stats?.price || "N/A",
-              minted: videoItem.stats?.minted || "N/A",
-              value: videoItem.stats?.value || "N/A",
-            });
+          // Clear URL when no asset is selected
+          if (Platform.OS === 'web') {
+            const currentPath = window.location.pathname;
+            if (currentPath.startsWith('/ledger/') && currentPath !== '/ledger') {
+              window.history.replaceState({}, "", '/ledger');
+            }
           }
-        } catch (error) {
-          console.error(
-            `Error fetching price data for pitch ${selectedPitchAddress}:`,
-            error
-          );
-          setCurrentPriceData({ timeframe: "Error", points: [] });
-        } finally {
-          setIsLoading(false);
         }
-      };
-      fetchPitchPrice();
-    } else {
-      if (address && address !== "select an item first") {
-        ApiService.getPriceData(address)
-          .then(setCurrentPriceData)
-          .catch((err) => {
-            console.error(
-              "Error fetching portfolio price data after deselecting pitch:",
-              err
-            );
-            setCurrentPriceData({ timeframe: "1Y", points: [] });
-          });
-        if (address && !selectedItem) {
-          ApiService.getTotalPortfolioValue(address).then(portfolioValue => {
-            setStats({
-              price: currentPriceData.points.length > 0 ? currentPriceData.points[currentPriceData.points.length -1].value.toFixed(2) : "N/A",
-              minted: "Portfolio",
-              value: portfolioValue,
-            });
-          });
-        }
+      } catch (error) {
+        console.error("Error updating stats:", error);
+        setStats({ price: "Error", minted: "Error", value: "Error" });
       }
-    }
-  }, [selectedPitchAddress, address, selectedItem, currentPriceData.points]);
+    };
 
-  const handleAssetOrPitchSelect = (item: AssetData | VideoData) => {
+    updateStatsLogic();
+  }, [selectedItem]);
+
+  const handleAssetOrPitchSelect = (item: AssetData) => {
     setSelectedItem(item);
-    if (item.type === "pitch" && item.address) {
-      setSelectedPitchAddress(item.address);
-      const pitch = item as VideoData;
-      setStats({
-        price: pitch.stats?.price || "N/A",
-        minted: pitch.stats?.minted || "N/A",
-        value: pitch.stats?.value || "N/A",
-      });
-    } else {
-      setSelectedPitchAddress(null);
-      const asset = item as AssetData;
-      setStats({
-        price: asset.price || "N/A",
-        minted: asset.minted || "N/A",
-        value: asset.value || "N/A",
-      });
-      if (address) {
-        ApiService.getPriceData(address).then(setCurrentPriceData);
-      }
+
+    // Update URL to reflect selected asset
+    if (Platform.OS === 'web' && item.address) {
+      const targetPath = `/ledger/${encodeURIComponent(item.address)}`;
+      window.history.replaceState({}, "", targetPath);
     }
   };
 
-  const renderListItem = ({ item }: { item: AssetData | VideoData }) => {
-    const isPitch = item.type === "pitch";
-    const asset = item as AssetData;
-    const pitch = item as VideoData;
+  const handleBuyPress = () => {
+    if (!selectedItem) {
+      Alert.alert("No Asset Selected", "Please select an asset to buy.");
+      return;
+    }
 
-    const itemName = isPitch ? `Pitch: ${pitch.address}` : asset.name;
-    const itemValue = isPitch ? pitch.stats?.value || "N/A" : asset.value;
-    const itemPriceChange = isPitch
-      ? (Math.random() - 0.5) * 10
-      : asset.priceChange;
-    const itemLastUpdated = isPitch
-      ? new Date(pitch.timestamp! * 1000).toLocaleDateString()
-      : asset.lastUpdated;
-    const itemAddress = isPitch ? pitch.address : asset.address;
+    // For now, show an alert. This could be replaced with a proper trading modal
+    Alert.alert(
+      "Buy Asset",
+      `Would you like to buy ${selectedItem.symbol || selectedItem.address}?`,
+      [
+        { text: "Cancel", style: "cancel" },
+        { text: "Buy", onPress: () => {
+          console.log("Buy action for:", selectedItem.address);
+          // TODO: Implement actual buy functionality
+        }}
+      ]
+    );
+  };
 
-    const formatAddress = (address: string) => {
-      if (!address) return "";
-      if (address.length > 30) {
-        return address.substring(0, 25) + "...";
+  const handleSellPress = () => {
+    if (!selectedItem) {
+      Alert.alert("No Asset Selected", "Please select an asset to sell.");
+      return;
+    }
+
+    // For now, show an alert. This could be replaced with a proper trading modal
+    Alert.alert(
+      "Sell Asset",
+      `Would you like to sell ${selectedItem.symbol || selectedItem.address}?`,
+      [
+        { text: "Cancel", style: "cancel" },
+        { text: "Sell", onPress: () => {
+          console.log("Sell action for:", selectedItem.address);
+          // TODO: Implement actual sell functionality
+        }}
+      ]
+    );
+  };
+
+  const handlePitchPress = () => {
+    if (!selectedItem || !selectedItem.address) {
+      Alert.alert("No Asset Selected", "Please select an asset to view its pitch.");
+      return;
+    }
+
+    // Navigate to explore screen with the asset address
+    if (Platform.OS === 'web') {
+      // const targetPath = `/explore/${encodeURIComponent(selectedItem.address)}`;
+      // window.location.href = targetPath;
+      navigation.navigate("Explore", { address: selectedItem.address });
+    } else {
+      // For mobile, you might need to use a different navigation method
+      console.log("Navigate to explore screen with address:", selectedItem.address);
+      navigation.navigate("Explore", { address: selectedItem.address });
+    }
+  };
+
+  const renderListItem = ({ item }: { item: AssetData }) => {
+    const isSelected = selectedItem?.address === item.address;
+    const asset = item;
+
+    const itemName = asset.address; // Use address as name
+    const itemValueDisplay = asset.stat?.value?.toFixed(2) || "N/A";
+
+    // Calculate price change from price array
+    let itemPriceChange = 0;
+    if (asset.price && asset.price.length >= 2) {
+      const firstPrice = asset.price[0];
+      const lastPrice = asset.price[asset.price.length - 1];
+      if (firstPrice > 0) {
+        itemPriceChange = ((lastPrice - firstPrice) / firstPrice) * 100;
       }
-      return address;
-    };
+    }
+
+    const itemMintedDisplay = asset.stat?.minted?.toString() || "N/A";
+    const itemAddressDisplay = item.address || "No Address";
 
     return (
       <TouchableOpacity
         onPress={() => handleAssetOrPitchSelect(item)}
         style={styles.touchableListItem}
       >
-        <Frame style={styles.listItemInbound}>
-          <View style={styles.assetDetails}>
-            <Text style={styles.assetTitle} numberOfLines={1}>
-              {itemName}
-            </Text>
-            <Text style={styles.assetId}>{formatAddress(itemAddress)}</Text>
-          </View>
-          <View style={styles.assetValue}>
-            <Text style={styles.valueText}>${itemValue}</Text>
-            <View style={styles.changeContainer}>
-              <Text
-                style={[
-                  styles.changeText,
-                  { color: itemPriceChange >= 0 ? "#4CAF50" : "#F44336" },
-                ]}
-              >
-                {itemPriceChange >= 0 ? "+" : ""}
-                {itemPriceChange.toFixed(1)}%
-              </Text>
-              <Text style={styles.updateTime}>{itemLastUpdated}</Text>
+        <Frame style={[styles.listItemFrame, isSelected && styles.selectedListItemFrame]}>
+          <View style={styles.listItemContainer}>
+            {/* Left Section (80%) */}
+            <View style={styles.listItemLeftSection}>
+              <View style={styles.listItemStatsLine1}>
+                <RNText style={[styles.listItemPriceChange, { color: itemPriceChange >= 0 ? "#4CAF50" : "#F44336" }]}>
+                  {itemPriceChange >= 0 ? "+" : ""}{itemPriceChange.toFixed(2)}%
+                </RNText>
+                <RNText style={styles.listItemValue}>${itemValueDisplay}</RNText>
+                <RNText style={styles.listItemMinted}>{itemMintedDisplay}</RNText>
+              </View>
+              <RNText style={styles.listItemAddress} numberOfLines={1} ellipsizeMode="middle">
+                {itemName !== itemAddressDisplay ? `${itemName} (${itemAddressDisplay})` : itemAddressDisplay}
+              </RNText>
+            </View>
+
+            {/* Right Section */}
+            <View style={styles.listItemRightSection}>
+              <CandlestickMiniGraph style={styles.listItemMiniGraph} prices={asset.price || []} />
             </View>
           </View>
         </Frame>
@@ -390,25 +536,7 @@ export const AssetsScreen = ({ initialAddress }: AssetsScreenProps) => {
   };
 
   const AssetsContent = () => {
-    const filteredData = displayData.filter((item) => {
-      const searchTextLower = searchText.toLowerCase();
-      if (item.type === "pitch") {
-        const pitch = item as VideoData;
-        return (
-          pitch.address?.toLowerCase().includes(searchTextLower) ||
-          (pitch.source || "").toLowerCase().includes(searchTextLower)
-        );
-      } else {
-        const asset = item as AssetData;
-        return (
-          asset.name.toLowerCase().includes(searchTextLower) ||
-          asset.symbol.toLowerCase().includes(searchTextLower) ||
-          asset.address.toLowerCase().includes(searchTextLower)
-        );
-      }
-    });
-
-    if (filteredData.length === 0 && !isLoading) {
+    if (displayData.length === 0 && !isLoading) {
       return (
         <View style={styles.emptyState}>
           <Text style={styles.emptyStateText}>No items found</Text>
@@ -416,25 +544,21 @@ export const AssetsScreen = ({ initialAddress }: AssetsScreenProps) => {
       );
     }
 
-    if (viewMode === "list") {
-      return (
-        <View style={styles.listContainer}>
+    return (
+      <>
+        {viewMode === "list" ? (
           <ScrollView
             style={styles.scrollView}
             contentContainerStyle={styles.scrollContent}
             showsVerticalScrollIndicator={false}
           >
-            {filteredData.map((item, index) => (
+            {displayData.map((item, index) => (
               <View key={`asset-${index}`} style={styles.listItemWrapper}>
                 {renderListItem({ item })}
               </View>
             ))}
           </ScrollView>
-        </View>
-      );
-    } else {
-      return (
-        <View style={styles.mapViewContainer}>
+      ) : (
           <CellGrid
             data={gridData}
             selectedCoords={selectedMapCell}
@@ -445,108 +569,68 @@ export const AssetsScreen = ({ initialAddress }: AssetsScreenProps) => {
                 handleAssetOrPitchSelect(displayData[index]);
               }
             }}
-            style={styles.cellGridStyle}
             assetLabels={gridLabels}
           />
-        </View>
-      );
-    }
+        )}
+      </>
+    );
   };
 
   const GraphView = ({ style }: { style?: StyleProp<ViewStyle> }) => {
-    const points = currentPriceData?.points || [];
-    const maxValue = Math.max(...points.map((p) => p.value), 0);
-    const minValue = Math.min(...points.map((p) => p.value), 0);
-    const range = maxValue - minValue || 1;
-
-    const screenWidth = Dimensions.get("window").width;
-    const graphHeight = 180;
-
-    // Apply exponential function to values - f(x) = a * e^(b*x)
-    // Parameters a and b control the shape of the exponential curve
-    const applyExponential = (value: number, min: number, max: number): number => {
-      // Normalize value between 0 and 1
-      const normalizedValue = (value - min) / (max - min);
-      // Apply exponential function (a=0.2, b=2 as example parameters)
-      const a = 0.2;
-      const b = 2;
-      return a * Math.exp(b * normalizedValue);
-    };
-
-    // Calculate bar positions and heights
-    const barWidth = Math.max(3, (screenWidth / points.length) - 2);
-    const barGap = 2;
-    const bars = points.map((point, index) => {
-      // Calculate bar height with exponential function
-      const expValue = applyExponential(point.value, minValue, maxValue);
-      const heightPercent = expValue / applyExponential(maxValue, minValue, maxValue);
-      const barHeight = graphHeight * heightPercent;
-
-      // Position bar
-      const x = index * (barWidth + barGap);
-      const y = graphHeight - barHeight;
-
-      return {
-        x,
-        y,
-        height: barHeight,
-        value: point.value,
-      };
-    });
-
     return (
       <Frame style={[styles.graphContainer, style]}>
-        {points.length > 0 ? (
-          <>
-            <View style={styles.graphHeader}>
-              <Text style={styles.graphTitle}>
-                {performance >= 0 ? "+" : ""}
-                {performance.toFixed(2)}%
-              </Text>
-              <Text style={styles.graphTimeframe}>
-                {currentPriceData?.timeframe || "1M"}
-              </Text>
-            </View>
-
-            <View style={styles.graphContent}>
-              <View style={styles.graphYAxis}>
-                <Text style={styles.axisLabel}>${maxValue.toFixed(2)}</Text>
-                <Text style={styles.axisLabel}>
-                  ${((maxValue + minValue) / 2).toFixed(2)}
-                </Text>
-                <Text style={styles.axisLabel}>${minValue.toFixed(2)}</Text>
-              </View>
-              <View style={styles.graphCanvas}>
-                <View style={styles.barChartContainer}>
-                  {bars.map((bar, index) => (
-                    <View
-                      key={index}
-                      style={[
-                        styles.barStyle,
-                        {
-                          height: bar.height,
-                          width: barWidth,
-                          left: bar.x,
-                          bottom: 0,
-                          backgroundColor: performance >= 0 ? "#4CAF50" : "#F44336",
-                        },
-                      ]}
-                    />
-                  ))}
-                </View>
-              </View>
-            </View>
-          </>
-        ) : (
-          <View style={styles.noDataContainer}>
-            <Text style={styles.noDataText}>No price data available</Text>
-          </View>
-        )}
+        <WagmiMainGraph data={currentPriceData?.points || []} />
       </Frame>
     );
   };
 
-  if (isLoading && !address && !assets.length && !pitches.length) {
+  // Handle initial address focus
+  useEffect(() => {
+    if (initialAddress && assets.length > 0 && !selectedItem) {
+      const itemToSelect = assets.find(item => item.address === initialAddress);
+      if (itemToSelect) {
+        handleAssetOrPitchSelect(itemToSelect);
+      }
+    }
+  }, [initialAddress, assets, selectedItem]);
+
+  // Handle direct URL navigation - load specific asset info
+  useEffect(() => {
+    if (initialAddress && assets.length > 0) {
+      const loadSpecificAsset = async () => {
+        // Check if the asset is already in the list
+        const existingAsset = assets.find(item => item.address === initialAddress);
+        if (existingAsset) {
+          handleAssetOrPitchSelect(existingAsset);
+          return;
+        }
+
+        // Load the specific asset info from API
+        try {
+          const assetInfo = await ApiService.getAssetInfo(initialAddress);
+          if (assetInfo) {
+            // Add the asset to the list and select it
+            setAssets(prevAssets => {
+              const updatedAssets = [...prevAssets, assetInfo];
+              setDisplayData(updatedAssets);
+              return updatedAssets;
+            });
+
+            // Select the newly loaded asset
+            setTimeout(() => {
+              handleAssetOrPitchSelect(assetInfo);
+            }, 100);
+          }
+        } catch (error) {
+          console.error("Error loading specific asset:", error);
+        }
+      };
+
+      loadSpecificAsset();
+    }
+  }, [initialAddress, assets, handleAssetOrPitchSelect]);
+
+  if (isLoading && !address && !assets.length) {
     return (
       <View style={styles.loadingContainer}>
         <Text style={styles.loadingText}>Loading data...</Text>
@@ -554,36 +638,27 @@ export const AssetsScreen = ({ initialAddress }: AssetsScreenProps) => {
     );
   }
 
-
-
-
   return (
     <SafeAreaView style={styles.screenContainer}>
       <Outbound style={styles.headerOutbound}>
-        <View style={styles.addressBox}>
-          <Text style={styles.addressText}>
-            {address && address !== "select an item first"
-              ? address
-              : "Select an item to view assets"}
-          </Text>
-        </View>
+
+        <Frame style={styles.statsSection}>
+          <View style={styles.statsItem}>
+            <Text style={styles.statsLabel}>Current Price</Text>
+            <Text style={styles.statsValue}>${stats.price}</Text>
+          </View>
+          <View style={styles.statsItem}>
+            <Text style={styles.statsLabel}>Minted</Text>
+            <Text style={styles.statsValue}>{stats.minted}</Text>
+          </View>
+          <View style={styles.statsItem}>
+            <Text style={styles.statsLabel}>Value</Text>
+            <Text style={styles.statsValue}>${stats.value}</Text>
+          </View>
+        </Frame>
 
         <View style={styles.portfolioContainer}>
-          <GraphView style={styles.leftSection} />
-          <Frame style={styles.rightSection}>
-            <View style={styles.rightSectionItem}>
-              <Text style={styles.totalValueLabel}>Current Price</Text>
-              <Text style={styles.totalValue}>${stats.price}</Text>
-            </View>
-            <View style={styles.rightSectionItem}>
-              <Text style={styles.totalValueLabel}>Minted</Text>
-              <Text style={styles.totalValue}>${stats.minted}</Text>
-            </View>
-            <View style={styles.rightSectionItem}>
-              <Text style={styles.totalValueLabel}>Value</Text>
-              <Text style={styles.totalValue}>${stats.value}</Text>
-            </View>
-          </Frame>
+          <GraphView style={styles.mainGraph} />
         </View>
 
         <View style={styles.actionsContainer}>
@@ -591,52 +666,54 @@ export const AssetsScreen = ({ initialAddress }: AssetsScreenProps) => {
             title="Buy"
             style={styles.actionButton}
             iconPath={require("../assets/emojis/money-face.png")}
-            onPress={() => {
-            }}
+            onPress={handleBuyPress}
+            textStyle={styles.actionButtonText}
+          />
+
+          <Link href={selectedItem?.discussion || ""} external={true}>
+            <Button
+              title="Group"
+              style={styles.actionButton}
+              iconPath={require("../assets/emojis/talk.png")}
+              textStyle={styles.actionButtonText}
+            />
+          </Link>
+
+          <Button
+            title="Pitch"
+            style={styles.actionButton}
+            iconPath={require("../assets/emojis/camera.png")}
             textStyle={styles.actionButtonText}
           />
 
           <Button
-            title="Discussion"
-            style={styles.actionButton}
-            iconPath={require("../assets/emojis/talk.png")}
-            onPress={() => {
-              if (selectedItem && selectedItem.discussion) {
-                platformContext.isPlatform("web") ? openLink(selectedItem.discussion) : Linking.openURL(selectedItem.discussion);
-              } else {
-                console.warn("No discussion link available for the selected item.");
-              }
-            }}
-            textStyle={styles.actionButtonText}
-          />
-          <Button
             title="Sell"
             style={styles.actionButton}
             iconPath={require("../assets/emojis/money-wings.png")}
-            onPress={() => {
-            }}
+            onPress={handleSellPress}
             textStyle={styles.actionButtonText}
           />
         </View>
       </Outbound>
 
       <Outbound style={styles.searchSwitchOutbound}>
-        <View style={{ position: "relative", flex: 1, width: "100%" }}>
+        <View style={{ position: "relative", width: "100%" }}>
           <Field
             placeholder="Search Assets or Pitches"
-            placeholderTextColor="rgba(255, 255, 255, 0.5)"
             style={styles.searchInput}
             value={searchText}
             onChangeText={setSearchText}
           />
           <Switch style={{ position: "absolute", right: 0 }}>
             <Switch.Tab
-              tab={{ key: "map", label: "Map", img: require("../assets/emojis/map.png") }}
+              label="Map"
+              img={require("../assets/emojis/map.png")}
               active={viewMode === "map"}
               onPress={() => setViewMode("map")}
             />
             <Switch.Tab
-              tab={{ key: "list", label: "List", img: require("../assets/emojis/list.png") }}
+              label="List"
+              img={require("../assets/emojis/list.png")}
               active={viewMode === "list"}
               onPress={() => setViewMode("list")}
             />
@@ -644,11 +721,13 @@ export const AssetsScreen = ({ initialAddress }: AssetsScreenProps) => {
         </View>
 
         <View style={styles.assetsContentContainer}>
-          {isLoading && (assets.length > 0 || pitches.length > 0) ? (
-            <Text style={styles.loadingText}>Updating...</Text>
-          ) : (
-            <AssetsContent />
-          )}
+          <Inbound style={styles.listContainer}>
+            {isLoading && (assets.length > 0) ? (
+              <Text style={styles.loadingText}>Updating...</Text>
+            ) : (
+              <AssetsContent />
+            )}
+          </Inbound>
         </View>
       </Outbound>
     </SafeAreaView>
@@ -672,88 +751,68 @@ const styles = StyleSheet.create({
     backgroundColor: 'transparent',
   },
   scrollContent: {
-    paddingBottom: 16,
+    paddingVertical: 8,
     width: '100%',
   },
   headerOutbound: {
     marginHorizontal: 12,
     marginTop: 12,
-    paddingVertical: 15,
+    marginBottom: 8,
+    paddingVertical: 12,
+    paddingHorizontal: 16,
     borderRadius: 20,
+    gap: 8,
   },
   portfolioContainer: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    paddingHorizontal: 10,
-    marginBottom: 15,
+    flexDirection: "column",
     width: '100%',
   },
-  leftSection: {
-    flex: 8,
-    marginRight: 10,
-    justifyContent: "center",
+  mainGraph: {
+    width: "100%",
+    minHeight: 300,
+    padding: 8,
   },
-  noDataSection: {
-    borderRadius: 15,
-    padding: 15,
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  rightSection: {
-    flex: 2,
-    justifyContent: "center",
+  statsSection: {
+    flexDirection: "row",
+    paddingVertical: 8,
+    justifyContent: "space-around",
     alignItems: "center",
     borderRadius: 15,
-    padding: 15,
-    marginLeft: 10,
+    width: '100%',
   },
-  rightSectionItem: {
-
+  statsItem: {
+    alignItems: "center",
     flex: 1,
     gap: 4
   },
-  headerFrame: {
-    borderRadius: 16,
-  },
-  headerInbound: {
-    padding: 12,
-    gap: 8,
-  },
-  addressBox: {
-    backgroundColor: "rgba(0, 0, 0, 0.3)",
-    paddingVertical: 8,
-    paddingHorizontal: 12,
-    borderRadius: 10,
-    alignItems: "center",
-    width: "100%",
-    flex: 1,
-    marginHorizontal: 15,
-    marginBottom: 15,
-  },
-  addressText: {
-    color: "rgba(255, 255, 255, 0.8)",
-    fontSize: 13,
-    fontFamily: "DMMono_500Medium",
-  },
-  valueContainer: {
-    alignItems: "center",
-  },
-  totalValueLabel: {
+  statsLabel: {
     color: "rgba(255, 255, 255, 0.9)",
-    width: '100%',
-    fontSize: 14,
-    marginBottom: 5,
+    fontSize: 13,
+    marginBottom: 2,
   },
-  totalValue: {
+  statsValue: {
     color: "#FFFFFF",
-    fontSize: 16,
+    fontSize: 15,
     fontWeight: "700",
+  },
+  pitchBarPlaceholder: {
+    height: 50,
+    backgroundColor: 'rgba(255, 255, 255, 0.1)',
+    borderRadius: 10,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 20,
+    marginHorizontal: 12,
+  },
+  pitchBarText: {
+    color: 'rgba(255, 255, 255, 0.7)',
+    fontSize: 14,
   },
   actionsContainer: {
     flexDirection: "row",
     width: '100%',
     justifyContent: "space-between",
-    gap: 10,
+    gap: 12,
   },
   actionButton: {
     flex: 1,
@@ -763,24 +822,14 @@ const styles = StyleSheet.create({
     fontSize: 15,
     fontWeight: "600",
   },
-  graphOutbound: {
-    marginHorizontal: 12,
-    marginTop: 8,
-  },
   graphContainer: {
-    height: 240,
     width: "100%",
     borderRadius: 12,
     overflow: "hidden",
   },
-  graphInner: {
-    padding: 16,
-    backgroundColor: "rgba(30, 30, 30, 0.5)",
-  },
   graphHeader: {
     flexDirection: "row",
     justifyContent: "space-between",
-    marginBottom: 16,
   },
   graphTitle: {
     fontSize: 18,
@@ -794,6 +843,7 @@ const styles = StyleSheet.create({
   graphContent: {
     flexDirection: "row",
     height: 180,
+    width: '100%',
   },
   graphYAxis: {
     width: 60,
@@ -810,22 +860,6 @@ const styles = StyleSheet.create({
     height: "100%",
     position: "relative",
   },
-  graphLine: {
-    width: "100%",
-    height: "100%",
-    position: "absolute",
-  },
-  lineChart: {
-    position: "relative",
-    width: "100%",
-    borderWidth: 1,
-  },
-  dataPoint: {
-    position: "absolute",
-    width: 3,
-    height: 3,
-    borderRadius: 2,
-  },
   noDataContainer: {
     flex: 1,
     justifyContent: "center",
@@ -840,17 +874,9 @@ const styles = StyleSheet.create({
     marginHorizontal: 12,
     marginTop: 8,
     borderRadius: 25,
-    padding: 10,
+    padding: 16,
+    flex: 1,
     width: 'auto',
-  },
-  searchBarContainer: {
-    flexDirection: "row",
-    alignItems: "center",
-    backgroundColor: "rgba(0, 0, 0, 0.3)",
-    borderRadius: 25,
-    paddingHorizontal: 15,
-    paddingVertical: 8,
-    marginBottom: 10,
   },
   searchInput: {
     width: "100%",
@@ -859,92 +885,142 @@ const styles = StyleSheet.create({
     fontSize: 14,
     textAlign: "left",
     fontFamily: "Nunito_600SemiBold",
-  },
-  mapListSwitch: {
-    flexDirection: "row",
-    backgroundColor: "rgba(0, 0, 0, 0.4)",
-    borderRadius: 20,
-    overflow: "hidden",
-  },
-  switchButton: {
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-  },
-  activeSwitch: {
-    backgroundColor: "rgba(255, 255, 255, 0.2)",
-  },
-  switchText: {
-    color: "#FFFFFF",
-    fontSize: 13,
+    borderRadius: 999,
   },
   assetsContentContainer: {
     marginTop: 10,
-    minHeight: 200,
+    flex: 1,
     width: '100%',
     alignSelf: 'stretch',
     paddingBottom: 10,
   },
-  listItemInbound: {
+  listItemWrapper: {
+    width: '100%',
+    marginBottom: 10,
+    paddingHorizontal: 0,
+  },
+  touchableListItem: {
+    width: '100%',
+    flex: 1,
+  },
+  listContainer: {
+    flex: 1,
+    paddingHorizontal: 8,
+    width: '100%',
+    height: '100%',
+  },
+  barsContainer: {
+    flex: 1,
+    flexDirection: "row",
+    alignItems: "flex-end",
+    justifyContent: "space-evenly",
+    height: "100%",
+    paddingHorizontal: 20,
+    paddingVertical: 40,
+  },
+  barColumn: {
+    alignItems: "center",
+    justifyContent: "flex-end",
+    height: "100%",
+  },
+  dataBar: {
+    backgroundColor: "rgba(255, 255, 255, 0.9)",
+    borderRadius: 999,
+  },
+  barWrapper: {
+    alignItems: "center",
+    justifyContent: "center",
+    position: "relative",
+    height: "100%",
+  },
+  outerBar: {
+    backgroundColor: "rgba(255, 255, 255, 0.15)",
+    borderRadius: 999,
+    width: 4,
+  },
+  innerBar: {
+    backgroundColor: "rgba(255, 255, 255, 0.9)",
+    borderRadius: 999,
+    position: "absolute",
+  },
+  miniGraphLoadingContainer: {
+    width: 60,
+    height: 40,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: 'rgba(255,255,255,0.05)',
+    borderRadius: 4,
+  },
+  miniGraphInfoText: {
+    fontSize: 9,
+    color: 'rgba(255,255,255,0.6)',
+  },
+  listItemFrame: {
     flexDirection: "row",
     width: '100%',
     alignItems: "center",
-    padding: 10,
     alignSelf: 'stretch',
+    borderRadius: 12,
   },
-  assetCard: {
-    flexDirection: "row",
-    backgroundColor: "rgba(0, 0, 0, 0.3)",
-    borderRadius: 8,
-    padding: 12,
-    width: "100%",
-    alignItems: "center",
+  selectedListItemFrame: {
+    borderWidth: 2,
+    borderColor: "#FFFFFF",
   },
-  assetSymbol: {
-    fontSize: 22,
-    marginRight: 12,
-    color: "rgba(255, 255, 255, 0.9)",
+  listItemContainer: {
+    flexDirection: 'row',
+    width: '100%',
+    alignItems: 'center',
+    gap: 16
   },
-  assetDetails: {
-    flex: 1,
-    marginRight: 8,
+  listItemLeftSection: {
+    flex: 0.7,
+    justifyContent: 'center',
+    paddingVertical: 16,
+    paddingLeft: 8,
   },
-  assetTitle: {
-    color: "rgba(255, 255, 255, 0.9)",
-    fontSize: 15,
-    fontWeight: "600",
+  listItemRightSection: {
+    flex: 0.3,
+    minWidth: 120,
+    alignItems: 'flex-end',
+    justifyContent: 'center',
   },
-  assetId: {
-    color: "rgba(255, 255, 255, 0.6)",
+  listItemMiniGraph: {
+    width: 120,
+    height: 80,
+  },
+  listItemStatsLine1: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 4,
+  },
+  listItemPriceChange: {
+    fontSize: 13,
+    fontWeight: '600',
+    flexShrink: 1,
+  },
+  listItemValue: {
+    fontSize: 13,
+    color: 'rgba(255,255,255,0.9)',
+    fontWeight: '600',
+    marginHorizontal: 6,
+    flexShrink: 1,
+  },
+  listItemMinted: {
+    fontSize: 13,
+    color: 'rgba(255,255,255,0.7)',
+    flexShrink: 1,
+  },
+  listItemAddress: {
     fontSize: 11,
+    color: 'rgba(255,255,255,0.6)',
     fontFamily: "DMMono_500Medium",
-  },
-  assetValue: {
-    alignItems: "flex-end",
-  },
-  valueText: {
-    color: "rgba(255, 255, 255, 0.9)",
-    fontSize: 14,
-    fontWeight: "600",
-  },
-  changeContainer: {
-    flexDirection: "row",
-    alignItems: "center",
-    marginTop: 2,
-  },
-  changeText: {
-    fontSize: 12,
-    fontWeight: "600",
-    marginRight: 4,
-  },
-  updateTime: {
-    color: "rgba(255, 255, 255, 0.5)",
-    fontSize: 10,
   },
   mapViewContainer: {
     flex: 1,
     borderRadius: 16,
     overflow: "hidden",
-    minHeight: 200,
+    height: '100%',
     width: '100%',
     alignSelf: 'stretch',
   },
@@ -976,59 +1052,21 @@ const styles = StyleSheet.create({
     color: "#FFFFFF",
     textAlign: "center",
   },
-  nextVideoButton: {
-    marginHorizontal: 12,
-    marginTop: 16,
-    marginBottom: 24,
+  graphTopLabel: {
+    position: "absolute",
+    top: 10,
+    left: 10,
   },
-  centeredMessageContainer: {
-    flex: 1,
-    justifyContent: "center",
-    alignItems: "center",
-    padding: 20,
-    backgroundColor: "transparent",
+  graphBottomLabel: {
+    position: "absolute",
+    bottom: 10,
+    left: 10,
   },
-  centeredMessageText: {
-    fontSize: 16,
+  graphCanvasLabel: {
     color: "rgba(255, 255, 255, 0.7)",
-    textAlign: "center",
-  },
-  searchSwitch: {
-    position: "relative",
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 8,
-  },
-  listItemWrapper: {
-    width: '100%',
-    marginBottom: 10,
-    paddingHorizontal: 0,
-  },
-  touchableListItem: {
-    width: '100%',
-    flex: 1,
-  },
-  listContainer: {
-    flex: 1,
-    width: '100%',
-  },
-  listItemTouchable: {
-    width: '100%',
-    marginBottom: 10,
-  },
-  barChartContainer: {
-    position: "absolute",
-    flexDirection: "row",
-    alignItems: "flex-end",
-    width: "100%",
-    height: "100%",
-  },
-  barStyle: {
-    position: "absolute",
-    bottom: 0,
-    borderTopLeftRadius: 2,
-    borderTopRightRadius: 2,
+    fontSize: 12,
+    fontWeight: "600",
   },
 });
 
-export default AssetsScreen;
+export default LedgerScreen;

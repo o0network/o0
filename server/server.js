@@ -6,6 +6,8 @@ import { dirname } from "path";
 import { execFile } from "child_process";
 import fetch from "node-fetch";
 import crypto from "crypto";
+import multipart from "@fastify/multipart";
+import { promisify } from "util";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -17,12 +19,23 @@ const pendingDir = path.join(__dirname, "pending");
 const TELEGRAM_BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN || "";
 const TELEGRAM_ADMIN_CHAT_ID = process.env.TELEGRAM_ADMIN_CHAT_ID || "";
 
+const execFileAsync = promisify(execFile);
+
 await fs.mkdir(videosDir, { recursive: true });
 await fs.mkdir(thumbnailsDir, { recursive: true });
 await fs.mkdir(pendingDir, { recursive: true });
 
 const fastify = Fastify({
   logger: true,
+  bodyLimit: 50 * 1024 * 1024, // 50MB limit for video uploads
+});
+
+// Register multipart support for file uploads
+await fastify.register(multipart, {
+  limits: {
+    fileSize: 50 * 1024 * 1024, // 50MB limit
+    files: 1, // Only allow 1 file at a time
+  }
 });
 
 if (process.env.NODE_ENV === "development") {
@@ -60,6 +73,7 @@ function createVideoNoteFromFile(filename) {
       minted: Math.floor(Math.random() * 30),
       value: (Math.random() * 0.5).toFixed(2),
     },
+    priceChanges: generatePriceChanges(),
   };
 }
 
@@ -89,6 +103,35 @@ async function generateThumbnail(videoPath, outputDir, thumbnailName) {
       }
       resolve(thumbnailFullPath);
     });
+  });
+}
+
+// Add helper to generate normalized price history array (0-100%)
+function generatePriceChanges(length = 16) {
+  // Generate raw price history
+  const prices = [];
+  let currentPrice = Math.random() * 50 + 25; // Start between 25-75
+  for (let i = 0; i < length; i++) {
+    prices.push(currentPrice);
+    currentPrice += (Math.random() - 0.5) * 15; // Smaller variations
+    if (currentPrice < 5) currentPrice = 5;
+    if (currentPrice > 95) currentPrice = 95;
+  }
+  // Normalize to 0-100%
+  const minPrice = Math.min(...prices);
+  const maxPrice = Math.max(...prices);
+  const range = maxPrice - minPrice || 1;
+
+  // If range is too small, create some artificial variation
+  if (range < 5) {
+    return prices.map((_, i) =>
+      parseFloat((30 + Math.sin(i * 0.5) * 20 + Math.random() * 10).toFixed(1))
+    );
+  }
+
+  return prices.map(price => {
+    const normalized = (price - minPrice) / range * 100;
+    return parseFloat(Math.max(0, Math.min(100, normalized)).toFixed(1));
   });
 }
 
@@ -617,94 +660,41 @@ async function notifyUserAboutValidation(userId, status, videoAddress) {
 }
 
 // Add a new endpoint for video submission
-fastify.post(
-  "/api/videos/submit",
-  {
-    schema: {
-      operationId: "submit_video",
-      summary: "Submit a video for validation",
-      description:
-        "Submits a video note for admin validation before publishing",
-      body: {
-        type: "object",
-        required: ["video", "userId"],
-        properties: {
-          video: {
-            type: "string",
-            format: "binary",
-            description: "Video file",
-          },
-          title: { type: "string", description: "Video title" },
-          userId: { type: "string", description: "User ID for notification" },
-        },
-      },
-      response: {
-        200: {
-          description: "Successful submission",
-          type: "object",
-          properties: {
-            success: { type: "boolean" },
-            message: { type: "string" },
-            address: { type: "string" },
-          },
-        },
-        400: {
-          description: "Bad request",
-          type: "object",
-          properties: {
-            error: { type: "string" },
-          },
-        },
-      },
-    },
-  },
-  async (request, reply) => {
-    try {
-      const data = await request.file();
-
-      if (!data || !data.file) {
-        return reply.code(400).send({ error: "No video file provided" });
-      }
-
-      // Generate a unique address for the video
-      const address = crypto.randomBytes(16).toString("hex");
-      const pendingVideoPath = path.join(pendingDir, `${address}.mp4`);
-
-      // Create a JSON metadata file with submission details
-      const metadata = {
-        userId: request.body.userId,
-        title: request.body.title || "Untitled",
-        address: address,
-        timestamp: Date.now(),
-        status: "pending",
-      };
-      const metadataPath = path.join(pendingDir, `${address}.json`);
-
-      // Save the video file
-      const writeStream = fs.createWriteStream(pendingVideoPath);
-      await data.file.pipe(writeStream);
-
-      // Save the metadata
-      await fs.writeFile(metadataPath, JSON.stringify(metadata, null, 2));
-
-      // Notify admin about pending validation
-      const notified = await notifyAdminAboutValidation(metadata);
-
-      if (!notified) {
-        fastify.log.warn(`Couldn't notify admin about video ${address}`);
-      }
-
-      return {
-        success: true,
-        message: "Video submitted for validation",
-        address: address,
-      };
-    } catch (err) {
-      fastify.log.error(`Error submitting video: ${err.message}`);
-      return reply.code(500).send({ error: "Failed to submit video" });
+fastify.post("/api/videos/submit", async (request, reply) => {
+  try {
+    const data = await request.file();
+    if (!data) {
+      return reply.code(400).send({ error: "No video file provided" });
     }
+    const videoBuffer = await data.toBuffer();
+    const address = crypto.randomBytes(46).toString("hex");
+    // Save the raw upload to a temp file
+    const inputExt = data.mimetype === "video/webm" ? ".webm"
+      : data.mimetype === "video/quicktime" ? ".mov" : ".mp4";
+    const tempPath = path.join(videosDir, `${address}_temp${inputExt}`);
+    await fs.writeFile(tempPath, videoBuffer);
+    // Convert to squared mp4
+    const outputPath = path.join(videosDir, `${address}.mp4`);
+    await execFileAsync(ffmpegPath, [
+      "-y",
+      "-i", tempPath,
+      "-vf", "crop=min(iw\\,ih):min(iw\\,ih)",
+      "-c:v", "libx264",
+      "-preset", "fast",
+      "-c:a", "aac",
+      "-b:a", "128k",
+      outputPath,
+    ]);
+    // Remove temp file
+    await fs.unlink(tempPath);
+    // Generate thumbnail from final video
+    await generateThumbnail(outputPath, thumbnailsDir, address);
+    return reply.send({ success: true, message: "Video uploaded successfully", address });
+  } catch (err) {
+    fastify.log.error(`Error submitting video: ${err.message}`);
+    return reply.code(500).send({ error: "Failed to submit video", details: err.message });
   }
-);
+});
 
 // Endpoint to check video validation status
 fastify.get(
@@ -893,17 +883,16 @@ fastify.post(
 
 // Add a new endpoint for assets by address
 fastify.get(
-  "/api/assets/:address",
+  "/api/ledger",
   {
     schema: {
-      operationId: "get_assets_by_address",
-      summary: "Get assets for an address",
-      description: "Returns assets for a given address",
-      params: {
+      operationId: "get_user_ledger",
+      summary: "Get ledger for authenticated user",
+      description: "Returns ledger entries for the authenticated user",
+      headers: {
         type: "object",
-        required: ["address"],
         properties: {
-          address: { type: "string", description: "Wallet address" },
+          authorization: { type: "string", description: "Bearer token or user identifier" },
         },
       },
       response: {
@@ -913,20 +902,26 @@ fastify.get(
           items: {
             type: "object",
             properties: {
-              id: { type: "string" },
-              type: { type: "string" },
-              name: { type: "string" },
-              symbol: { type: "string" },
               address: { type: "string" },
-              value: { type: "string" },
-              priceChange: { type: "number" },
-              lastUpdated: { type: "string" },
+              stat: {
+                type: "object",
+                properties: {
+                  value: { type: "number" },
+                  valuation: { type: "number" },
+                  price: { type: "number" },
+                  minted: { type: "number" },
+                },
+              },
               discussion: { type: "string" },
+              price: {
+                type: "array",
+                items: { type: "number" },
             },
           },
         },
-        400: {
-          description: "Invalid address format",
+        },
+        401: {
+          description: "Unauthorized",
           type: "object",
           properties: {
             error: { type: "string" },
@@ -937,44 +932,46 @@ fastify.get(
   },
   async (request, reply) => {
     try {
-      const { address } = request.params;
-
-      // Validate address - reject placeholder text or clearly invalid addresses
-      if (address.includes("select an item first") || address.includes("%20")) {
-        return reply.code(400).send({
-          error: "Invalid address format",
-          message: "Please provide a valid address",
+      const authHeader = request.headers.authorization;
+      if (!authHeader) {
+        return reply.code(401).send({
+          error: "Authorization header required",
         });
       }
 
-      // For demo purposes, generate mock assets for any valid-looking address
-      // In a real app, you'd query a database or blockchain API
-      const assetTypes = ["token", "nft", "pitch", "other"];
-      const assetNames = ["Bitcoin", "Ethereum", "Solana", "Uniswap", "Aave", "Chainlink"];
-      const assetSymbols = ["BTC", "ETH", "SOL", "UNI", "AAVE", "LINK"];
+      // Extract user identifier from auth header (Bearer token, wallet address, etc.)
+      const userIdentifier = authHeader.replace('Bearer ', '').replace('User ', '');
 
-      const assets = Array.from({ length: 5 }, (_, i) => {
-        const type = assetTypes[Math.floor(Math.random() * assetTypes.length)];
-        const nameIndex = Math.floor(Math.random() * assetNames.length);
+      if (!userIdentifier) {
+        return reply.code(401).send({
+          error: "Invalid authorization header",
+        });
+      }
+
+      // Read available video files to create realistic asset addresses
+      const videoFiles = await fs.readdir(videosDir);
+      const availableAddresses = videoFiles
+        .filter(file => file.endsWith('.mp4'))
+        .map(file => path.basename(file, '.mp4'));
+
+      const assets = Array.from({ length: Math.min(5, availableAddresses.length || 1) }, (_, i) => {
+        const assetAddress = availableAddresses[i] || `mock-asset-${i}`;
         return {
-          id: `asset-${address.substring(0, 8)}-${i}`,
-          type,
-          name: assetNames[nameIndex],
-          symbol: assetSymbols[nameIndex],
-          address: `0x${crypto.randomBytes(20).toString("hex")}`,
-          value: (Math.random() * 1000).toFixed(2), // String value, not "X minted" format
-          priceChange: (Math.random() * 20) - 10, // Between -10 and +10
-          lastUpdated: new Date().toISOString().split("T")[0],
-          discussion: `https://example.com/discuss/${type}/${i}`,
-          price: (Math.random() * 10).toFixed(2), // Clean number as string
-          minted: Math.floor(Math.random() * 100).toString(), // Clean number as string
+          address: assetAddress,
+          stat: {
+            value: parseFloat((Math.random() * 500 + 50).toFixed(2)),
+            valuation: parseFloat((Math.random() * 600 + 100).toFixed(2)),
+            price: parseFloat((Math.random() * 10 + 1).toFixed(2)),
+            minted: Math.floor(Math.random() * 100) + 1,
+          },
+          discussion: `https://example.com/discuss/${assetAddress}`,
+          price: generatePriceChanges(16),
         };
       });
-
       return assets;
     } catch (err) {
-      fastify.log.error(`Error fetching assets: ${err.message}`);
-      return reply.code(500).send({ error: "Failed to fetch assets" });
+      fastify.log.error(`Error fetching ledger: ${err.message}`);
+      return reply.code(500).send({ error: "Failed to fetch ledger" });
     }
   }
 );
@@ -1019,21 +1016,15 @@ fastify.get(
     try {
       const { address } = request.params;
 
-      // For demo/placeholder text, return empty data
-      if (address.includes("select an item first") || address.includes("%20")) {
-        return { timeframe: "1M", points: [] };
-      }
-
-      // Generate mock price data
       const points = [];
       const now = Date.now();
       const oneDay = 24 * 60 * 60 * 1000;
-      let currentValue = Math.random() * 100 + 50; // Start between 50-150
+      let currentValue = Math.random() * 100 + 50;
 
       for (let i = 0; i < 30; i++) {
         const timestamp = Math.floor((now - (30 - i) * oneDay) / 1000);
-        currentValue += (Math.random() - 0.5) * 10; // Random fluctuation
-        if (currentValue < 10) currentValue = 10; // Minimum value
+        currentValue += (Math.random() - 0.5) * 10;
+        if (currentValue < 10) currentValue = 10;
         points.push({ timestamp, value: parseFloat(currentValue.toFixed(2)) });
       }
 
@@ -1045,14 +1036,185 @@ fastify.get(
   }
 );
 
+// New endpoint for individual video info by address
+fastify.get(
+  "/api/video/:addr/info",
+  {
+    schema: {
+      operationId: "get_video_info",
+      summary: "Get video information by address",
+      description: "Returns metadata and information for a specific video",
+      params: {
+        type: "object",
+        required: ["addr"],
+        properties: {
+          addr: { type: "string", description: "Video address" },
+        },
+      },
+      response: {
+        200: {
+          description: "Successful response",
+          type: "object",
+          properties: {
+            address: { type: "string" },
+            timestamp: { type: "integer" },
+            stats: {
+              type: "object",
+              properties: {
+                price: { type: "string" },
+                minted: { type: "string" },
+                value: { type: "string" },
+              },
+            },
+            discussion: { type: "string" },
+            source: { type: "string" },
+            thumbnailUrl: { type: "string" },
+            price: {
+              type: "array",
+              items: { type: "number" },
+            },
+          },
+        },
+        404: {
+          description: "Video not found",
+          type: "object",
+          properties: {
+            error: { type: "string" },
+          },
+        },
+      },
+    },
+  },
+  async (request, reply) => {
+    try {
+      let { addr } = request.params;
+      if (addr.endsWith(".mp4")) addr = addr.slice(0, -4);
+
+      const videoPath = path.join(videosDir, `${addr}.mp4`);
+
+      try {
+        await fs.access(videoPath);
+      } catch (err) {
+        fastify.log.error(`Video not found: ${videoPath}`);
+        return reply.code(404).send({ error: "Video not found" });
+      }
+
+      // Generate video metadata
+      const videoInfo = createVideoNoteFromFile(`${addr}.mp4`);
+
+      // Add source and thumbnail URLs
+      videoInfo.source = `/api/video/${addr}`;
+      videoInfo.thumbnailUrl = `/api/thumbnail/${addr}`;
+
+      // Add price history
+      videoInfo.price = generatePriceChanges();
+
+      return videoInfo;
+    } catch (err) {
+      fastify.log.error(`Failed to retrieve video info: ${err.message}`);
+      return reply.code(500).send({ error: "Failed to retrieve video info" });
+    }
+  }
+);
+
+// New endpoint for individual asset info by address
+fastify.get(
+  "/api/asset/:addr/info",
+  {
+    schema: {
+      operationId: "get_asset_info",
+      summary: "Get asset information by address",
+      description: "Returns metadata and information for a specific asset",
+      params: {
+        type: "object",
+        required: ["addr"],
+        properties: {
+          addr: { type: "string", description: "Asset address" },
+        },
+      },
+      response: {
+        200: {
+          description: "Successful response",
+          type: "object",
+          properties: {
+            address: { type: "string" },
+            stat: {
+              type: "object",
+              properties: {
+                value: { type: "number" },
+                valuation: { type: "number" },
+                price: { type: "number" },
+                minted: { type: "number" },
+              },
+            },
+            discussion: { type: "string" },
+            price: {
+              type: "array",
+              items: { type: "number" },
+            },
+            symbol: { type: "string" },
+            type: { type: "string" },
+          },
+        },
+        404: {
+          description: "Asset not found",
+          type: "object",
+          properties: {
+            error: { type: "string" },
+          },
+        },
+      },
+    },
+  },
+  async (request, reply) => {
+    try {
+      const { addr } = request.params;
+
+      // Check if this asset exists (could be a video address or other asset)
+      const videoPath = path.join(videosDir, `${addr}.mp4`);
+      let assetExists = false;
+
+      try {
+        await fs.access(videoPath);
+        assetExists = true;
+      } catch (err) {
+        // Asset might not be a video, but we can still return mock data
+        assetExists = true; // For now, always return data
+      }
+
+      if (!assetExists) {
+        return reply.code(404).send({ error: "Asset not found" });
+      }
+
+      // Generate asset metadata
+      const assetInfo = {
+        address: addr,
+        stat: {
+          value: parseFloat((Math.random() * 500 + 50).toFixed(2)),
+          valuation: parseFloat((Math.random() * 600 + 100).toFixed(2)),
+          price: parseFloat((Math.random() * 10 + 1).toFixed(2)),
+          minted: Math.floor(Math.random() * 100) + 1,
+        },
+        discussion: `https://example.com/discuss/${addr}`,
+        price: generatePriceChanges(16),
+        symbol: `SYM${addr.substring(0, 4).toUpperCase()}`,
+        type: 'token',
+      };
+
+      return assetInfo;
+    } catch (err) {
+      fastify.log.error(`Failed to retrieve asset info: ${err.message}`);
+      return reply.code(500).send({ error: "Failed to retrieve asset info" });
+    }
+  }
+);
+
 // Start the server
 try {
   await fastify.listen({ port: 5555, host: "0.0.0.0" });
   console.log(`Server is running at ${fastify.server.address().port}`);
   console.log(
-    `MCP SSE server running at http://localhost:${
-      fastify.server.address().port
-    }/mcp/sse`
+    `MCP SSE server running at http://localhost:${fastify.server.address().port}/mcp/sse`
   );
 } catch (err) {
   fastify.log.error(err);

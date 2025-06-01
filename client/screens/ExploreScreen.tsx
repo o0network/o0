@@ -8,25 +8,51 @@ import {
   Animated,
   PanResponderInstance,
   PanResponder,
+  ActivityIndicator,
 } from "react-native";
 import { useState, useEffect, useRef, useMemo, useCallback } from "react";
-import { Text, GloriousButton, Button, Inbound } from "../components";
-import VideoNote from "../components/VideoNote";
+import { Text, GloriousButton, Button, Inbound, VideoNote } from "../components";
 import { ApiService, VideoData, API_URL } from "../data/api";
 import SafeAreaView from "../components/SafeAreaView";
 import { useIsFocused } from "@react-navigation/native";
 import { useAuth } from "../contexts/AuthContext";
 import { useModal } from "../contexts/ModalContext";
+import { useRoute, RouteProp } from "@react-navigation/native";
 
 const EXPLORE_PATH = "/explore";
 const { width: screenWidth, height: screenHeight } = Dimensions.get("window");
 
 // Canvas and video configuration
-const ITEM_SIZE = 180; // Larger video size
+const ITEM_SIZE = 180;
 const FOCUSED_VIDEO_MAX_SIZE = Math.min(512, screenWidth - 40);
 const ANIMATION_DURATION = 350;
 const LOAD_BATCH_SIZE = 10;
-const VIEWPORT_PADDING = 300; // Load videos this distance outside the viewport
+const VIEWPORT_PADDING = 300;
+const GRID_CELL_SIZE = ITEM_SIZE * 1.5; // Prevent video overlap in center
+const SIGNIFICANT_MOVEMENT_THRESHOLD = 150;
+const MIN_VISIBLE_VIDEOS_THRESHOLD = 8;
+
+// Calculate initial videos needed to cover screen with Y grid pattern
+const calculateInitialVideoCount = (): number => {
+  // Calculate the diagonal distance from center to corner
+  const diagonal = Math.sqrt(screenWidth * screenWidth + screenHeight * screenHeight) / 2;
+
+  // Calculate how many rings we need to cover this distance in Y grid
+  const ringsNeeded = Math.ceil(diagonal / (GRID_CELL_SIZE * 0.866)); // 0.866 = sin(60°) for Y grid
+
+  // Calculate total videos in Y grid pattern up to needed rings
+  // Center = 1 video
+  // Ring 1 = 6 videos
+  // Ring n = 6 * n videos
+  let totalVideos = 1; // center video
+  for (let ring = 1; ring <= ringsNeeded + 2; ring++) { // Add 2 more rings for broader initial coverage
+    totalVideos += 6 * ring;
+  }
+
+  return Math.min(Math.max(totalVideos, MIN_VISIBLE_VIDEOS_THRESHOLD), 100); // Cap at 100 initial points
+};
+
+const INITIAL_GRID_POINTS_COUNT = calculateInitialVideoCount();
 
 // Parse stats helpers
 const parseMinted = (mintedStr?: string): number => {
@@ -40,14 +66,108 @@ const parseNumericStat = (statStr?: string): number => {
   return parseFloat(statStr) || 0;
 };
 
-// Canvas Store for managing viewport and coordinates
+// Y Grid generator for hexagonal/triangular grid positioning
+class YGridGenerator {
+  private currentRing = 0;
+  private currentPosition = 0;
+  private center = { x: screenWidth / 2, y: screenHeight / 2 };
+  private readonly rowHeight = GRID_CELL_SIZE * 0.866; // sin(60°) for Y grid spacing
+
+  // Generate next position in Y grid pattern (hexagonal)
+  getNextPosition(): { x: number; y: number; cellKey: string; ring: number; position: number } {
+    if (this.currentRing === 0) {
+      // Center position
+      const centerData = {
+        x: this.center.x,
+        y: this.center.y,
+        cellKey: "0,0",
+        ring: 0,
+        position: 0
+      };
+      this.currentRing = 1;
+      this.currentPosition = 0;
+      return centerData;
+    }
+
+    const positionsInRing = this.currentRing * 6;
+    if (this.currentPosition >= positionsInRing) {
+      // Move to next ring
+      this.currentRing++;
+      this.currentPosition = 0;
+      // Fall through to calculate position for the new ring and position 0
+    }
+
+    // Capture the ring and position for the current item *before* calculating its x,y
+    // and *before* potentially incrementing currentPosition for the *next* call.
+    const ringForCurrentItem = this.currentRing;
+    const positionForCurrentItem = this.currentPosition;
+
+    // Calculate angle for current position in the current ring
+    // Note: positionsInRing here must be for ringForCurrentItem
+    const currentRingPositions = ringForCurrentItem * 6;
+    const angleStep = (2 * Math.PI) / currentRingPositions;
+    const angle = positionForCurrentItem * angleStep;
+
+    const ringRadius = ringForCurrentItem * GRID_CELL_SIZE;
+    const isOddRing = ringForCurrentItem % 2 === 1;
+    const offsetAngle = isOddRing ? 0 : angleStep / 2;
+
+    const x = this.center.x + ringRadius * Math.cos(angle + offsetAngle);
+    const y = this.center.y + ringRadius * Math.sin(angle + offsetAngle);
+
+    const cellKey = `${ringForCurrentItem},${positionForCurrentItem}`;
+
+    // Increment for the *next* call to getNextPosition
+    this.currentPosition++;
+
+    return { x, y, cellKey, ring: ringForCurrentItem, position: positionForCurrentItem };
+  }
+
+  // Reset generator to start from beginning
+  reset() {
+    this.currentRing = 0;
+    this.currentPosition = 0;
+  }
+
+  // Get a specific position by ring and position (for video reuse)
+  getPositionAt(ring: number, position: number): { x: number; y: number; cellKey: string } {
+    if (ring === 0) {
+      return {
+        x: this.center.x,
+        y: this.center.y,
+        cellKey: "0,0"
+      };
+    }
+
+    const positionsInRing = ring * 6;
+    const normalizedPosition = position % positionsInRing;
+
+    const angleStep = (2 * Math.PI) / positionsInRing;
+    const angle = normalizedPosition * angleStep;
+
+    const ringRadius = ring * GRID_CELL_SIZE;
+    const isOddRing = ring % 2 === 1;
+    const offsetAngle = isOddRing ? 0 : angleStep / 2;
+
+    const x = this.center.x + ringRadius * Math.cos(angle + offsetAngle);
+    const y = this.center.y + ringRadius * Math.sin(angle + offsetAngle);
+
+    return { x, y, cellKey: `${ring},${normalizedPosition}` };
+  }
+
+  setCenter(x: number, y: number) {
+    this.center = { x, y };
+  }
+}
+
+// Canvas Store for managing viewport and coordinates with Y grid support
 class CanvasStore {
   private static instance: CanvasStore;
   private _shouldRender = true;
   private _camera = { x: 0, y: 0, scale: 1 };
   private _viewport = { width: 0, height: 0 };
-  private _pointer = { x: 0, y: 0 };
-  private _lastPosition = { x: 0, y: 0 }; // Track last position to detect significant movement
+  private _lastPosition = { x: 0, y: 0 };
+  private _lastRenderPosition = { x: 0, y: 0 };
 
   static getInstance(): CanvasStore {
     if (!CanvasStore.instance) {
@@ -61,6 +181,7 @@ class CanvasStore {
     this._camera = { x: 0, y: 0, scale: 1 };
     this._shouldRender = true;
     this._lastPosition = { x: 0, y: 0 };
+    this._lastRenderPosition = { x: 0, y: 0 };
   }
 
   get shouldRender() {
@@ -79,16 +200,24 @@ class CanvasStore {
     return this._viewport;
   }
 
-  // Has camera moved significantly since last check
-  hasMovedSignificantly(threshold = 100) {
+  hasMovedSignificantly(threshold = SIGNIFICANT_MOVEMENT_THRESHOLD) {
     const dx = Math.abs(this._camera.x - this._lastPosition.x);
     const dy = Math.abs(this._camera.y - this._lastPosition.y);
     return dx > threshold || dy > threshold;
   }
 
-  // Update last position
+  hasMovedSinceLastRender(threshold = 5) {
+    const dx = Math.abs(this._camera.x - this._lastRenderPosition.x);
+    const dy = Math.abs(this._camera.y - this._lastRenderPosition.y);
+    return dx > threshold || dy > threshold;
+  }
+
   updateLastPosition() {
     this._lastPosition = { x: this._camera.x, y: this._camera.y };
+  }
+
+  updateLastRenderPosition() {
+    this._lastRenderPosition = { x: this._camera.x, y: this._camera.y };
   }
 
   get visibleRect() {
@@ -100,7 +229,6 @@ class CanvasStore {
     };
   }
 
-  // Check if a point with size is visible in the viewport (with padding)
   isVisible(x: number, y: number, size: number): boolean {
     const { left, top, width, height } = this.visibleRect;
     const padding = VIEWPORT_PADDING / this._camera.scale;
@@ -113,35 +241,32 @@ class CanvasStore {
     );
   }
 
-  // Move camera by delta
   moveCamera(dx: number, dy: number) {
     this._camera.x += dx;
     this._camera.y += dy;
     this._shouldRender = true;
   }
 
-  // Zoom camera at pointer position
-  zoomCamera(scale: number, centerX: number, centerY: number) {
-    const prevScale = this._camera.scale;
-    const newScale = Math.max(0.1, Math.min(5, this._camera.scale * scale));
-
-    // Calculate the world point under the pointer
-    const worldX = (centerX - this._camera.x) / prevScale;
-    const worldY = (centerY - this._camera.y) / prevScale;
-
-    // Calculate new camera position to keep worldX, worldY under the pointer
-    this._camera.x = centerX - worldX * newScale;
-    this._camera.y = centerY - worldY * newScale;
-    this._camera.scale = newScale;
+  centerOn(x: number, y: number) {
+    this._camera.x = this._viewport.width / 2 - x * this._camera.scale;
+    this._camera.y = this._viewport.height / 2 - y * this._camera.scale;
     this._shouldRender = true;
   }
 
-  // Set pointer position
-  movePointer(x: number, y: number) {
-    this._pointer = { x, y };
+  // Enhanced parallax calculation for Y grid pattern
+  worldToScreenWithParallax(x: number, y: number, parallaxFactor: number) {
+    // Enhanced parallax with edge effects
+    const parallaxStrength = 0.75; // New: Consistent strength, adjust as needed
+
+    const parallaxX = x - (this._camera.x * parallaxFactor * parallaxStrength);
+    const parallaxY = y - (this._camera.y * parallaxFactor * parallaxStrength);
+
+    return {
+      x: parallaxX * this._camera.scale + this._camera.x,
+      y: parallaxY * this._camera.scale + this._camera.y,
+    };
   }
 
-  // World to screen coordinates
   worldToScreen(x: number, y: number) {
     return {
       x: x * this._camera.scale + this._camera.x,
@@ -149,7 +274,6 @@ class CanvasStore {
     };
   }
 
-  // Screen to world coordinates
   screenToWorld(x: number, y: number) {
     return {
       x: (x - this._camera.x) / this._camera.scale,
@@ -168,20 +292,43 @@ type VideoItem = VideoData & {
   scale: Animated.Value;
   opacity: Animated.Value;
   parallaxFactor: number;
+  cellKey: string;
+  ring: number;
+  position: number;
   numericStats: {
     minted: number;
     price: number;
     value: number;
   };
+  loaded: boolean;
 };
+
+type GridPoint = {
+  id: string; // Unique ID for the grid slot
+  x: number;
+  y: number;
+  cellKey: string;
+  ring: number;
+  position: number;
+  videoData?: VideoItem; // Video data will be attached here
+  isPlaceholder: boolean; // True if it's just a placeholder
+  isVisibleOnScreen: boolean; // Track if this point is currently visible
+}
 
 export default function ExploreScreen({
   initialAddress,
 }: {
   initialAddress?: string | null;
 }) {
+  const route = useRoute<RouteProp<Record<string, { address?: string }>, string>>();
+  const routeAddress = route.params?.address;
+
+  // Use routeAddress (from URL) as priority, fall back to initialAddress prop
+  const addressFromUrl = routeAddress || initialAddress;
+
   const isFocused = useIsFocused();
   const canvasStore = useMemo(() => CanvasStore.getInstance(), []);
+  const yGridGenerator = useMemo(() => new YGridGenerator(), []);
 
   const { isWalletConnected } = useAuth();
   const { openWalletConnect } = useModal();
@@ -190,361 +337,353 @@ export default function ExploreScreen({
   const panResponderRef = useRef<PanResponderInstance | null>(null);
   const rafRef = useRef<number | null>(null);
   const lastTouchRef = useRef({ x: 0, y: 0 });
-  const occupiedAreasRef = useRef<Map<string, boolean>>(new Map());
   const processedAddressesRef = useRef<Set<string>>(new Set());
+  const apiVideosRef = useRef<VideoData[]>([]);
   const maxRelevanceRef = useRef<number>(1);
-  const loadTimerRef = useRef<any>(null);
-  const currentOffsetRef = useRef<number>(0); // Track API pagination offset
-  const lastRequestedOffsetRef = useRef<number>(-1); // Track last requested offset to prevent duplicates
+  const currentOffsetRef = useRef<number>(0);
+  const occupiedCellsRef = useRef<Set<string>>(new Set());
+  const lastLoadTimeRef = useRef<number>(0);
+  const isUserInteractingRef = useRef<boolean>(false);
+  const initialLoadCompleteRef = useRef<boolean>(false);
+  const exploredAreasRef = useRef<Set<string>>(new Set());
+  const nextGridPositionRef = useRef<{ ring: number; position: number }>({ ring: 0, position: 0 });
+  const dynamicThresholdRef = useRef<number>(MIN_VISIBLE_VIDEOS_THRESHOLD);
+  const velocityRef = useRef({ x: 0, y: 0 }); // For inertia
+  const inertiaActiveRef = useRef(false); // To track if inertia animation is running
+  const initialGridPointsRef = useRef<GridPoint[]>([]); // Store precalculated grid points
 
-  const [videos, setVideos] = useState<VideoItem[]>([]);
+  const [gridItems, setGridItems] = useState<GridPoint[]>([]);
   const [focusedVideoId, setFocusedVideoId] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
-  const [allVideosLoaded, setAllVideosLoaded] = useState(false);
+  const [apiExhausted, setApiExhausted] = useState(false);
   const [forceRender, setForceRender] = useState(0);
+  const [canInteract, setCanInteract] = useState(true);
 
   // Find focused video
   const focusedVideo = useMemo(() => {
-    return videos.find(v => v.id === focusedVideoId);
-  }, [videos, focusedVideoId]);
+    // Find the grid item that contains the focused video
+    const focusedGridItem = gridItems.find(item => item.videoData?.id === focusedVideoId);
+    return focusedGridItem?.videoData;
+  }, [gridItems, focusedVideoId]);
 
-  // Generate a unique position for a video using a grid-based approach
-  const generateUniquePosition = useCallback(() => {
-    const { left, top, width, height } = canvasStore.visibleRect;
-    const padding = VIEWPORT_PADDING / canvasStore.camera.scale;
-
-    // Grid cell size for organized layout
-    const gridCellSize = ITEM_SIZE * 1.5;
-
-    // Start with visible viewport plus padding
-    const viewportLeft = left - padding;
-    const viewportTop = top - padding;
-    const viewportWidth = width + padding * 2;
-    const viewportHeight = height + padding * 2;
-
-    // Create a grid structure within the viewport area
-    const gridColumns = Math.floor(viewportWidth / gridCellSize);
-    const gridRows = Math.floor(viewportHeight / gridCellSize);
-
-    // Try to find an unoccupied cell
-    for (let attempts = 0; attempts < 50; attempts++) {
-      // Choose a random grid cell
-      const gridCol = Math.floor(Math.random() * gridColumns);
-      const gridRow = Math.floor(Math.random() * gridRows);
-
-      const cellKey = `${gridCol},${gridRow}`;
-
-      // Check if this cell is already occupied
-      if (!occupiedAreasRef.current.has(cellKey)) {
-        // Calculate the actual position with a small random offset to avoid perfect alignment
-        const x = viewportLeft + gridCol * gridCellSize + (Math.random() * 0.3 * gridCellSize);
-        const y = viewportTop + gridRow * gridCellSize + (Math.random() * 0.3 * gridCellSize);
-
-        // Mark as occupied
-        occupiedAreasRef.current.set(cellKey, true);
-        return { x, y, cellKey };
-      }
-    }
-
-    // If all cells are occupied, generate a random position as fallback
-    const x = viewportLeft + Math.random() * viewportWidth;
-    const y = viewportTop + Math.random() * viewportHeight;
-    const cellKey = `random-${Date.now()}-${Math.random()}`;
-    occupiedAreasRef.current.set(cellKey, true);
-    return { x, y, cellKey };
+  // Get current area key based on camera position
+  const getCurrentAreaKey = useCallback(() => {
+    const { left, top } = canvasStore.visibleRect;
+    const areaSize = GRID_CELL_SIZE * 2;
+    const areaX = Math.floor(left / areaSize);
+    const areaY = Math.floor(top / areaSize);
+    return `${areaX},${areaY}`;
   }, [canvasStore]);
 
-  // Load videos from API
-  const loadVideos = useCallback(async () => {
-    if (isLoading || allVideosLoaded) return;
+  // Check if we're exploring a new area
+  const isExploringNewArea = useCallback(() => {
+    const currentArea = getCurrentAreaKey();
+    return !exploredAreasRef.current.has(currentArea);
+  }, [getCurrentAreaKey]);
 
-    // Prevent duplicate API calls with same offset
-    if (lastRequestedOffsetRef.current === currentOffsetRef.current) {
-      console.log(`Skipping duplicate request for offset ${currentOffsetRef.current}`);
-      return;
+  // Mark current area as explored and increase dynamic threshold
+  const markAreaAsExplored = useCallback(() => {
+    const currentArea = getCurrentAreaKey();
+    exploredAreasRef.current.add(currentArea);
+
+    // Increase dynamic threshold based on exploration
+    const exploredCount = exploredAreasRef.current.size;
+    dynamicThresholdRef.current = MIN_VISIBLE_VIDEOS_THRESHOLD + Math.floor(exploredCount / 5);
+
+    console.log('Marked area as explored:', currentArea, 'New threshold:', dynamicThresholdRef.current);
+  }, [getCurrentAreaKey]);
+
+  // Get next available grid position for video reuse
+  const getNextGridPosition = useCallback((): { x: number; y: number; cellKey: string; ring: number; position: number } => {
+    const { ring, position } = nextGridPositionRef.current;
+    // This function remains largely the same, but its usage will change.
+    // It will be used to generate new points if we expand beyond the initial set.
+
+    // Get position from Y grid generator
+    let gridPosition;
+    if (ring === 0 && position === 0) {
+      gridPosition = yGridGenerator.getNextPosition();
+      nextGridPositionRef.current = { ring: 1, position: 0 };
+    } else {
+      gridPosition = yGridGenerator.getPositionAt(ring, position);
+
+      // Advance to next position
+      const positionsInRing = ring * 6;
+      if (position + 1 >= positionsInRing) {
+        // Move to next ring
+        nextGridPositionRef.current = { ring: ring + 1, position: 0 };
+      } else {
+        nextGridPositionRef.current = { ring, position: position + 1 };
+      }
     }
 
+    return {
+      ...gridPosition,
+      ring,
+      position
+    };
+  }, [yGridGenerator]);
+
+  // Create video item from video data with Y grid positioning
+  const createVideoItem = useCallback((video: VideoData, gridPoint: GridPoint): VideoItem => {
+    // Parse stats
+    const mintedCount = parseMinted(video.stats?.minted);
+    const price = parseNumericStat(video.stats?.price);
+    const value = parseNumericStat(video.stats?.value);
+
+    // Calculate relevance (can be tied to stats later)
+    let relevance = mintedCount || price || value || Math.random();
+    if (relevance === 0) relevance = Math.random() * 0.5; // Ensure some relevance
+
+    if (relevance > maxRelevanceRef.current) {
+      maxRelevanceRef.current = relevance;
+    }
+
+    const minSize = ITEM_SIZE * 0.8;
+    const maxSize = ITEM_SIZE * 1.2;
+    const normalizedRelevance = maxRelevanceRef.current > 0 ? relevance / maxRelevanceRef.current : 0.5;
+    const size = minSize + normalizedRelevance * (maxSize - minSize);
+
+    const maxParallax = 0.9;
+    const minParallax = 0.2;
+    const parallaxFactor = maxParallax - (normalizedRelevance * (maxParallax - minParallax));
+
+    const source = `/api/video/${video.address}`;
+    const thumbnailUrl = `/api/thumbnail/${video.address}`;
+    const uniqueId = `${video.address}-${gridPoint.id}`;
+
+    // console.log(`Creating VideoItem ${uniqueId} for GridPoint ${gridPoint.id} at (${gridPoint.x}, ${gridPoint.y})`);
+
+    return {
+      ...video,
+      id: uniqueId,
+      x: gridPoint.x, // Use grid point coordinates
+      y: gridPoint.y, // Use grid point coordinates
+      relevance,
+      size,
+      scale: new Animated.Value(0), // Initial scale for animation
+      opacity: new Animated.Value(0), // Initial opacity for animation
+      source,
+      thumbnailUrl,
+      parallaxFactor,
+      cellKey: gridPoint.cellKey,
+      ring: gridPoint.ring,
+      position: gridPoint.position,
+      numericStats: {
+        minted: mintedCount,
+        price,
+        value
+      },
+      loaded: false,
+    };
+  }, [maxRelevanceRef]);
+
+  // Abstract video loading from API or reuse existing videos
+  const getVideosFromSource = useCallback(async (batchSize: number): Promise<VideoData[]> => {
+    if (!apiExhausted) {
+      // Try API first
+      const fetchedVideos = await ApiService.fetchVideos(batchSize, currentOffsetRef.current);
+      if (fetchedVideos.length === 0) {
+        console.log("API exhausted, will reuse existing videos");
+        setApiExhausted(true);
+
+        // Return existing videos for reuse
+        const availableVideos = apiVideosRef.current;
+        if (availableVideos.length === 0) return [];
+
+        // Select random videos for reuse
+        const reusedVideos = [];
+        for (let i = 0; i < batchSize; i++) {
+          const randomIndex = Math.floor(Math.random() * availableVideos.length);
+          reusedVideos.push(availableVideos[randomIndex]);
+        }
+        return reusedVideos;
+      } else {
+        // Add new videos to cache
+        fetchedVideos.forEach(video => {
+          if (!apiVideosRef.current.find(v => v.address === video.address)) {
+            apiVideosRef.current.push(video);
+          }
+        });
+        currentOffsetRef.current += fetchedVideos.length;
+        return fetchedVideos;
+      }
+    } else {
+      // Reuse existing videos
+      const availableVideos = apiVideosRef.current;
+      if (availableVideos.length === 0) return [];
+
+      const reusedVideos = [];
+      for (let i = 0; i < batchSize; i++) {
+        const randomIndex = Math.floor(Math.random() * availableVideos.length);
+        reusedVideos.push(availableVideos[randomIndex]);
+      }
+      return reusedVideos;
+    }
+  }, [apiExhausted]);
+
+  // Load videos from source (API or reuse existing)
+  const loadVideos = useCallback(async (pointsToFill: GridPoint[]): Promise<void> => {
+    if (isLoading || pointsToFill.length === 0) return Promise.resolve();
+
+    console.log(`loadVideos called to fill ${pointsToFill.length} grid points`);
     setIsLoading(true);
-    lastRequestedOffsetRef.current = currentOffsetRef.current;
-    console.log(`Loading more videos with offset ${currentOffsetRef.current}...`);
 
     try {
-      // Use the tracked offset for API call
-      const fetchedVideos = await ApiService.fetchVideos(LOAD_BATCH_SIZE, currentOffsetRef.current);
-      console.log(`Fetched ${fetchedVideos.length} videos with offset ${currentOffsetRef.current}`);
+      const batchSize = pointsToFill.length;
+      const sourceVideos = await getVideosFromSource(batchSize);
+      console.log(`Got ${sourceVideos.length} videos from source (API exhausted: ${apiExhausted})`);
 
-      // Log details of videos for debugging
-      if (fetchedVideos.length > 0) {
-        console.log("Sample video:", JSON.stringify(fetchedVideos[0], null, 2));
-      } else {
-        console.log("No videos returned from API");
-      }
-
-      if (fetchedVideos.length === 0) {
-        setAllVideosLoaded(true);
+      if (sourceVideos.length === 0) {
         setIsLoading(false);
-        return;
+        return Promise.resolve();
       }
 
-      // Filter out videos we've already processed
-      const newVideos = fetchedVideos.filter(
-        video => !processedAddressesRef.current.has(video.address)
-      );
+      const updatedGridItems: GridPoint[] = [];
+      const videosToAnimate: VideoItem[] = [];
 
-      console.log(`After filtering, ${newVideos.length} new videos to display`);
+      // Map fetched videos to the grid points that need filling
+      sourceVideos.forEach((videoData, index) => {
+        const pointToFill = pointsToFill[index];
+        if (pointToFill && !processedAddressesRef.current.has(videoData.address)) {
+          const newVideoItem = createVideoItem(videoData, pointToFill);
 
-      if (newVideos.length === 0) {
-        // Only consider all videos loaded if we have some videos already
-        if (videos.length > 0) {
-          setAllVideosLoaded(true);
-        } else {
-          // If no videos at all, increment offset and try again later
-          currentOffsetRef.current += LOAD_BATCH_SIZE;
-        }
-        setIsLoading(false);
-        return;
-      }
-
-      // Process videos
-      const videoItems: VideoItem[] = newVideos.map(video => {
-        // Mark as processed
-        processedAddressesRef.current.add(video.address);
-
-        // Parse stats
-        const mintedCount = parseMinted(video.stats?.minted);
-        const price = parseNumericStat(video.stats?.price);
-        const value = parseNumericStat(video.stats?.value);
-
-        // Calculate relevance - we'll use minted count as primary relevance factor
-        const relevance = mintedCount || Math.random();
-
-        // Update max relevance
-        if (relevance > maxRelevanceRef.current) {
-          maxRelevanceRef.current = relevance;
-        }
-
-        // Generate unique position
-        const { x, y, cellKey } = generateUniquePosition();
-
-        // Calculate size based on relevance
-        // More popular videos are larger
-        const minSize = ITEM_SIZE * 0.8;
-        const maxSize = ITEM_SIZE * 1.2;
-        const normalizedRelevance = relevance / maxRelevanceRef.current;
-        const size = minSize + normalizedRelevance * (maxSize - minSize);
-
-        // Calculate parallax factor
-        // IMPORTANT: Less popular videos have higher parallax factor (appear closer to user, move faster)
-        const maxParallax = 0.3;
-        const minParallax = 0.05;
-        const parallaxFactor = maxParallax - (normalizedRelevance * (maxParallax - minParallax));
-
-        // Always construct URLs from address
-        const source = `/api/video/${video.address}`;
-        const thumbnailUrl = `/api/thumbnail/${video.address}`;
-
-        return {
-          ...video,
-          id: `${video.address}-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`,
-          x,
-          y,
-          relevance,
-          size,
-          scale: new Animated.Value(0),
-          opacity: new Animated.Value(0),
-          source,
-          thumbnailUrl,
-          parallaxFactor,
-          numericStats: {
-            minted: mintedCount,
-            price,
-            value
+          // Prefetch thumbnail
+          if (newVideoItem.thumbnailUrl) {
+            Image.prefetch(newVideoItem.thumbnailUrl).catch(() => {});
           }
-        };
+
+          updatedGridItems.push({
+            ...pointToFill,
+            videoData: newVideoItem,
+            isPlaceholder: false,
+          });
+          videosToAnimate.push(newVideoItem);
+
+          if (!apiExhausted) {
+            processedAddressesRef.current.add(videoData.address);
+          }
+        } else if (pointToFill && apiExhausted) { // Handle reuse for exhausted API
+          // If API is exhausted, we are reusing. Allow creating item even if address was processed.
+           const newVideoItem = createVideoItem(videoData, pointToFill); // isReuse is implicitly true
+           if (newVideoItem.thumbnailUrl) {
+             Image.prefetch(newVideoItem.thumbnailUrl).catch(() => {});
+           }
+           updatedGridItems.push({
+             ...pointToFill,
+             videoData: newVideoItem,
+             isPlaceholder: false,
+           });
+           videosToAnimate.push(newVideoItem);
+        }
       });
 
-      // Add to state
-      setVideos(prev => [...prev, ...videoItems]);
+      if (updatedGridItems.length > 0) {
+        setGridItems(prevItems => {
+          const newItemsMap = new Map(updatedGridItems.map(item => [item.id, item]));
+          return prevItems.map(item => newItemsMap.get(item.id) || item);
+        });
 
-      // Animate videos appearing
-      videoItems.forEach(video => {
-        Animated.parallel([
-          Animated.spring(video.scale, {
-            toValue: 1,
-            friction: 7,
-            tension: 40,
-            useNativeDriver: true
-          }),
-          Animated.timing(video.opacity, {
-            toValue: 1,
-            duration: ANIMATION_DURATION,
-            useNativeDriver: true
-          })
-        ]).start();
-      });
+        // Animate videos appearing with spring effect
+        videosToAnimate.forEach(video => {
+          Animated.parallel([
+            Animated.spring(video.scale, {
+              toValue: 1,
+              friction: 8,
+              tension: 50,
+              useNativeDriver: true
+            }),
+            Animated.timing(video.opacity, {
+              toValue: 1,
+              duration: ANIMATION_DURATION,
+              useNativeDriver: true
+            })
+          ]).start();
+        });
+      }
 
-      // Increment the offset for the next request
-      currentOffsetRef.current += fetchedVideos.length;
+      // No explicit initialLoadCompleteRef.current = true; here, driven by grid points now
+      // markAreaAsExplored(); // This might need rethinking or to be called differently
 
     } catch (error) {
       console.error("Error loading videos:", error);
     } finally {
       setIsLoading(false);
     }
-  }, [isLoading, allVideosLoaded, generateUniquePosition, videos.length]);
 
-  // Check if we need to load more videos based on current view
+    return Promise.resolve();
+  }, [isLoading, apiExhausted, getVideosFromSource, createVideoItem]);
+
+  // Check if we need to load more videos with dynamic threshold
   const checkLoadMoreVideos = useCallback(() => {
-    if (isLoading || allVideosLoaded) return;
+    if (isLoading || !initialLoadCompleteRef.current) { // Keep initialLoadCompleteRef for now
+      return;
+    }
 
-    // Count visible videos
-    const visibleVideos = videos.filter(video =>
-      canvasStore.isVisible(video.x, video.y, video.size)
+    const now = Date.now();
+    if (now - lastLoadTimeRef.current < 2000) { // Cooldown
+      return;
+    }
+
+    const visibleEmptyGridPoints = gridItems.filter(item =>
+      item.isPlaceholder &&
+      item.isVisibleOnScreen && // A new flag we need to set in the render loop or similar
+      canvasStore.isVisible(item.x, item.y, ITEM_SIZE) // Double check with canvasStore
     );
 
-    // If camera has moved significantly or there are few visible videos, load more
-    if (canvasStore.hasMovedSignificantly() || visibleVideos.length < 10) {
-      canvasStore.updateLastPosition();
-      loadVideos();
-    }
-  }, [videos, canvasStore, allVideosLoaded, isLoading, loadVideos]);
-
-  // Initialize camera and canvas
-  useEffect(() => {
-    canvasStore.initialize(screenWidth, screenHeight);
-
-    // Setup pan responder
-    panResponderRef.current = PanResponder.create({
-      onStartShouldSetPanResponder: () => true,
-      onMoveShouldSetPanResponder: (_, gestureState) => {
-        const { dx, dy } = gestureState;
-        return Math.abs(dx) > 5 || Math.abs(dy) > 5;
-      },
-      onPanResponderGrant: (evt) => {
-        lastTouchRef.current = {
-          x: evt.nativeEvent.pageX,
-          y: evt.nativeEvent.pageY
-        };
-
-        // Change cursor for web
-        if (Platform.OS === 'web') {
-          document.body.style.cursor = 'grabbing';
-        }
-
-        // Clear any pending load checks
-        if (loadTimerRef.current) {
-          clearTimeout(loadTimerRef.current);
-        }
-      },
-      onPanResponderMove: (evt, gestureState) => {
-        const { pageX, pageY } = evt.nativeEvent;
-        const dx = pageX - lastTouchRef.current.x;
-        const dy = pageY - lastTouchRef.current.y;
-
-        canvasStore.moveCamera(dx, dy);
-        lastTouchRef.current = { x: pageX, y: pageY };
-        setForceRender(prev => prev + 1);
-      },
-      onPanResponderRelease: () => {
-        // Change cursor back
-        if (Platform.OS === 'web') {
-          document.body.style.cursor = 'grab';
-        }
-
-        // Schedule a check to load more videos after panning
-        if (loadTimerRef.current) {
-          clearTimeout(loadTimerRef.current);
-        }
-
-        loadTimerRef.current = setTimeout(() => {
-          checkLoadMoreVideos();
-        }, 100);
-      },
-      onPanResponderTerminate: () => {
-        if (Platform.OS === 'web') {
-          document.body.style.cursor = 'grab';
-        }
-      }
-    });
-
-    // Setup render loop
-    const startRenderLoop = () => {
-      const frame = () => {
-        if (canvasStore.shouldRender) {
-          setForceRender(prev => prev + 1);
-          canvasStore.shouldRender = false;
-        }
-        rafRef.current = requestAnimationFrame(frame);
-      };
-
-      rafRef.current = requestAnimationFrame(frame);
-    };
-
-    startRenderLoop();
-
-    // Load initial videos
-    loadVideos();
-
-    // Setup interval to check for loading more videos
-    const loadCheckInterval = setInterval(() => {
-      if (isFocused) {
-        checkLoadMoreVideos();
-      }
-    }, 2000); // Check every 2 seconds if we need more videos
-
-    // Set cursor style for web
-    if (Platform.OS === 'web') {
-      document.body.style.cursor = 'grab';
+    // Prioritize filling visible empty grid points
+    if (visibleEmptyGridPoints.length > 0) {
+      console.log(`Found ${visibleEmptyGridPoints.length} visible empty grid points to fill.`);
+      lastLoadTimeRef.current = now;
+      loadVideos(visibleEmptyGridPoints.slice(0, LOAD_BATCH_SIZE)); // Load for a batch of them
+      return; // Prioritize this load
     }
 
-    // Clean up
-    return () => {
-      if (rafRef.current) {
-        cancelAnimationFrame(rafRef.current);
-      }
+    // Original logic for exploring new areas can be adapted if needed,
+    // but the primary driver now is filling visible empty grid slots.
+    // For now, we simplify: if many grid points are visible and empty, load them.
 
-      if (loadTimerRef.current) {
-        clearTimeout(loadTimerRef.current);
-      }
-
-      clearInterval(loadCheckInterval);
-
-      if (Platform.OS === 'web') {
-        document.body.style.cursor = '';
-      }
-    };
-  }, [canvasStore, loadVideos, checkLoadMoreVideos, isFocused]);
-
-  // Handle wheel events for zooming
-  const handleWheel = useCallback((event: any) => {
-    // Prevent default browser zoom/scroll behavior triggered by wheel,
-    // especially if ctrl/meta is pressed (common for pinch-to-zoom on trackpads)
-    if (event.ctrlKey || event.metaKey) {
-      event.preventDefault();
+    // If user is interacting and exploring new areas, and we have capacity:
+    if (isUserInteractingRef.current && isExploringNewArea()) {
+        const allEmptyGridPoints = gridItems.filter(item => item.isPlaceholder);
+        if (allEmptyGridPoints.length > LOAD_BATCH_SIZE * 2) { // Check if we have a good buffer of empty points
+            console.log("Exploring new area, proactively loading for distant grid points");
+            // This part needs more refinement: which points to load?
+            // For now, let's just load for the first few empty ones as a placeholder for this logic
+            loadVideos(allEmptyGridPoints.slice(0, LOAD_BATCH_SIZE));
+            markAreaAsExplored();
+            lastLoadTimeRef.current = now;
+        }
     }
-    // Do not call canvasStore.zoomCamera or other zoom logic to disable zoom via wheel
-  }, []); // Removed dependencies as it no longer calls zoom related functions
 
-  // Handle focus/unfocus of a video
-  const handleVideoFocus = useCallback((video: VideoItem, options?: { preserveUrl?: boolean }) => {
+  }, [gridItems, canvasStore, isLoading, loadVideos, isExploringNewArea, markAreaAsExplored]);
+
+  // Handle video focus with canvas interaction control
+  const handleVideoFocus = useCallback((videoItem: VideoItem, options?: { preserveUrl?: boolean }) => {
     const preserveUrlOnFocus = options?.preserveUrl || false;
 
-    // If clicking the already focused video, or closing the focused video overlay
-    if (focusedVideoId === video.id) {
+    if (focusedVideoId === videoItem.id) {
+      // Unfocus video
       setFocusedVideoId(null);
-      videos.forEach(v => {
-        Animated.parallel([
-          Animated.spring(v.scale, {
-            toValue: 1,
-            friction: 7,
-            tension: 40,
-            useNativeDriver: true
-          }),
-          Animated.spring(v.opacity, { // Use spring for consistency or timing as preferred
-            toValue: 1,
-            useNativeDriver: true
-          })
-        ]).start();
+      setCanInteract(true);
+
+      gridItems.forEach(item => {
+        if (item.videoData) {
+          Animated.parallel([
+            Animated.spring(item.videoData.scale, {
+              toValue: 1,
+              friction: 8,
+              tension: 50,
+              useNativeDriver: true
+            }),
+            Animated.spring(item.videoData.opacity, {
+              toValue: 1,
+              friction: 8,
+              tension: 50,
+              useNativeDriver: true
+            })
+          ]).start();
+        }
       });
 
       if (Platform.OS === 'web') {
@@ -553,148 +692,456 @@ export default function ExploreScreen({
       return;
     }
 
-    // Focusing a new video
-    setFocusedVideoId(video.id);
+    // Focus new video
+    setFocusedVideoId(videoItem.id);
+    setCanInteract(false);
 
-    const centerX = video.x * canvasStore.camera.scale - screenWidth / 2;
-    const centerY = video.y * canvasStore.camera.scale - screenHeight / 2;
-    // TODO: Consider animating camera movement for smoother transition
-    canvasStore.moveCamera(-centerX, -centerY);
-    setForceRender(prev => prev + 1); // Ensure re-render after camera move
+    // Center camera on focused video
+    canvasStore.centerOn(videoItem.x, videoItem.y);
+    setForceRender(prev => prev + 1);
 
-    videos.forEach(v => {
-      const isFocusedItem = v.id === video.id;
-      Animated.parallel([
-        Animated.spring(v.scale, {
-          toValue: isFocusedItem ? 1.5 : 0, // Other videos minimize
-          friction: 7,
-          tension: 40,
-          useNativeDriver: true
-        }),
-        Animated.spring(v.opacity, { // Other videos fade out
-          toValue: isFocusedItem ? 1 : 0,
-          useNativeDriver: true
-        })
-      ]).start();
+    gridItems.forEach(item => {
+      if (item.videoData) {
+        const isFocusedItem = item.videoData.id === videoItem.id;
+        Animated.parallel([
+          Animated.spring(item.videoData.scale, {
+            toValue: isFocusedItem ? 1.5 : 0,
+            friction: 8,
+            tension: 50,
+            useNativeDriver: true
+          }),
+          Animated.spring(item.videoData.opacity, {
+            toValue: isFocusedItem ? 1 : 0,
+            friction: 8,
+            tension: 50,
+            useNativeDriver: true
+          })
+        ]).start();
+      }
     });
 
     if (Platform.OS === 'web') {
-      if (preserveUrlOnFocus && video.address) {
-        const targetPath = `${EXPLORE_PATH}/${encodeURIComponent(video.address)}`;
-        // Only update if different, though replaceState is idempotent for same state/URL
-        if (window.location.pathname !== targetPath) {
-            window.history.replaceState({}, "", targetPath);
-        }
-      } else {
-        window.history.replaceState({}, "", EXPLORE_PATH);
+      if (videoItem.address) {
+        const targetPath = `${EXPLORE_PATH}/${encodeURIComponent(videoItem.address)}`;
+        window.history.replaceState({}, "", targetPath);
       }
     }
-  }, [videos, focusedVideoId, canvasStore]);
+  }, [gridItems, focusedVideoId, canvasStore]);
+
+  // Initialize canvas and setup interactions
+  useEffect(() => {
+    // Prevent multiple initial loads
+    if (initialLoadCompleteRef.current) {
+      console.log('Initial load already completed, skipping');
+      return;
+    }
+
+    console.log('Initializing Y grid canvas with precalculated points...');
+    canvasStore.initialize(screenWidth, screenHeight);
+    yGridGenerator.reset(); // Ensure generator starts from center
+
+    // Pre-calculate initial grid points
+    const points: GridPoint[] = [];
+    for (let i = 0; i < INITIAL_GRID_POINTS_COUNT; i++) {
+      const pos = yGridGenerator.getNextPosition();
+      points.push({
+        id: `grid-${pos.cellKey}-${i}`,
+        ...pos,
+        isPlaceholder: true,
+        isVisibleOnScreen: false, // Initially false
+      });
+    }
+    initialGridPointsRef.current = points;
+    setGridItems(points);
+    console.log(`Pre-calculated ${points.length} initial grid points. First point: ${points.length > 0 ? JSON.stringify(points[0]) : 'N/A'}`);
+    console.log(`CanvasStore visibleRect on init: ${JSON.stringify(canvasStore.visibleRect)}`);
+
+    // Setup pan responder with interaction control
+    panResponderRef.current = PanResponder.create({
+      onStartShouldSetPanResponder: () => canInteract,
+      onMoveShouldSetPanResponder: (_, gestureState) => {
+        if (!canInteract) return false;
+        const { dx, dy } = gestureState;
+        return Math.abs(dx) > 5 || Math.abs(dy) > 5;
+      },
+      onPanResponderGrant: (evt) => {
+        if (!canInteract) return;
+        console.log('User started panning - enabling interaction');
+        isUserInteractingRef.current = true;
+        lastTouchRef.current = {
+          x: evt.nativeEvent.pageX,
+          y: evt.nativeEvent.pageY
+        };
+
+        if (Platform.OS === 'web') {
+          document.body.style.cursor = 'grabbing';
+        }
+        inertiaActiveRef.current = false; // Stop any ongoing inertia
+      },
+      onPanResponderMove: (evt, gestureState) => {
+        if (!canInteract) return;
+        const { pageX, pageY } = evt.nativeEvent;
+        const dx = pageX - lastTouchRef.current.x;
+        const dy = pageY - lastTouchRef.current.y;
+
+        // Update velocity for inertia calculation
+        velocityRef.current = { x: gestureState.vx, y: gestureState.vy };
+
+        // Inverted deltas for natural dragging experience
+        canvasStore.moveCamera(dx, dy);
+        lastTouchRef.current = { x: pageX, y: pageY };
+
+        // Only trigger rerender if camera moved significantly
+        if (canvasStore.hasMovedSinceLastRender()) {
+          canvasStore.updateLastRenderPosition();
+          setForceRender(prev => prev + 1);
+        }
+      },
+      onPanResponderRelease: (_, gestureState) => {
+        console.log('User released pan - checking for more videos');
+        if (Platform.OS === 'web') {
+          document.body.style.cursor = 'grab';
+        }
+
+        // Start inertia if velocity is significant
+        const { vx, vy } = gestureState;
+        const speed = Math.sqrt(vx * vx + vy * vy);
+        const decelerationFactor = 0.95; // Adjust for desired slowdown speed
+
+        if (speed > 0.1 && canInteract) { // Check canInteract again
+          inertiaActiveRef.current = true;
+          velocityRef.current = { x: vx * 20, y: vy * 20 }; // Multiply for noticeable effect
+
+          // Start the inertia animation loop within the main render loop
+          // The main render loop will now handle decaying velocity
+          canvasStore.shouldRender = true; // Ensure render loop runs
+        } else {
+          inertiaActiveRef.current = false;
+        }
+
+        // Check for more videos after panning
+        setTimeout(() => {
+          checkLoadMoreVideos();
+          // Mark user as not actively interacting after delay
+          setTimeout(() => {
+            console.log('Setting interaction to false');
+            isUserInteractingRef.current = false;
+          }, 1000);
+        }, 100);
+      },
+      onPanResponderTerminate: () => {
+        console.log('Pan responder terminated');
+        isUserInteractingRef.current = false;
+        if (Platform.OS === 'web') {
+          document.body.style.cursor = 'grab';
+        }
+      }
+    });
+
+    // Setup optimized render loop
+    const startRenderLoop = () => {
+      const frame = () => {
+        let movedByInertia = false;
+        if (inertiaActiveRef.current && canInteract) {
+          const decay = 0.95;
+          velocityRef.current.x *= decay;
+          velocityRef.current.y *= decay;
+
+          if (Math.abs(velocityRef.current.x) < 0.1 && Math.abs(velocityRef.current.y) < 0.1) {
+            inertiaActiveRef.current = false;
+          } else {
+            canvasStore.moveCamera(velocityRef.current.x, velocityRef.current.y);
+            movedByInertia = true;
+          }
+        }
+
+        let visibilityChangedThisFrame = false;
+        setGridItems(currentGridItems => {
+          let changed = false;
+          const updatedItems = currentGridItems.map(item => {
+            const currentlyVisible = canvasStore.isVisible(item.x, item.y, ITEM_SIZE);
+            if (item.isVisibleOnScreen !== currentlyVisible) {
+              changed = true;
+              return { ...item, isVisibleOnScreen: currentlyVisible };
+            }
+            return item;
+          });
+
+          if (changed) {
+            visibilityChangedThisFrame = true;
+            return updatedItems;
+          }
+          return currentGridItems;
+        });
+
+        // Determine if a visual re-render is needed
+        const cameraMovedSignificantly = canvasStore.hasMovedSinceLastRender();
+        const explicitRenderRequest = canvasStore.shouldRender;
+
+        if (movedByInertia || explicitRenderRequest || (visibilityChangedThisFrame && !cameraMovedSignificantly)) {
+          // ^ If visibility changed but camera didn't move significantly beyond its last render pos,
+          // setGridItems handles re-render. But if camera also moved, or explicit request, force it.
+          // The condition `(visibilityChangedThisFrame && !cameraMovedSignificantly)` ensures that if visibility changes
+          // and the camera *hasn't* moved since last render, we still consider updating last render position
+          // if this visibility change warrants a new visual state that should be considered "rendered".
+          // However, setGridItems should trigger a render on its own for visibility changes.
+          // Let's simplify: if camera moved or was asked to render, then update and forceRender.
+          // Visibility changes triggering setGridItems will cause their own render pass.
+          if (cameraMovedSignificantly || explicitRenderRequest) {
+             canvasStore.updateLastRenderPosition();
+             setForceRender(prev => prev + 1);
+             canvasStore.shouldRender = false;
+          } else if (movedByInertia) {
+            // Inertia moved the camera, but maybe not beyond hasMovedSinceLastRender() threshold yet
+            // still, visually it has changed, so update render position and force a render.
+            canvasStore.updateLastRenderPosition();
+            setForceRender(prev => prev + 1);
+          }
+        }
+
+        rafRef.current = requestAnimationFrame(frame);
+      };
+      rafRef.current = requestAnimationFrame(frame);
+    };
+
+    startRenderLoop();
+
+    // Load initial videos for currently visible grid points
+    console.log('Loading initial videos for visible grid points');
+    lastLoadTimeRef.current = Date.now();
+    isUserInteractingRef.current = true; // Simulate interaction for initial load trigger
+
+    // Determine initially visible points and load them
+    console.log('Determining initially visible points...');
+    const initiallyVisiblePoints = points.filter(p => {
+      const isVis = canvasStore.isVisible(p.x, p.y, ITEM_SIZE);
+      // console.log(`Point ${p.id} at (${p.x}, ${p.y}) - visible: ${isVis}`); // Optional: very verbose
+      return isVis;
+    });
+    console.log(`Found ${initiallyVisiblePoints.length} initially visible grid points.`);
+
+    if (initiallyVisiblePoints.length > 0) {
+        loadVideos(initiallyVisiblePoints.slice(0, LOAD_BATCH_SIZE * 2)).then(() => {
+            initialLoadCompleteRef.current = true; // Mark initial setup as complete
+            markAreaAsExplored();
+            console.log('Initial video data load for visible points complete');
+            setTimeout(() => { isUserInteractingRef.current = false; }, 500);
+        });
+    } else {
+        // If no points are initially visible (e.g. grid starts far off), still mark complete
+        initialLoadCompleteRef.current = true;
+        markAreaAsExplored();
+        console.log('No grid points initially visible, initial setup complete.');
+        setTimeout(() => { isUserInteractingRef.current = false; }, 500);
+    }
+
+    if (Platform.OS === 'web') {
+      document.body.style.cursor = 'grab';
+    }
+
+    return () => {
+      if (rafRef.current) {
+        cancelAnimationFrame(rafRef.current);
+      }
+      if (Platform.OS === 'web') {
+        document.body.style.cursor = '';
+      }
+    };
+  }, []); // Empty dependency array to run only once
 
   // Handle initial address focus
   useEffect(() => {
-    if (initialAddress && videos.length > 0 && !focusedVideoId) {
-      const videoToFocus = videos.find(v => v.address === initialAddress);
-      if (videoToFocus) {
-        handleVideoFocus(videoToFocus, { preserveUrl: true });
+    if (addressFromUrl && gridItems.length > 0 && !focusedVideoId) {
+      const itemToFocus = gridItems.find(item => item.videoData?.address === addressFromUrl);
+      if (itemToFocus && itemToFocus.videoData) {
+        handleVideoFocus(itemToFocus.videoData, { preserveUrl: true });
       }
     }
-  }, [initialAddress, videos, focusedVideoId, handleVideoFocus]);
+  }, [addressFromUrl, gridItems, focusedVideoId, handleVideoFocus]);
+
+  // Handle direct URL navigation - load specific video info
+  useEffect(() => {
+    if (addressFromUrl && initialLoadCompleteRef.current) {
+      const loadSpecificVideo = async () => {
+        // Check if the video is already in the grid
+        const existingItem = gridItems.find(item => item.videoData?.address === addressFromUrl);
+        if (existingItem && existingItem.videoData) {
+          handleVideoFocus(existingItem.videoData, { preserveUrl: true });
+          return;
+        }
+
+        // Load the specific video info from API
+        try {
+          const videoInfo = await ApiService.getVideoInfo(addressFromUrl);
+          if (videoInfo) {
+            // Find an empty grid slot to place this video
+            const emptySlot = gridItems.find(item => item.isPlaceholder);
+            if (emptySlot) {
+              const newVideoItem = createVideoItem(videoInfo, emptySlot);
+
+              // Update the grid with the new video
+              setGridItems(prevItems =>
+                prevItems.map(item =>
+                  item.id === emptySlot.id
+                    ? { ...emptySlot, videoData: newVideoItem, isPlaceholder: false }
+                    : item
+                )
+              );
+
+              // Animate the video appearing
+              Animated.parallel([
+                Animated.spring(newVideoItem.scale, {
+                  toValue: 1,
+                  friction: 8,
+                  tension: 50,
+                  useNativeDriver: true
+                }),
+                Animated.timing(newVideoItem.opacity, {
+                  toValue: 1,
+                  duration: ANIMATION_DURATION,
+                  useNativeDriver: true
+                })
+              ]).start(() => {
+                // Focus on the video after it's loaded
+                handleVideoFocus(newVideoItem, { preserveUrl: true });
+              });
+            }
+          }
+        } catch (error) {
+          console.error("Error loading specific video:", error);
+        }
+      };
+
+      loadSpecificVideo();
+    }
+  }, [addressFromUrl, gridItems, initialLoadCompleteRef.current, handleVideoFocus, createVideoItem]);
 
   // Handle app focus/unfocus animations
   useEffect(() => {
     if (isFocused) {
-      // Animate videos appearing
-      videos.forEach(video => {
-        Animated.parallel([
-          Animated.spring(video.scale, {
-            toValue: focusedVideoId === video.id ? 1.5 : 1,
-            friction: 7,
-            tension: 40,
-            useNativeDriver: true
-          }),
-          Animated.timing(video.opacity, {
-            toValue: 1,
-            duration: ANIMATION_DURATION,
-            useNativeDriver: true
-          })
-        ]).start();
+      gridItems.forEach(item => {
+        if (item.videoData) {
+          Animated.parallel([
+            Animated.spring(item.videoData.scale, {
+              toValue: focusedVideoId === item.videoData.id ? 1.5 : 1,
+              friction: 8,
+              tension: 50,
+              useNativeDriver: true
+            }),
+            Animated.timing(item.videoData.opacity, {
+              toValue: 1,
+              duration: ANIMATION_DURATION,
+              useNativeDriver: true
+            })
+          ]).start();
+        }
       });
     } else {
-      // Animate videos disappearing
-      videos.forEach(video => {
-        Animated.parallel([
-          Animated.timing(video.scale, {
-            toValue: 0,
-            duration: ANIMATION_DURATION / 2,
-            useNativeDriver: true
-          }),
-          Animated.timing(video.opacity, {
-            toValue: 0,
-            duration: ANIMATION_DURATION / 2,
-            useNativeDriver: true
-          })
-        ]).start();
+      gridItems.forEach(item => {
+        if (item.videoData) {
+          Animated.parallel([
+            Animated.timing(item.videoData.scale, {
+              toValue: 0,
+              duration: ANIMATION_DURATION / 2,
+              useNativeDriver: true
+            }),
+            Animated.timing(item.videoData.opacity, {
+              toValue: 0,
+              duration: ANIMATION_DURATION / 2,
+              useNativeDriver: true
+            })
+          ]).start();
+        }
       });
     }
-  }, [isFocused, videos, focusedVideoId]);
+  }, [isFocused, gridItems, focusedVideoId]);
 
-  // Render visible videos
+  // Render visible videos with enhanced Y grid parallax
   const renderVideos = useCallback(() => {
-    return videos.map(video => {
-      // Check if video is visible
-      if (!canvasStore.isVisible(video.x, video.y, video.size)) {
+    const itemsToRender = gridItems.map(item => {
+      const isCurrentlyVisible = item.isVisibleOnScreen;
+      let displaySize = ITEM_SIZE * canvasStore.camera.scale;
+      let videoToRender = item.videoData;
+
+      if (videoToRender) {
+        displaySize = videoToRender.size * canvasStore.camera.scale;
+      }
+
+      if (!isCurrentlyVisible) {
         return null;
       }
 
-      // Get screen coordinates
-      const { x, y } = canvasStore.worldToScreen(video.x, video.y);
+      const { x: screenX, y: screenY } = canvasStore.worldToScreenWithParallax(
+        item.x,
+        item.y,
+        videoToRender ? videoToRender.parallaxFactor : 0.5
+      );
 
-      // Calculate display size based on camera scale
-      const displaySize = video.size * canvasStore.camera.scale;
+      // if (videoToRender) {
+      //   console.log(`Rendering ${videoToRender.id} (grid: ${item.id}) at world (${item.x},${item.y}), screen (${screenX},${screenY}), size ${displaySize}`);
+      // }
 
-      // Apply parallax effect based on camera movement
-      // Videos with higher parallax factor appear closer to the user and move faster
-      const offsetX = canvasStore.camera.x * video.parallaxFactor;
-      const offsetY = canvasStore.camera.y * video.parallaxFactor;
-
-      // Construct thumbnail URL directly from address
-      const thumbnailUrl = `${API_URL}/api/thumbnail/${video.address}`;
+      const thumbnailUrl = videoToRender ? `${API_URL}/api/thumbnail/${videoToRender.address}` : null;
 
       return (
         <Animated.View
-          key={video.id}
+          key={item.id} // Use grid item ID as key
           style={[
             styles.videoItem,
             {
               transform: [
-                { translateX: x + offsetX },
-                { translateY: y + offsetY },
-                { scale: video.scale }
+                { translateX: screenX },
+                { translateY: screenY },
+                // Apply scale from videoData if it exists, otherwise default or placeholder scale
+                { scale: videoToRender ? videoToRender.scale : (isCurrentlyVisible ? 1 : 0) }
               ],
-              opacity: video.opacity,
+              // Apply opacity from videoData if it exists, otherwise default or placeholder opacity
+              opacity: videoToRender ? videoToRender.opacity : (isCurrentlyVisible ? 1 : 0),
               width: displaySize,
               height: displaySize,
               borderRadius: displaySize / 2,
-              zIndex: Math.floor((1 - video.parallaxFactor) * 10),
+              zIndex: Math.floor(100 - item.ring), // Z-index from grid item
+              // backgroundColor: videoToRender ? 'transparent' : 'rgba(50,50,50,0.3)', // Placeholder bg
             }
           ]}
         >
           <TouchableOpacity
-            onPress={() => handleVideoFocus(video)}
+            onPress={() => videoToRender && handleVideoFocus(videoToRender)}
             activeOpacity={0.7}
             style={styles.videoTouchable}
+            disabled={!canInteract || !videoToRender} // Disable if no video or interaction locked
           >
-            <Image
-              source={{ uri: thumbnailUrl }}
-              style={styles.videoThumbnail}
-              resizeMode="cover"
-            />
+            {item.isPlaceholder && isCurrentlyVisible && (
+              <View style={[styles.placeholder, { borderRadius: displaySize / 2 }]} />
+            )}
+            {videoToRender && thumbnailUrl && (
+              <Image
+                source={{ uri: thumbnailUrl }}
+                style={[
+                  styles.videoThumbnail,
+                  {
+                    opacity: videoToRender.loaded ? 1 : 0,
+                    borderRadius: displaySize / 2
+                  }
+                ]}
+                onLoad={() => {
+                  // Update loaded state for the specific videoData within the gridItem
+                  setGridItems(prevItems => prevItems.map(gi =>
+                    gi.id === item.id && gi.videoData
+                      ? { ...gi, videoData: { ...gi.videoData, loaded: true } }
+                      : gi
+                  ));
+                }}
+              />
+            )}
           </TouchableOpacity>
         </Animated.View>
       );
     });
-  }, [videos, canvasStore, handleVideoFocus, forceRender]);
+
+    return itemsToRender.filter(Boolean); // Filter out nulls
+
+  }, [gridItems, canvasStore, handleVideoFocus, forceRender, canInteract]);
 
   // Render focused video overlay
   const renderFocusedVideoOverlay = useCallback(() => {
@@ -710,19 +1157,22 @@ export default function ExploreScreen({
       ? `${focusedVideo.numericStats.minted} minted`
       : "Minted N/A";
 
-    // Construct video source URL directly from address
     const videoSource = `${API_URL}/api/video/${focusedVideo.address}`;
 
     return (
       <View style={styles.focusedVideoOuterContainer}>
-        <View style={{marginBottom: 20}}>
-          <Button title="Hide" onPress={() => setFocusedVideoId(null)} style={{width: 120}} />
+        <View style={{ marginBottom: 20 }}>
+          <Button
+            title="Hide"
+            onPress={() => handleVideoFocus(focusedVideo)}
+            style={{ width: 120 }}
+          />
         </View>
 
         <View style={styles.focusedVideoContainer}>
           <TouchableOpacity
             style={styles.closeButton}
-            onPress={() => setFocusedVideoId(null)}
+            onPress={() => handleVideoFocus(focusedVideo)}
           >
             <Text style={styles.closeButtonText}>✕</Text>
           </TouchableOpacity>
@@ -730,7 +1180,8 @@ export default function ExploreScreen({
           <View style={styles.videoPlayerContainer}>
             <VideoNote
               videoSource={videoSource}
-              playing={true}
+              scale={1}
+              transparent
             />
           </View>
         </View>
@@ -746,71 +1197,73 @@ export default function ExploreScreen({
             <Text style={styles.statText}>{mintedText}</Text>
           </Inbound>
         </View>
-
-        <GloriousButton
-          style={styles.mintButtonContainer}
-          onPress={() => console.log("Mint pressed")}
-          title="Mint"
-        />
       </View>
     );
-  }, [focusedVideo]);
+  }, [focusedVideo, handleVideoFocus]);
 
-  // Screen for events
+  // Screen props with interaction control
   const screenProps = {
-    ...panResponderRef.current?.panHandlers,
-    onWheel: handleWheel,
+    ...(canInteract ? panResponderRef.current?.panHandlers : {}),
     style: styles.container,
   };
 
   return (
-    <View style={{...StyleSheet.absoluteFillObject}}>
-      {!isWalletConnected ? (
+    <View style={{ ...StyleSheet.absoluteFillObject }}>
+      {!isWalletConnected && (
         <GloriousButton
           style={styles.gloriousButton}
-            onPress={openWalletConnect}
-            title="Connect Wallet"
-          />
-        ) : (
-          <GloriousButton
-            style={styles.gloriousButton}
-            onPress={() => console.log("Mint pressed")}
-            title="Mint"
-          />
-        )}
+          onPress={openWalletConnect}
+          title="Connect Wallet"
+        />
+      )}
 
-     <SafeAreaView style={styles.container}>
-      <View {...screenProps}>
-        {/* Render only visible videos */}
-        {renderVideos()}
+      <SafeAreaView style={styles.container}>
+        <View {...screenProps}>
+          {renderVideos()}
+          {focusedVideoId && renderFocusedVideoOverlay()}
 
-        {/* Focused video overlay */}
-        {focusedVideoId && renderFocusedVideoOverlay()}
+          {gridItems.filter(item => !item.isPlaceholder).length === 0 && !apiExhausted && (
+            <View style={styles.noVideosContainer}>
+              <Text style={styles.noVideosText}>Loading videos...</Text>
+            </View>
+          )}
 
-        {/* Loading state */}
-        {videos.length === 0 && !allVideosLoaded && (
-          <View style={styles.noVideosContainer}>
-            <Text style={styles.noVideosText}>Loading videos...</Text>
-          </View>
-        )}
-
-        {/* No videos state */}
-        {videos.length === 0 && allVideosLoaded && (
-          <View style={styles.noVideosContainer}>
-            <Text style={styles.noVideosText}>No videos available</Text>
-            <Button
-              title="Retry"
-              onPress={() => {
-                setAllVideosLoaded(false);
-                processedAddressesRef.current.clear();
-                occupiedAreasRef.current.clear();
-                loadVideos();
-              }}
-            />
-          </View>
-        )}
-      </View>
-    </SafeAreaView>
+          {gridItems.filter(item => !item.isPlaceholder).length === 0 && apiExhausted && (
+            <View style={styles.noVideosContainer}>
+              <Text style={styles.noVideosText}>No videos available</Text>
+              <Button
+                title="Retry"
+                onPress={() => {
+                  setApiExhausted(false);
+                  processedAddressesRef.current.clear();
+                  occupiedCellsRef.current.clear();
+                  apiVideosRef.current = [];
+                  currentOffsetRef.current = 0;
+                  nextGridPositionRef.current = { ring: 0, position: 0 };
+                  dynamicThresholdRef.current = MIN_VISIBLE_VIDEOS_THRESHOLD;
+                  exploredAreasRef.current.clear();
+                  yGridGenerator.reset();
+                  // Re-initialize grid points on retry
+                  const points: GridPoint[] = [];
+                  for (let i = 0; i < INITIAL_GRID_POINTS_COUNT; i++) {
+                    const pos = yGridGenerator.getNextPosition();
+                    points.push({
+                      id: `grid-${pos.cellKey}-${i}`,
+                      ...pos,
+                      isPlaceholder: true,
+                      isVisibleOnScreen: false,
+                    });
+                  }
+                  initialGridPointsRef.current = points;
+                  setGridItems(points);
+                  initialLoadCompleteRef.current = false; // Allow initial load logic to run again
+                  loadVideos(points.filter(p => canvasStore.isVisible(p.x, p.y, ITEM_SIZE)).slice(0, LOAD_BATCH_SIZE*2));
+                }}
+              />
+            </View>
+          )}
+        </View>
+      </SafeAreaView>
     </View>
   );
 }
@@ -823,11 +1276,14 @@ const styles = StyleSheet.create({
   videoItem: {
     position: "absolute",
     overflow: "hidden",
-    backgroundColor: "#333",
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   videoTouchable: {
     width: "100%",
     height: "100%",
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   videoThumbnail: {
     width: "100%",
@@ -895,12 +1351,6 @@ const styles = StyleSheet.create({
     fontWeight: "600",
     textAlign: "center",
   },
-  mintButtonContainer: {
-    marginTop: 20,
-    width: 120,
-    alignItems: "center",
-    zIndex: 100,
-  },
   noVideosContainer: {
     flex: 1,
     justifyContent: "center",
@@ -926,5 +1376,11 @@ const styles = StyleSheet.create({
     left: "50%",
     transform: [{ translateX: "-50%" }],
     alignSelf: "center",
+  },
+  placeholder: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(100, 100, 100, 0.3)',
+    justifyContent: 'center',
+    alignItems: 'center',
   },
 });

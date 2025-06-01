@@ -10,13 +10,15 @@ import {
   TextStyle,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
-import { Inbound } from "../components";
+import { Inbound, Frame } from "../components";
 
 type FieldProps = TextInputProps & {
   placeholder?: string;
   secureTextEntry?: boolean;
   style?: StyleProp<ViewStyle>;
   inputStyle?: StyleProp<TextStyle>;
+  disabled?: boolean;
+  variant?: "inbound" | "frame";
 };
 
 export const Field: React.FC<FieldProps> = ({
@@ -25,6 +27,8 @@ export const Field: React.FC<FieldProps> = ({
   style,
   inputStyle,
   children,
+  disabled = false,
+  variant = "inbound",
   ...props
 }) => {
   const [isPasswordVisible, setIsPasswordVisible] = useState(false);
@@ -38,8 +42,10 @@ export const Field: React.FC<FieldProps> = ({
 
   const finalInputStyle = [styles.input, inputStyle];
 
+  const Container = variant === "inbound" ? Inbound : Frame;
+
   return (
-    <Inbound style={containerStyle}>
+    <Container style={containerStyle}>
       <TextInput
         style={finalInputStyle}
         placeholder={placeholder}
@@ -47,6 +53,7 @@ export const Field: React.FC<FieldProps> = ({
         secureTextEntry={secureTextEntry && !isPasswordVisible}
         onFocus={() => setIsFocused(true)}
         onBlur={() => setIsFocused(false)}
+        editable={!disabled}
         {...props}
       />
       {secureTextEntry && (
@@ -63,7 +70,7 @@ export const Field: React.FC<FieldProps> = ({
         </TouchableOpacity>
       )}
       <View style={styles.childrenContainer}>{children}</View>
-    </Inbound>
+    </Container>
   );
 };
 
@@ -85,7 +92,7 @@ const styles = StyleSheet.create({
     paddingVertical: 10,
   },
   placeholderText: {
-    color: "rgba(255, 255, 255, 0.23)",
+    color: "rgba(255, 255, 255, 0.6)",
   },
   iconStyle: {
     color: "rgba(235, 235, 245, 0.6)",

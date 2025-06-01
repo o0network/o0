@@ -16,18 +16,21 @@ export const GloriousButton = ({
   onPress,
   style,
   textStyle,
+  disabled,
 }: {
   title: string;
   iconPath?: ImageSourcePropType;
   onPress?: () => void;
   style?: StyleProp<ViewStyle>;
   textStyle?: StyleProp<TextStyle>;
+  disabled?: boolean;
 }) => {
   return (
     <TouchableOpacity
-      style={[styles.touchable, style]}
+      style={[styles.touchable, style, disabled && styles.disabledButton]}
       onPress={onPress}
       activeOpacity={0.8}
+      disabled={disabled}
     >
       <View style={styles.buttonLayout}>
         <View style={styles.capLeft}>
@@ -69,6 +72,9 @@ const styles = StyleSheet.create({
   touchable: {
     height: PILL_HEIGHT,
     width: "100%",
+  },
+  disabledButton: {
+    opacity: 0.5,
   },
   buttonLayout: {
     flexDirection: "row",

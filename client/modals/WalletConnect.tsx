@@ -49,6 +49,11 @@ export default function WalletConnectModal({
 
   return (
     <Outbound style={styles.container}>
+      {!isBottomSheet && onClose && (
+        <TouchableOpacity style={styles.closeButton} onPress={onClose}>
+          <Text style={styles.closeButtonText}>×</Text>
+        </TouchableOpacity>
+      )}
       {isBottomSheet && <View style={styles.grabber} />}
       <ScrollViewComponent
         style={styles.content}
@@ -108,11 +113,21 @@ const styles = StyleSheet.create({
     marginTop: 10,
   },
   closeButton: {
-    padding: 8,
+    position: "absolute",
+    top: 16,
+    right: 16,
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: "rgba(255, 255, 255, 0.1)",
+    justifyContent: "center",
+    alignItems: "center",
+    zIndex: 10,
   },
   closeButtonText: {
-    fontSize: 18,
+    fontSize: 20,
     color: "#FFFFFF",
+    fontWeight: "bold",
   },
   content: {
     flex: 1,

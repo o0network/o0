@@ -139,22 +139,43 @@ const ScreenContext = createContext<ScreenContextType>({
 });
 
 export const ScreenProvider = ({ children }: { children: ReactNode }) => {
-  const [isLargeScreen, setIsLargeScreen] = useState(
-    Dimensions.get("window").width >= 600
-  );
+  const [isLargeScreen, setIsLargeScreen] = useState(() => {
+    if (typeof window !== "undefined") {
+      // For web, use window.innerWidth
+      return window.innerWidth >= 600;
+    }
+    // For native, use Dimensions
+    return Dimensions.get("window").width >= 600;
+  });
 
   useEffect(() => {
-    const onChange = ({
-      window,
-    }: {
-      window: { width: number; height: number };
-    }) => {
-      setIsLargeScreen(window.width >= 600);
-    };
+    if (typeof window !== "undefined") {
+      // Web platform - use window resize event
+      const handleResize = () => {
+        const newIsLargeScreen = window.innerWidth >= 600;
+        setIsLargeScreen(newIsLargeScreen);
+      };
 
-    const subscription = Dimensions.addEventListener("change", onChange);
+      window.addEventListener("resize", handleResize);
 
-    return () => subscription?.remove();
+      // Call once to set initial value
+      handleResize();
+
+      return () => window.removeEventListener("resize", handleResize);
+    } else {
+      // Native platform - use Dimensions change event
+      const onChange = ({
+        window,
+      }: {
+        window: { width: number; height: number };
+      }) => {
+        const newIsLargeScreen = window.width >= 600;
+        setIsLargeScreen(newIsLargeScreen);
+      };
+
+      const subscription = Dimensions.addEventListener("change", onChange);
+      return () => subscription?.remove();
+    }
   }, []);
 
   return (
