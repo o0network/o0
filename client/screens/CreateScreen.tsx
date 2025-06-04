@@ -16,7 +16,6 @@ import { useModal } from "../contexts/ModalContext";
 import { useAuth } from "../contexts/AuthContext";
 import { usePlatform } from "../contexts/ScreenContext";
 import ApiService from "../data/api";
-import { retrieveLaunchParams } from "@telegram-apps/sdk";
 import Svg, { Circle } from "react-native-svg";
 import { useIsFocused } from '@react-navigation/native';
 import { Easing } from "react-native";
@@ -500,6 +499,7 @@ export default function CreateScreen() {
     }
     if (mode === "camera" || mode === "recording") {
       if (isWeb) {
+        const isTelegram = window.Telegram?.WebApp?.initData;
         return (
           <video
             ref={videoRef}
@@ -507,7 +507,7 @@ export default function CreateScreen() {
               width: "100%",
               height: "100%",
               objectFit: "cover",
-              transform: facing === "front" ? "scaleX(-1)" : "none",
+              transform: (isTelegram && facing === "back") ? "none" : "scaleX(-1)",
             }}
             autoPlay
             muted
@@ -537,7 +537,6 @@ export default function CreateScreen() {
         <View style={{
           width: "100%",
           height: "100%",
-          transform: [{ scaleX: facing === "front" ? -1 : 1 }]
         }}>
           <VideoNote
             videoSource={recordedVideo}

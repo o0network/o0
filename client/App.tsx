@@ -36,7 +36,6 @@ import {
 import { ModalContext } from "./contexts/ModalContext";
 import { AuthProvider } from "./contexts/AuthContext";
 import SettingsScreen from "./screens/SettingsScreen";
-import WalletConnectModal from "./modals/WalletConnect";
 import ExploreScreen from "./screens/ExploreScreen";
 import CreateScreen from "./screens/CreateScreen";
 import LedgerScreen from "./screens/LedgerScreen";
@@ -499,9 +498,8 @@ const AppContent = () => {
                 isVisible={isWalletConnectVisible}
                 onBackdropPress={handleCloseWalletConnect}
               >
-                <WalletConnectModal
-                  onClose={handleCloseWalletConnect}
-                />
+                <View style={{ flex: 1, backgroundColor: "red" }}>
+                </View>
               </BlurModalWrapper>
             ) : (
               <BottomSheetModal
@@ -518,10 +516,8 @@ const AppContent = () => {
                 android_keyboardInputMode="adjustResize"
                 keyboardBehavior="extend"
               >
-                <WalletConnectModal
-                  onClose={handleCloseWalletConnect}
-                  isBottomSheet={true}
-                />
+                <View style={{ flex: 1, backgroundColor: "red" }}>
+                </View>
               </BottomSheetModal>
             )}
           </AuthProvider>

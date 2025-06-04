@@ -170,8 +170,15 @@ export default function VideoNote({
   // Play/pause side effect
   useEffect(() => {
     if (!player) return;
-    if (isPlaying) player.play();
-    else player.pause();
+    if (isPlaying) {
+      try {
+        player.play();
+      } catch (err) {
+        console.error('[VideoNote] Play failed:', err, { videoSource });
+      }
+    } else {
+      player.pause();
+    }
   }, [player, isPlaying]);
 
   // Initialize stroke offset based on initial progress

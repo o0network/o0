@@ -55,10 +55,36 @@ await fastify.register(import("@fastify/cors"), {
   origin: "*",
 });
 
+// Add global hook to ensure CORS headers for video files
+fastify.addHook('onSend', async (request, reply, payload) => {
+  // Add CORS headers specifically for video files
+  if (request.url.startsWith('/api/video/')) {
+    reply.header("Access-Control-Allow-Origin", "*");
+    reply.header("Access-Control-Allow-Methods", "GET, HEAD, OPTIONS");
+    reply.header("Access-Control-Allow-Headers", "Range");
+    reply.header("Access-Control-Expose-Headers", "Content-Range, Content-Length, Accept-Ranges");
+    reply.header("Accept-Ranges", "bytes");
+    if (!reply.getHeader('Content-Type')) {
+      reply.header("Content-Type", "video/mp4");
+    }
+  }
+  return payload;
+});
+
+// Re-enable static file plugin - the onSend hook will add CORS headers
 await fastify.register(import("@fastify/static"), {
   root: videosDir,
   prefix: "/api/video/",
   decorateReply: false,
+});
+
+// Global OPTIONS handler for CORS preflight
+fastify.options('/api/video/*', async (request, reply) => {
+  reply.header("Access-Control-Allow-Origin", "*");
+  reply.header("Access-Control-Allow-Methods", "GET, HEAD, OPTIONS");
+  reply.header("Access-Control-Allow-Headers", "Range");
+  reply.header("Access-Control-Max-Age", "86400");
+  return reply.code(200).send();
 });
 
 function createVideoNoteFromFile(filename) {
@@ -361,6 +387,15 @@ fastify.get(
   }
 );
 
+// Add OPTIONS handler for CORS preflight requests
+fastify.options("/api/video/:addr", async (request, reply) => {
+  reply.header("Access-Control-Allow-Origin", "*");
+  reply.header("Access-Control-Allow-Methods", "GET, HEAD, OPTIONS");
+  reply.header("Access-Control-Allow-Headers", "Range");
+  reply.header("Access-Control-Max-Age", "86400");
+  return reply.code(200).send();
+});
+
 fastify.get(
   "/api/video/:addr",
   {
@@ -388,7 +423,15 @@ fastify.get(
         fastify.log.error(`Video not found: ${videoPath}`);
         return reply.code(404).send({ error: "Video not found" });
       }
+
+      // Add CORS headers for media content
+      reply.header("Access-Control-Allow-Origin", "*");
+      reply.header("Access-Control-Allow-Methods", "GET, HEAD, OPTIONS");
+      reply.header("Access-Control-Allow-Headers", "Range");
+      reply.header("Access-Control-Expose-Headers", "Content-Range, Content-Length, Accept-Ranges");
       reply.header("Content-Type", "video/mp4");
+      reply.header("Accept-Ranges", "bytes");
+
       try {
         return reply.sendFile(`${addr}.mp4`, videosDir);
       } catch (sendFileErr) {
